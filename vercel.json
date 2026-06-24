@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "buildCommand": "npm run db:generate && npm run build:client",
+  "buildCommand": "npm run build:client",
   "outputDirectory": "client/dist",
   "installCommand": "npm install",
   "functions": {
