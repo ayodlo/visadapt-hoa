@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { CommunityDocument, DocumentCategory, fullName } from '../types';
 import { Pagination } from '../components/Pagination';
 
+const API_BASE = import.meta.env.VITE_API_URL ?? '';
 const TOKEN_KEY = 'chq_token';
 
 interface DocumentsResponse {
@@ -62,7 +63,7 @@ function UploadForm({ onDone }: { onDone: () => void }) {
       fd.append('name', name || file.name);
       fd.append('category', category);
       const token = localStorage.getItem(TOKEN_KEY);
-      const res = await fetch(`/api/documents`, {
+      const res = await fetch(`${API_BASE}/api/documents`, {
         method: 'POST',
         headers: token ? { Authorization: `Bearer ${token}` } : {},
         body: fd,
@@ -152,7 +153,7 @@ function UploadForm({ onDone }: { onDone: () => void }) {
 
 async function downloadFile(doc: CommunityDocument) {
   const token = localStorage.getItem(TOKEN_KEY);
-  const res = await fetch(`/api/documents/${doc.id}/download`, {
+  const res = await fetch(`${API_BASE}/api/documents/${doc.id}/download`, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
   const { url } = await res.json();
