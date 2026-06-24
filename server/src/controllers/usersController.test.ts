@@ -25,7 +25,7 @@ function makeNext(): NextFunction {
   return vi.fn() as unknown as NextFunction;
 }
 
-const fakeUser = { id: 'u1', name: 'Alice', email: 'alice@example.com', role: 'RESIDENT', createdAt: new Date() };
+const fakeUser = { id: 'u1', firstName: 'Alice', lastName: 'Smith', email: 'alice@example.com', role: 'RESIDENT', createdAt: new Date() };
 
 beforeEach(() => vi.clearAllMocks());
 

@@ -3,7 +3,7 @@ import { prisma } from '../utils/prisma';
 import { createAnnouncementSchema } from '../schemas/announcement';
 import { paginate, paginationMeta } from '../utils/paginate';
 
-const authorSelect = { id: true, name: true, role: true } as const;
+const authorSelect = { id: true, firstName: true, lastName: true, role: true } as const;
 
 export async function listAnnouncements(req: Request, res: Response, next: NextFunction) {
   try {

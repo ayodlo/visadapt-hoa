@@ -1,14 +1,14 @@
 import { Outlet, Link, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { dashboardPath, fullName } from '../types';
 
-const NAV = [
-  { to: '/', label: 'Dashboard', end: true },
-  { to: '/announcements', label: 'Announcements' },
-  { to: '/documents', label: 'Documents' },
-  { to: '/maintenance', label: 'Maintenance' },
-  { to: '/dues', label: 'Dues' },
-  { to: '/events', label: 'Events' },
-  { to: '/polls', label: 'Polls' },
+const SHARED_NAV = [
+  { to: 'announcements', label: 'Announcements' },
+  { to: 'documents', label: 'Documents' },
+  { to: 'maintenance', label: 'Maintenance' },
+  { to: 'dues', label: 'Dues' },
+  { to: 'events', label: 'Events' },
+  { to: 'polls', label: 'Polls' },
 ];
 
 const navClass = ({ isActive }: { isActive: boolean }) =>
@@ -31,18 +31,24 @@ export function AppLayout() {
     navigate('/login', { replace: true });
   }
 
+  const dashHome = user ? dashboardPath(user.role) : '/login';
+
   return (
     <div className="flex min-h-screen bg-gray-50">
       <aside className="fixed inset-y-0 left-0 w-56 bg-white border-r border-gray-200 flex flex-col">
         <div className="px-5 h-16 flex items-center border-b border-gray-100 shrink-0">
-          <Link to="/" className="text-brand-700 font-bold text-lg tracking-tight">
+          <Link to={dashHome} className="text-brand-700 font-bold text-lg tracking-tight">
             CommunityHQ
           </Link>
         </div>
 
         <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-          {NAV.map(({ to, label, end }) => (
-            <NavLink key={to} to={to} end={end} className={navClass}>
+          <NavLink to={dashHome} end className={navClass}>
+            Dashboard
+          </NavLink>
+
+          {SHARED_NAV.map(({ to, label }) => (
+            <NavLink key={to} to={`/${to}`} className={navClass}>
               {label}
             </NavLink>
           ))}
@@ -61,7 +67,9 @@ export function AppLayout() {
 
         <div className="px-4 py-4 border-t border-gray-100 space-y-3 shrink-0">
           <Link to="/profile" className="block group">
-            <p className="text-sm font-medium text-gray-900 truncate group-hover:text-brand-700 transition-colors">{user?.name}</p>
+            <p className="text-sm font-medium text-gray-900 truncate group-hover:text-brand-700 transition-colors">
+              {user ? fullName(user) : ''}
+            </p>
             <p className="text-xs text-gray-400 truncate">{user?.email}</p>
             <p className="text-xs text-gray-400 mt-0.5">{user && roleLabel(user.role)}</p>
           </Link>

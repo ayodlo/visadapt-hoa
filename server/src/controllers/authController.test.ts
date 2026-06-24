@@ -30,8 +30,9 @@ function makeNext(): NextFunction {
 const fakeUser = {
   id: 'u1',
   email: 'test@example.com',
-  name: 'Test User',
-  password: 'hashed',
+  firstName: 'Test',
+  lastName: 'User',
+  passwordHash: 'hashed',
   role: 'RESIDENT',
   createdAt: new Date(),
   updatedAt: new Date(),
@@ -49,7 +50,9 @@ describe('register', () => {
     vi.mocked(bcrypt.hash).mockResolvedValue('hashed' as never);
     vi.mocked(prisma.user.create).mockResolvedValue(fakeUser as never);
 
-    const req = { body: { email: 'test@example.com', name: 'Test User', password: 'password123' } } as Request;
+    const req = {
+      body: { firstName: 'Test', lastName: 'User', email: 'test@example.com', password: 'password123' },
+    } as Request;
     const res = makeRes();
     const next = makeNext();
 
@@ -64,7 +67,9 @@ describe('register', () => {
   it('returns 409 when email already exists', async () => {
     vi.mocked(prisma.user.findUnique).mockResolvedValue(fakeUser as never);
 
-    const req = { body: { email: 'test@example.com', name: 'Test', password: 'password123' } } as Request;
+    const req = {
+      body: { firstName: 'Test', lastName: 'User', email: 'test@example.com', password: 'password123' },
+    } as Request;
     const next = makeNext();
 
     await register(req, makeRes(), next);

@@ -6,7 +6,7 @@ import { prisma } from '../utils/prisma';
 import { AppError } from '../middleware/errorHandler';
 import { paginate, paginationMeta } from '../utils/paginate';
 
-const uploadedBySelect = { id: true, name: true } as const;
+const uploadedBySelect = { id: true, firstName: true, lastName: true } as const;
 
 export async function listDocuments(req: Request, res: Response, next: NextFunction) {
   try {

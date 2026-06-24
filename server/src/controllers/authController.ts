@@ -13,8 +13,24 @@ function signToken(userId: string, role: string) {
   );
 }
 
-function safeUser(user: { id: string; email: string; name: string; role: string; createdAt: Date; updatedAt: Date }) {
-  return { id: user.id, email: user.email, name: user.name, role: user.role, createdAt: user.createdAt, updatedAt: user.updatedAt };
+function safeUser(user: {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  role: string;
+  createdAt: Date;
+  updatedAt: Date;
+}) {
+  return {
+    id: user.id,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    email: user.email,
+    role: user.role,
+    createdAt: user.createdAt,
+    updatedAt: user.updatedAt,
+  };
 }
 
 export async function register(req: Request, res: Response, next: NextFunction) {
@@ -23,9 +39,14 @@ export async function register(req: Request, res: Response, next: NextFunction) 
     const existing = await prisma.user.findUnique({ where: { email: data.email } });
     if (existing) return next(new AppError(409, 'Email already in use'));
 
-    const hashed = await bcrypt.hash(data.password, 12);
+    const passwordHash = await bcrypt.hash(data.password, 12);
     const user = await prisma.user.create({
-      data: { email: data.email, name: data.name, password: hashed },
+      data: {
+        firstName: data.firstName,
+        lastName: data.lastName,
+        email: data.email,
+        passwordHash,
+      },
     });
 
     res.status(201).json({ token: signToken(user.id, user.role), user: safeUser(user) });
@@ -40,7 +61,7 @@ export async function login(req: Request, res: Response, next: NextFunction) {
     const user = await prisma.user.findUnique({ where: { email: data.email } });
     if (!user) return next(new AppError(401, 'Invalid email or password'));
 
-    const match = await bcrypt.compare(data.password, user.password);
+    const match = await bcrypt.compare(data.password, user.passwordHash);
     if (!match) return next(new AppError(401, 'Invalid email or password'));
 
     res.json({ token: signToken(user.id, user.role), user: safeUser(user) });
@@ -61,7 +82,7 @@ export async function me(req: Request, res: Response, next: NextFunction) {
 
 export async function updateProfile(req: Request, res: Response, next: NextFunction) {
   try {
-    const { name, email } = updateProfileSchema.parse(req.body);
+    const { firstName, lastName, email } = updateProfileSchema.parse(req.body);
 
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing && existing.id !== req.userId) {
@@ -70,7 +91,7 @@ export async function updateProfile(req: Request, res: Response, next: NextFunct
 
     const user = await prisma.user.update({
       where: { id: req.userId },
-      data: { name, email },
+      data: { firstName, lastName, email },
     });
     res.json({ user: safeUser(user) });
   } catch (err) {
@@ -85,11 +106,11 @@ export async function changePassword(req: Request, res: Response, next: NextFunc
     const user = await prisma.user.findUnique({ where: { id: req.userId } });
     if (!user) return next(new AppError(404, 'User not found'));
 
-    const match = await bcrypt.compare(currentPassword, user.password);
+    const match = await bcrypt.compare(currentPassword, user.passwordHash);
     if (!match) return next(new AppError(400, 'Current password is incorrect'));
 
-    const hashed = await bcrypt.hash(newPassword, 12);
-    await prisma.user.update({ where: { id: req.userId }, data: { password: hashed } });
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+    await prisma.user.update({ where: { id: req.userId }, data: { passwordHash } });
 
     res.json({ message: 'Password updated' });
   } catch (err) {

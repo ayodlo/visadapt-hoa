@@ -1,4 +1,4 @@
-import { createBrowserRouter } from 'react-router-dom';
+import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { AppLayout } from '@/layouts/AppLayout';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { DashboardPage } from '@/pages/DashboardPage';
@@ -37,8 +37,27 @@ export const router = createBrowserRouter([
         children: [
           {
             index: true,
-            element: <DashboardPage />,
+            element: <Navigate to="/resident/dashboard" replace />,
           },
+
+          // Role-specific dashboards
+          {
+            path: 'resident/dashboard',
+            element: <ProtectedRoute allowedRoles={['RESIDENT']} />,
+            children: [{ index: true, element: <DashboardPage /> }],
+          },
+          {
+            path: 'admin/dashboard',
+            element: <ProtectedRoute allowedRoles={['ADMIN']} />,
+            children: [{ index: true, element: <DashboardPage /> }],
+          },
+          {
+            path: 'board/dashboard',
+            element: <ProtectedRoute allowedRoles={['BOARD_MEMBER']} />,
+            children: [{ index: true, element: <DashboardPage /> }],
+          },
+
+          // Shared routes
           {
             path: 'announcements',
             element: <AnnouncementsPage />,
@@ -49,7 +68,8 @@ export const router = createBrowserRouter([
           },
           {
             path: 'users',
-            element: <UsersPage />,
+            element: <ProtectedRoute allowedRoles={['ADMIN']} />,
+            children: [{ index: true, element: <UsersPage /> }],
           },
           {
             path: 'maintenance',

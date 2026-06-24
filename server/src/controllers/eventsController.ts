@@ -4,7 +4,7 @@ import { createEventSchema } from '../schemas/event';
 import { AppError } from '../middleware/errorHandler';
 import { paginate, paginationMeta } from '../utils/paginate';
 
-const createdBySelect = { id: true, name: true } as const;
+const createdBySelect = { id: true, firstName: true, lastName: true } as const;
 
 export async function listEvents(req: Request, res: Response, next: NextFunction) {
   try {

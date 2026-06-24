@@ -5,7 +5,7 @@ import { createMaintenanceSchema, updateStatusSchema } from '../schemas/maintena
 import { AppError } from '../middleware/errorHandler';
 import { paginate, paginationMeta } from '../utils/paginate';
 
-const submittedBySelect = { id: true, name: true } as const;
+const submittedBySelect = { id: true, firstName: true, lastName: true } as const;
 
 export async function listRequests(req: Request, res: Response, next: NextFunction) {
   try {

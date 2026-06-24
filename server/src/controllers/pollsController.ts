@@ -11,7 +11,7 @@ export async function listPolls(req: Request, res: Response, next: NextFunction)
       prisma.poll.findMany({
         orderBy: { createdAt: 'desc' },
         include: {
-          createdBy: { select: { id: true, name: true } },
+          createdBy: { select: { id: true, firstName: true, lastName: true } },
           options: { include: { _count: { select: { votes: true } } } },
           votes: { where: { userId: req.userId }, select: { optionId: true } },
         },
@@ -46,7 +46,7 @@ export async function createPoll(req: Request, res: Response, next: NextFunction
         options: { create: options.map((text) => ({ text })) },
       },
       include: {
-        createdBy: { select: { id: true, name: true } },
+        createdBy: { select: { id: true, firstName: true, lastName: true } },
         options: { include: { _count: { select: { votes: true } } } },
       },
     });

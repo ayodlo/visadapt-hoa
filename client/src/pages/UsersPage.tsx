@@ -2,12 +2,13 @@ import { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { apiClient } from '../api/client';
 import { useAuth } from '../context/AuthContext';
-import { UserRole } from '../types';
+import { UserRole, fullName } from '../types';
 import { Pagination } from '../components/Pagination';
 
 interface ManagedUser {
   id: string;
-  name: string;
+  firstName: string;
+  lastName: string;
   email: string;
   role: UserRole;
   createdAt: string;
@@ -105,7 +106,7 @@ export function UsersPage() {
                   return (
                     <tr key={u.id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-6 py-4 font-medium text-gray-900">
-                        {u.name}
+                        {fullName(u)}
                         {isSelf && (
                           <span className="ml-2 text-xs text-gray-400">(you)</span>
                         )}

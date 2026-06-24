@@ -30,7 +30,7 @@ export async function getDashboard(req: Request, res: Response, next: NextFuncti
         where: { startAt: { gte: now } },
         orderBy: { startAt: 'asc' },
         take: 3,
-        include: { createdBy: { select: { id: true, name: true } } },
+        include: { createdBy: { select: { id: true, firstName: true, lastName: true } } },
       }),
       prisma.poll.count({
         where: {
@@ -40,7 +40,7 @@ export async function getDashboard(req: Request, res: Response, next: NextFuncti
       prisma.announcement.findMany({
         orderBy: { createdAt: 'desc' },
         take: 4,
-        include: { author: { select: { id: true, name: true, role: true } } },
+        include: { author: { select: { id: true, firstName: true, lastName: true, role: true } } },
       }),
       prisma.duesRecord.aggregate({
         where: {

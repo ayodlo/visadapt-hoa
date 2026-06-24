@@ -8,7 +8,8 @@ import { useAuth } from '../context/AuthContext';
 import { User } from '../types';
 
 const profileSchema = z.object({
-  name: z.string().min(2, 'Name must be at least 2 characters'),
+  firstName: z.string().min(1, 'First name is required'),
+  lastName: z.string().min(1, 'Last name is required'),
   email: z.string().email('Invalid email address'),
 });
 
@@ -51,7 +52,11 @@ export function ProfilePage() {
     setError: setProfileError,
   } = useForm<ProfileForm>({
     resolver: zodResolver(profileSchema),
-    defaultValues: { name: user?.name ?? '', email: user?.email ?? '' },
+    defaultValues: {
+      firstName: user?.firstName ?? '',
+      lastName: user?.lastName ?? '',
+      email: user?.email ?? '',
+    },
   });
 
   const {
@@ -92,7 +97,6 @@ export function ProfilePage() {
     <div className="max-w-lg mx-auto space-y-8">
       <h1 className="text-2xl font-bold text-gray-900">Profile & Settings</h1>
 
-      {/* Profile info */}
       <section className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-5">
         <h2 className="font-semibold text-gray-900">Personal information</h2>
 
@@ -103,9 +107,14 @@ export function ProfilePage() {
         )}
 
         <form onSubmit={handleProfile((d) => saveProfile(d))} className="space-y-4">
-          <Field label="Name" error={profileErrors.name?.message}>
-            <input {...regProfile('name')} className={inputClass} />
-          </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="First name" error={profileErrors.firstName?.message}>
+              <input {...regProfile('firstName')} className={inputClass} autoComplete="given-name" />
+            </Field>
+            <Field label="Last name" error={profileErrors.lastName?.message}>
+              <input {...regProfile('lastName')} className={inputClass} autoComplete="family-name" />
+            </Field>
+          </div>
           <Field label="Email" error={profileErrors.email?.message}>
             <input {...regProfile('email')} type="email" className={inputClass} />
           </Field>
@@ -124,7 +133,6 @@ export function ProfilePage() {
         </form>
       </section>
 
-      {/* Change password */}
       <section className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-5">
         <h2 className="font-semibold text-gray-900">Change password</h2>
 

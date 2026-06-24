@@ -5,7 +5,7 @@ import { createDuesSchema, updateDuesStatusSchema } from '../schemas/dues';
 import { AppError } from '../middleware/errorHandler';
 import { paginate, paginationMeta } from '../utils/paginate';
 
-const userSelect = { id: true, name: true, email: true } as const;
+const userSelect = { id: true, firstName: true, lastName: true, email: true } as const;
 
 export async function listDues(req: Request, res: Response, next: NextFunction) {
   try {

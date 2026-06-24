@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { apiClient } from '../api/client';
-import { User } from '../types';
+import { User, dashboardPath } from '../types';
 
 const loginSchema = z.object({
   email: z.string().email('Enter a valid email'),
@@ -13,6 +13,12 @@ const loginSchema = z.object({
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
+
+const DEMO_ACCOUNTS = [
+  { label: 'Resident', email: 'resident@communityhq.local', password: 'password123' },
+  { label: 'Admin', email: 'admin@communityhq.local', password: 'password123' },
+  { label: 'Board Member', email: 'board@communityhq.local', password: 'password123' },
+] as const;
 
 export function LoginPage() {
   const { login } = useAuth();
@@ -22,6 +28,7 @@ export function LoginPage() {
   const {
     register,
     handleSubmit,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -32,11 +39,16 @@ export function LoginPage() {
     try {
       const res = await apiClient.post<{ token: string; user: User }>('/api/auth/login', data);
       login(res.token, res.user);
-      navigate('/', { replace: true });
+      navigate(dashboardPath(res.user.role), { replace: true });
     } catch (err) {
       setServerError(err instanceof Error ? err.message : 'Login failed');
     }
   };
+
+  function fillDemo(email: string, password: string) {
+    setValue('email', email);
+    setValue('password', password);
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
@@ -46,6 +58,23 @@ export function LoginPage() {
             CommunityHQ
           </Link>
           <h2 className="mt-4 text-2xl font-bold text-gray-900">Sign in to your account</h2>
+        </div>
+
+        {/* Demo account quick-fill */}
+        <div className="space-y-2">
+          <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">Demo accounts</p>
+          <div className="flex gap-2">
+            {DEMO_ACCOUNTS.map(({ label, email, password }) => (
+              <button
+                key={label}
+                type="button"
+                onClick={() => fillDemo(email, password)}
+                className="flex-1 text-xs border border-gray-200 rounded-lg py-2 px-3 text-gray-600 hover:bg-gray-50 hover:border-brand-300 hover:text-brand-700 transition-colors font-medium"
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>

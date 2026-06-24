@@ -2,16 +2,24 @@ export type UserRole = 'ADMIN' | 'BOARD_MEMBER' | 'RESIDENT';
 
 export interface User {
   id: string;
+  firstName: string;
+  lastName: string;
   email: string;
-  name: string;
   role: UserRole;
   createdAt: string;
   updatedAt: string;
 }
 
+export interface UserSummary {
+  id: string;
+  firstName: string;
+  lastName: string;
+}
+
 export interface AnnouncementAuthor {
   id: string;
-  name: string;
+  firstName: string;
+  lastName: string;
   role: UserRole;
 }
 
@@ -33,7 +41,7 @@ export interface MaintenanceRequest {
   description: string;
   status: RequestStatus;
   priority: RequestPriority;
-  submittedBy: { id: string; name: string };
+  submittedBy: UserSummary;
   createdAt: string;
   updatedAt: string;
 }
@@ -45,7 +53,7 @@ export interface CommunityEvent {
   location?: string;
   startAt: string;
   endAt?: string;
-  createdBy: { id: string; name: string };
+  createdBy: UserSummary;
   createdAt: string;
 }
 
@@ -60,7 +68,7 @@ export interface Poll {
   question: string;
   description?: string;
   closesAt?: string;
-  createdBy: { id: string; name: string };
+  createdBy: UserSummary;
   options: PollOption[];
   myVote: string | null;
   totalVotes: number;
@@ -77,7 +85,7 @@ export interface DuesRecord {
   status: DuesStatus;
   paidAt?: string;
   notes?: string;
-  user: { id: string; name: string; email: string };
+  user: { id: string; firstName: string; lastName: string; email: string };
   createdAt: string;
 }
 
@@ -90,10 +98,20 @@ export interface CommunityDocument {
   mimeType: string;
   sizeBytes: number;
   category: DocumentCategory;
-  uploadedBy: { id: string; name: string };
+  uploadedBy: UserSummary;
   createdAt: string;
 }
 
 export interface ApiError {
   error: string;
+}
+
+export function fullName(user: { firstName: string; lastName: string }): string {
+  return `${user.firstName} ${user.lastName}`;
+}
+
+export function dashboardPath(role: UserRole): string {
+  if (role === 'ADMIN') return '/admin/dashboard';
+  if (role === 'BOARD_MEMBER') return '/board/dashboard';
+  return '/resident/dashboard';
 }

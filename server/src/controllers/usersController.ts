@@ -14,12 +14,18 @@ export async function listUsers(req: Request, res: Response, next: NextFunction)
     const { skip, take, page, limit } = paginate(req.query);
     const q = String(req.query.search ?? '').trim();
     const where = q
-      ? { OR: [{ name: { contains: q, mode: 'insensitive' as const } }, { email: { contains: q, mode: 'insensitive' as const } }] }
+      ? {
+          OR: [
+            { firstName: { contains: q, mode: 'insensitive' as const } },
+            { lastName: { contains: q, mode: 'insensitive' as const } },
+            { email: { contains: q, mode: 'insensitive' as const } },
+          ],
+        }
       : undefined;
     const [users, total] = await Promise.all([
       prisma.user.findMany({
         where,
-        select: { id: true, name: true, email: true, role: true, createdAt: true },
+        select: { id: true, firstName: true, lastName: true, email: true, role: true, createdAt: true },
         orderBy: { createdAt: 'asc' },
         skip,
         take,
@@ -47,7 +53,7 @@ export async function updateUserRole(req: Request, res: Response, next: NextFunc
     const updated = await prisma.user.update({
       where: { id },
       data: { role },
-      select: { id: true, name: true, email: true, role: true, createdAt: true },
+      select: { id: true, firstName: true, lastName: true, email: true, role: true, createdAt: true },
     });
 
     res.json({ user: updated });

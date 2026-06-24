@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { apiClient } from '../api/client';
 import { useAuth } from '../context/AuthContext';
-import { Announcement, CommunityEvent } from '../types';
+import { Announcement, CommunityEvent, fullName } from '../types';
 
 interface DashboardData {
   stats: {
@@ -11,8 +11,8 @@ interface DashboardData {
     activePollsCount: number;
     outstandingDuesCents: number;
   };
-  recentAnnouncements: (Announcement & { author: { id: string; name: string; role: string } })[];
-  upcomingEvents: (CommunityEvent & { createdBy: { id: string; name: string } })[];
+  recentAnnouncements: Announcement[];
+  upcomingEvents: CommunityEvent[];
 }
 
 function formatMoney(cents: number) {
@@ -69,7 +69,7 @@ export function DashboardPage() {
     <div className="max-w-4xl mx-auto space-y-8">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">
-          Welcome back, {user?.name?.split(' ')[0]}
+          Welcome back, {user?.firstName}
         </h1>
         <p className="text-sm text-gray-400 mt-1">Here's what's happening in your community.</p>
       </div>
@@ -127,7 +127,7 @@ export function DashboardPage() {
                       <p className="text-sm font-medium text-gray-900 line-clamp-1">{a.title}</p>
                       <p className="text-xs text-gray-500 line-clamp-2">{a.body}</p>
                       <p className="text-xs text-gray-400">
-                        {a.author.name} · {new Date(a.createdAt).toLocaleDateString()}
+                        {fullName(a.author)} · {new Date(a.createdAt).toLocaleDateString()}
                       </p>
                     </div>
                   ))}

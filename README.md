@@ -162,6 +162,40 @@ npm run test:server
 
 ---
 
+## Authentication
+
+### Demo credentials
+
+All demo accounts use the password `password123`.
+
+| Role | Email |
+|------|-------|
+| Resident | `resident@communityhq.local` |
+| Admin | `admin@communityhq.local` |
+| Board Member | `board@communityhq.local` |
+
+Use the **Demo accounts** buttons on the login page to pre-fill credentials.
+
+### How it works
+
+- Passwords are hashed with bcrypt (12 rounds) and stored in the `password_hash` column.
+- On login, the server issues a signed JWT (`JWT_SECRET` from `.env`) with a 7-day expiry.
+- The token is stored in `localStorage` under the key `chq_token` and sent as `Authorization: Bearer <token>` on every API request.
+- The `authenticate` middleware verifies the token on all protected routes.
+- The `requireRole` middleware enforces role-based access (e.g., only `ADMIN` can access `/api/users`).
+
+### Roles and redirects
+
+| Role | Dashboard path |
+|------|---------------|
+| `RESIDENT` | `/resident/dashboard` |
+| `ADMIN` | `/admin/dashboard` |
+| `BOARD_MEMBER` | `/board/dashboard` |
+
+Users who try to access a dashboard route for a different role are redirected to their own dashboard automatically.
+
+---
+
 ## Linting and formatting
 
 ```bash
