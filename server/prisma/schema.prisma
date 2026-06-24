@@ -1,0 +1,173 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                  String               @id @default(cuid())
+  email               String               @unique
+  name                String
+  password            String
+  role                UserRole             @default(RESIDENT)
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  announcements       Announcement[]
+  maintenanceRequests MaintenanceRequest[]
+  events              Event[]
+  polls               Poll[]
+  pollVotes           PollVote[]
+  duesRecords         DuesRecord[]
+  documents           Document[]
+
+  @@map("users")
+}
+
+model Announcement {
+  id        String   @id @default(cuid())
+  title     String
+  body      String
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("announcements")
+}
+
+enum UserRole {
+  ADMIN
+  BOARD_MEMBER
+  RESIDENT
+}
+
+model Event {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  location    String?
+  startAt     DateTime
+  endAt       DateTime?
+  createdById String
+  createdBy   User     @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("events")
+}
+
+model MaintenanceRequest {
+  id              String          @id @default(cuid())
+  title           String
+  description     String
+  status          RequestStatus   @default(OPEN)
+  priority        RequestPriority @default(MEDIUM)
+  submittedById   String
+  submittedBy     User            @relation(fields: [submittedById], references: [id])
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@map("maintenance_requests")
+}
+
+enum RequestStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum RequestPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+model Document {
+  id           String           @id @default(cuid())
+  name         String
+  filename     String
+  mimeType     String
+  sizeBytes    Int
+  category     DocumentCategory @default(GENERAL)
+  uploadedById String
+  uploadedBy   User             @relation(fields: [uploadedById], references: [id])
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  @@map("documents")
+}
+
+enum DocumentCategory {
+  GENERAL
+  MEETING_MINUTES
+  RULES_AND_BYLAWS
+  FINANCIALS
+  FORMS
+}
+
+model DuesRecord {
+  id        String     @id @default(cuid())
+  userId    String
+  user      User       @relation(fields: [userId], references: [id])
+  label     String
+  amountCents Int
+  dueDate   DateTime
+  status    DuesStatus @default(PENDING)
+  paidAt    DateTime?
+  notes     String?
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@map("dues_records")
+}
+
+enum DuesStatus {
+  PENDING
+  PAID
+  OVERDUE
+  WAIVED
+}
+
+model Poll {
+  id          String       @id @default(cuid())
+  question    String
+  description String?
+  closesAt    DateTime?
+  createdById String
+  createdBy   User         @relation(fields: [createdById], references: [id])
+  options     PollOption[]
+  votes       PollVote[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@map("polls")
+}
+
+model PollOption {
+  id     String     @id @default(cuid())
+  pollId String
+  poll   Poll       @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  text   String
+  votes  PollVote[]
+
+  @@map("poll_options")
+}
+
+model PollVote {
+  id       String     @id @default(cuid())
+  pollId   String
+  poll     Poll       @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  optionId String
+  option   PollOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+  userId   String
+  user     User       @relation(fields: [userId], references: [id])
+  createdAt DateTime  @default(now())
+
+  @@unique([pollId, userId])
+  @@map("poll_votes")
+}
