@@ -1,7 +1,6 @@
 import multer from 'multer';
 import multerS3 from 'multer-s3';
 import path from 'path';
-import { v4 as uuid } from 'uuid';
 import { s3, BUCKET } from '../services/s3';
 
 const ALLOWED_TYPES = [
@@ -24,7 +23,7 @@ const storage = multerS3({
   metadata: (_req, file, cb) => cb(null, { originalName: file.originalname }),
   key: (_req, file, cb) => {
     const ext = path.extname(file.originalname);
-    cb(null, `documents/${uuid()}${ext}`);
+    cb(null, `documents/${crypto.randomUUID()}${ext}`);
   },
 });
 
