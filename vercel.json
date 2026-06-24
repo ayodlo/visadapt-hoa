@@ -1,0 +1,16 @@
+{
+  "version": 2,
+  "buildCommand": "npm run db:generate && npm run build:client",
+  "outputDirectory": "client/dist",
+  "installCommand": "npm install",
+  "functions": {
+    "api/server.ts": {
+      "maxDuration": 30,
+      "includeFiles": "node_modules/.prisma/**"
+    }
+  },
+  "rewrites": [
+    { "source": "/api/:path*", "destination": "/api/server" },
+    { "source": "/((?!api).*)", "destination": "/index.html" }
+  ]
+}

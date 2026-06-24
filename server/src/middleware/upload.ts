@@ -1,6 +1,8 @@
 import multer from 'multer';
+import multerS3 from 'multer-s3';
 import path from 'path';
 import { v4 as uuid } from 'uuid';
+import { s3, BUCKET } from '../services/s3';
 
 const ALLOWED_TYPES = [
   'application/pdf',
@@ -15,11 +17,14 @@ const ALLOWED_TYPES = [
 
 const MAX_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
 
-const storage = multer.diskStorage({
-  destination: path.join(process.cwd(), 'uploads'),
-  filename: (_req, file, cb) => {
+const storage = multerS3({
+  s3,
+  bucket: BUCKET,
+  contentType: multerS3.AUTO_CONTENT_TYPE,
+  metadata: (_req, file, cb) => cb(null, { originalName: file.originalname }),
+  key: (_req, file, cb) => {
     const ext = path.extname(file.originalname);
-    cb(null, `${uuid()}${ext}`);
+    cb(null, `documents/${uuid()}${ext}`);
   },
 });
 

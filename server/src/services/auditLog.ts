@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { prisma } from '../utils/prisma';
 
 export async function createAuditLog({
@@ -14,6 +15,6 @@ export async function createAuditLog({
   metadata?: Record<string, unknown>;
 }) {
   await prisma.auditLog.create({
-    data: { userId, action, entityType, entityId, metadata },
+    data: { userId, action, entityType, entityId, metadata: metadata as Prisma.InputJsonValue | undefined },
   });
 }

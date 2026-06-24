@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tansta
 import { Link } from 'react-router-dom';
 import { apiClient } from '../api/client';
 import { useAuth } from '../context/AuthContext';
-import { Poll, PollOption } from '../types';
+import { Poll, PollOption, fullName } from '../types';
 import { Pagination } from '../components/Pagination';
 
 interface PollsResponse {
@@ -64,7 +64,7 @@ function PollCard({ poll }: { poll: Poll }) {
           <p className="text-sm text-gray-500">{poll.description}</p>
         )}
         <p className="text-xs text-gray-400">
-          By {poll.createdBy.name} · {poll.totalVotes} vote{poll.totalVotes !== 1 ? 's' : ''}
+          By {fullName(poll.createdBy)} · {poll.totalVotes} vote{poll.totalVotes !== 1 ? 's' : ''}
         </p>
       </div>
 

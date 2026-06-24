@@ -2,10 +2,9 @@ import { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { apiClient } from '../api/client';
 import { useAuth } from '../context/AuthContext';
-import { CommunityDocument, DocumentCategory } from '../types';
+import { CommunityDocument, DocumentCategory, fullName } from '../types';
 import { Pagination } from '../components/Pagination';
 
-const API_BASE = import.meta.env.VITE_API_URL ?? '';
 const TOKEN_KEY = 'chq_token';
 
 interface DocumentsResponse {
@@ -63,7 +62,7 @@ function UploadForm({ onDone }: { onDone: () => void }) {
       fd.append('name', name || file.name);
       fd.append('category', category);
       const token = localStorage.getItem(TOKEN_KEY);
-      const res = await fetch(`${API_BASE}/api/documents`, {
+      const res = await fetch(`/api/documents`, {
         method: 'POST',
         headers: token ? { Authorization: `Bearer ${token}` } : {},
         body: fd,
@@ -151,18 +150,14 @@ function UploadForm({ onDone }: { onDone: () => void }) {
   );
 }
 
-function downloadFile(doc: CommunityDocument) {
+async function downloadFile(doc: CommunityDocument) {
   const token = localStorage.getItem(TOKEN_KEY);
-  fetch(`${API_BASE}/api/documents/${doc.id}/download`, {
+  const res = await fetch(`/api/documents/${doc.id}/download`, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
-  })
-    .then((res) => res.blob())
-    .then((blob) => {
-      const url = URL.createObjectURL(blob);
-      const a = Object.assign(document.createElement('a'), { href: url, download: doc.name });
-      a.click();
-      URL.revokeObjectURL(url);
-    });
+  });
+  const { url } = await res.json();
+  const a = Object.assign(document.createElement('a'), { href: url, download: doc.name, target: '_blank' });
+  a.click();
 }
 
 export function DocumentsPage() {
@@ -244,7 +239,7 @@ export function DocumentsPage() {
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-gray-900 truncate">{doc.name}</p>
                     <p className="text-xs text-gray-400">
-                      {formatBytes(doc.sizeBytes)} · {doc.uploadedBy.name} · {new Date(doc.createdAt).toLocaleDateString()}
+                      {formatBytes(doc.sizeBytes)} · {fullName(doc.uploadedBy)} · {new Date(doc.createdAt).toLocaleDateString()}
                     </p>
                   </div>
                   <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${CATEGORY_BADGE[doc.category]}`}>

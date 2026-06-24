@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { useNavigate, Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../api/client';
-import { User } from '../types';
+import { User, fullName } from '../types';
 
 const schema = z.object({
   label: z.string().min(1, 'Label is required').max(200),
@@ -165,7 +165,7 @@ export function NewDuesPage() {
                   className="rounded border-gray-300 text-brand-600 focus:ring-brand-500"
                 />
                 <div>
-                  <p className="text-sm font-medium text-gray-900">{u.name}</p>
+                  <p className="text-sm font-medium text-gray-900">{fullName(u)}</p>
                   <p className="text-xs text-gray-400">{u.email}</p>
                 </div>
               </label>

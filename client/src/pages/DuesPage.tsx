@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tansta
 import { Link } from 'react-router-dom';
 import { apiClient } from '../api/client';
 import { useAuth } from '../context/AuthContext';
-import { DuesRecord, DuesStatus } from '../types';
+import { DuesRecord, DuesStatus, fullName } from '../types';
 import { Pagination } from '../components/Pagination';
 
 interface DuesResponse {
@@ -154,7 +154,7 @@ export function DuesPage() {
                 <tr key={r.id} className="hover:bg-gray-50 transition-colors">
                   {canManage && (
                     <td className="px-6 py-4">
-                      <p className="font-medium text-gray-900">{r.user.name}</p>
+                      <p className="font-medium text-gray-900">{fullName(r.user)}</p>
                       <p className="text-xs text-gray-400">{r.user.email}</p>
                     </td>
                   )}

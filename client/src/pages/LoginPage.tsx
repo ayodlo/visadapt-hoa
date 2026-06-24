@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { apiClient } from '../api/client';
 import { User, dashboardPath } from '../types';
@@ -23,7 +23,9 @@ const DEMO_ACCOUNTS = [
 export function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [serverError, setServerError] = useState<string | null>(null);
+  const didReset = searchParams.get('reset') === '1';
 
   const {
     register,
@@ -59,6 +61,12 @@ export function LoginPage() {
           </Link>
           <h2 className="mt-4 text-2xl font-bold text-gray-900">Sign in to your account</h2>
         </div>
+
+        {didReset && (
+          <p className="text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+            Password reset successfully. Sign in with your new password.
+          </p>
+        )}
 
         {/* Demo account quick-fill */}
         <div className="space-y-2">
@@ -101,9 +109,14 @@ export function LoginPage() {
           </div>
 
           <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-              Password
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+                Password
+              </label>
+              <Link to="/forgot-password" className="text-xs text-brand-600 hover:underline">
+                Forgot password?
+              </Link>
+            </div>
             <input
               id="password"
               type="password"

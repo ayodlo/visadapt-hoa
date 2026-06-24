@@ -1,10 +1,9 @@
-import path from 'path';
-import fs from 'fs';
 import { Request, Response, NextFunction } from 'express';
 import { DocumentCategory } from '@prisma/client';
 import { prisma } from '../utils/prisma';
 import { AppError } from '../middleware/errorHandler';
 import { paginate, paginationMeta } from '../utils/paginate';
+import { getPresignedDownloadUrl, deleteS3Object } from '../services/s3';
 
 const uploadedBySelect = { id: true, firstName: true, lastName: true } as const;
 
@@ -41,11 +40,13 @@ export async function uploadDocument(req: Request, res: Response, next: NextFunc
     }
 
     const name = (req.body.name as string)?.trim() || req.file.originalname;
+    // multer-s3 stores the S3 key in req.file.key
+    const s3File = req.file as Express.MulterS3.File;
 
     const document = await prisma.document.create({
       data: {
         name,
-        filename: req.file.filename,
+        filename: s3File.key,
         mimeType: req.file.mimetype,
         sizeBytes: req.file.size,
         category,
@@ -65,12 +66,8 @@ export async function downloadDocument(req: Request, res: Response, next: NextFu
     const doc = await prisma.document.findUnique({ where: { id: req.params.id } });
     if (!doc) return next(new AppError(404, 'Document not found'));
 
-    const filePath = path.join(process.cwd(), 'uploads', doc.filename);
-    if (!fs.existsSync(filePath)) return next(new AppError(404, 'File not found on disk'));
-
-    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(doc.name)}"`);
-    res.setHeader('Content-Type', doc.mimeType);
-    fs.createReadStream(filePath).pipe(res);
+    const url = await getPresignedDownloadUrl(doc.filename, doc.name);
+    res.json({ url });
   } catch (err) {
     next(err);
   }
@@ -81,9 +78,7 @@ export async function deleteDocument(req: Request, res: Response, next: NextFunc
     const doc = await prisma.document.findUnique({ where: { id: req.params.id } });
     if (!doc) return next(new AppError(404, 'Document not found'));
 
-    const filePath = path.join(process.cwd(), 'uploads', doc.filename);
-    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-
+    await deleteS3Object(doc.filename);
     await prisma.document.delete({ where: { id: req.params.id } });
     res.status(204).send();
   } catch (err) {

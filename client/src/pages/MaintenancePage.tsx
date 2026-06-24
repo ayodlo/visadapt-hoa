@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tansta
 import { Link } from 'react-router-dom';
 import { apiClient } from '../api/client';
 import { useAuth } from '../context/AuthContext';
-import { MaintenanceRequest, RequestStatus, RequestPriority } from '../types';
+import { MaintenanceRequest, RequestStatus, RequestPriority, fullName } from '../types';
 import { Pagination } from '../components/Pagination';
 
 interface MaintenanceResponse {
@@ -46,7 +46,7 @@ function RequestCard({ request, canManage }: { request: MaintenanceRequest; canM
         <div className="space-y-1">
           <h2 className="font-semibold text-gray-900">{request.title}</h2>
           <p className="text-xs text-gray-400">
-            Submitted by <span className="font-medium text-gray-500">{request.submittedBy.name}</span>
+            Submitted by <span className="font-medium text-gray-500">{fullName(request.submittedBy)}</span>
             {' · '}
             {new Date(request.createdAt).toLocaleDateString()}
           </p>

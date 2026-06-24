@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tansta
 import { Link } from 'react-router-dom';
 import { apiClient } from '../api/client';
 import { useAuth } from '../context/AuthContext';
-import { CommunityEvent } from '../types';
+import { CommunityEvent, fullName } from '../types';
 import { Pagination } from '../components/Pagination';
 
 interface EventsResponse {
@@ -59,7 +59,7 @@ function EventCard({ event, canManage }: { event: CommunityEvent; canManage: boo
       {event.description && (
         <p className="text-sm text-gray-600 whitespace-pre-wrap">{event.description}</p>
       )}
-      <p className="text-xs text-gray-400">Added by {event.createdBy.name}</p>
+      <p className="text-xs text-gray-400">Added by {fullName(event.createdBy)}</p>
     </div>
   );
 }

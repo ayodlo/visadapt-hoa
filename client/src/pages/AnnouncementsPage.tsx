@@ -3,7 +3,7 @@ import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { apiClient } from '../api/client';
 import { useAuth } from '../context/AuthContext';
-import { Announcement } from '../types';
+import { Announcement, fullName } from '../types';
 import { Pagination } from '../components/Pagination';
 
 interface AnnouncementsResponse {
@@ -30,7 +30,7 @@ function AnnouncementCard({ announcement }: { announcement: Announcement }) {
       </div>
       <p className="text-sm text-gray-600 whitespace-pre-wrap">{announcement.body}</p>
       <p className="text-xs text-gray-400">
-        Posted by <span className="font-medium text-gray-500">{announcement.author.name}</span>
+        Posted by <span className="font-medium text-gray-500">{fullName(announcement.author)}</span>
       </p>
     </article>
   );
