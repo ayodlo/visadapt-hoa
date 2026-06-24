@@ -1,8 +1,7 @@
 {
   "version": 2,
-  "buildCommand": "npm run build --workspace=client",
+  "buildCommand": "cd client && npm run build",
   "outputDirectory": "client/dist",
-  "installCommand": "npm install",
   "functions": {
     "api/server.ts": {
       "maxDuration": 30,
