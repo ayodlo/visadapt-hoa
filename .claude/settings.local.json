@@ -40,7 +40,11 @@
       "Bash(npx tsx -e ' *)",
       "PowerShell(cd \"C:\\\\Users\\\\theek\\\\OneDrive\\\\Desktop\\\\projects\\\\javascript\\\\visadapt-hoa\\\\server\"; $env:DATABASE_URL=\"postgresql://communityhq:communityhq_secret@localhost:5432/communityhq_dev?schema=public\"; npx tsx -e \"import { PrismaClient } from '@prisma/client'; const p = new PrismaClient\\(\\); const r = await p.user.count\\({where:{role:'RESIDENT'}}\\); const a = await p.user.count\\({where:{role:'ADMIN'}}\\); const b = await p.user.count\\({where:{role:'BOARD_MEMBER'}}\\); const v = await p.vendor.count\\(\\); const pr = await p.property.count\\(\\); console.log\\('Residents:',r,'Admins:',a,'Board:',b,'Vendors:',v,'Properties:',pr\\); const demos = await p.user.findMany\\({where:{email:{in:['resident@communityhq.local','admin@communityhq.local','board@communityhq.local']}},select:{email:true,role:true}}\\); demos.forEach\\(d=>console.log\\(d.email,d.role\\)\\); process.exit\\(0\\);\" 2>&1)",
       "PowerShell(Stop-Job *)",
-      "Bash(node *)"
+      "Bash(node *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "PowerShell(Copy-Item *)"
     ]
   }
 }
