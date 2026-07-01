@@ -1,6 +1,6 @@
 import DashboardShell from '@/components/DashboardShell';
 
-export default function DashboardLayout({
+export default function ResidentDashboardLayout({
   children,
 }: {
   children: React.ReactNode;

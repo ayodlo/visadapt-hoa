@@ -29,7 +29,9 @@ export default function LoginPage() {
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? 'Login failed'); return; }
-      router.push('/dashboard');
+      const role = data.user?.role;
+      const dest = role === 'ADMIN' ? '/admin/dashboard' : role === 'BOARD_MEMBER' ? '/board/dashboard' : '/resident/dashboard';
+      router.push(dest);
       router.refresh();
     } catch {
       setError('Failed to connect. Please try again.');
