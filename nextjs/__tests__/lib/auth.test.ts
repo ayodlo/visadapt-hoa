@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import jwt from 'jsonwebtoken';
 import { signToken, verifyToken } from '@/lib/auth';
 
 const payload = {
@@ -42,17 +43,11 @@ describe('verifyToken', () => {
   });
 
   it('returns null for a token signed with a different secret', () => {
-    const originalSecret = process.env.JWT_SECRET;
-    process.env.JWT_SECRET = 'different-secret-entirely';
-    // Re-require to pick up changed secret — instead we call jwt.sign directly
-    const jwt = require('jsonwebtoken') as typeof import('jsonwebtoken');
     const foreignToken = jwt.sign(payload, 'different-secret-entirely');
-    process.env.JWT_SECRET = originalSecret;
     expect(verifyToken(foreignToken)).toBeNull();
   });
 
   it('returns null for an expired token', () => {
-    const jwt = require('jsonwebtoken') as typeof import('jsonwebtoken');
     const expiredToken = jwt.sign(payload, process.env.JWT_SECRET!, { expiresIn: -1 });
     expect(verifyToken(expiredToken)).toBeNull();
   });

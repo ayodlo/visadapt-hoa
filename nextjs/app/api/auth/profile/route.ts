@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { getSession, signToken, setTokenCookie } from '@/lib/auth';
-import { ok, err, unauthorized } from '@/lib/api';
+import { err, unauthorized } from '@/lib/api';
 
 const schema = z.object({
   firstName: z.string().min(1),
