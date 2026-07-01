@@ -13,7 +13,7 @@ test('admin can create and delete an event', async ({ page }) => {
   await page.getByRole('button', { name: '+ New' }).click();
   await page.getByPlaceholder('Title').fill(TITLE);
   await page.getByPlaceholder('Location').fill('Community Center');
-  await page.getByLabel('Start').fill(START);
+  await page.locator('input[type="datetime-local"]').first().fill(START);
   await page.getByRole('button', { name: 'Save' }).click();
 
   await expect(page.getByText(TITLE)).toBeVisible();
