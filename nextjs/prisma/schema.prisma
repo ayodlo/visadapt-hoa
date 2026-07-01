@@ -162,11 +162,11 @@ enum RequestPriority {
 
 model Document {
   id           String           @id @default(cuid())
-  name         String
-  filename     String
-  mimeType     String
-  sizeBytes    Int
-  category     DocumentCategory @default(GENERAL)
+  title        String
+  description  String?
+  category     DocumentCategory @default(OTHER)
+  fileUrl      String
+  fileName     String
   uploadedById String
   uploadedBy   User             @relation(fields: [uploadedById], references: [id])
   createdAt    DateTime         @default(now())
@@ -176,11 +176,14 @@ model Document {
 }
 
 enum DocumentCategory {
-  GENERAL
+  CC_AND_RS
+  RULES_AND_REGS
   MEETING_MINUTES
-  RULES_AND_BYLAWS
   FINANCIALS
-  FORMS
+  INSURANCE
+  COMMUNITY_FORMS
+  MAINTENANCE
+  OTHER
 }
 
 model DuesRecord {

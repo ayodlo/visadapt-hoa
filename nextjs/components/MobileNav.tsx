@@ -11,8 +11,15 @@ function dashboardHref(role: SessionUser['role']) {
   return '/resident/dashboard';
 }
 
+function documentsHref(role: SessionUser['role']) {
+  if (role === 'ADMIN') return '/admin/documents';
+  if (role === 'BOARD_MEMBER') return '/board/documents';
+  return '/resident/documents';
+}
+
 function buildNav(role: SessionUser['role']) {
   const home = dashboardHref(role);
+  const docs = documentsHref(role);
   const isAdmin = role === 'ADMIN' || role === 'BOARD_MEMBER';
   const items = [
     { href: home, label: 'Dashboard', icon: '🏠' },
@@ -21,7 +28,7 @@ function buildNav(role: SessionUser['role']) {
     { href: '/dashboard/maintenance', label: 'Maintenance', icon: '🔧' },
     { href: '/dashboard/polls', label: 'Polls', icon: '📊' },
     { href: '/dashboard/dues', label: 'Dues', icon: '💰' },
-    { href: '/dashboard/documents', label: 'Documents', icon: '📄' },
+    { href: docs, label: 'Documents', icon: '📄' },
   ];
   if (isAdmin) items.push({ href: '/dashboard/users', label: 'Users', icon: '👥' });
   return items;

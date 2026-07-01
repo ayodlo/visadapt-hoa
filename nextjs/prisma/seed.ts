@@ -180,6 +180,110 @@ async function main() {
     ],
   });
 
+  console.log('Seeding sample documents…');
+  const PLACEHOLDER_BASE = 'https://cdn.example.com/hoa-docs';
+  await prisma.document.createMany({
+    skipDuplicates: false,
+    data: [
+      {
+        title: 'Declaration of CC&Rs (2024 Restatement)',
+        description: 'The governing document establishing the covenants, conditions, and restrictions for the community. All residents are required to comply with these rules.',
+        category: 'CC_AND_RS',
+        fileUrl: `${PLACEHOLDER_BASE}/cc-rs-2024.pdf`,
+        fileName: 'CC-Rs-2024-Restatement.pdf',
+        uploadedById: firstAdmin.id,
+      },
+      {
+        title: 'Community Rules and Regulations — Revised 2024',
+        description: 'Detailed community rules covering noise, parking, common area use, landscaping standards, and enforcement procedures.',
+        category: 'RULES_AND_REGS',
+        fileUrl: `${PLACEHOLDER_BASE}/rules-regulations-2024.pdf`,
+        fileName: 'Rules-and-Regulations-2024.pdf',
+        uploadedById: firstAdmin.id,
+      },
+      {
+        title: 'Pet Policy',
+        description: 'Community pet policy including approved animals, leash requirements, waste disposal rules, and nuisance pet procedures.',
+        category: 'RULES_AND_REGS',
+        fileUrl: `${PLACEHOLDER_BASE}/pet-policy.pdf`,
+        fileName: 'Pet-Policy.pdf',
+        uploadedById: firstAdmin.id,
+      },
+      {
+        title: 'Board Meeting Minutes — January 2026',
+        description: 'Official minutes from the January 15, 2026 board of directors meeting. Topics: budget review, maintenance approvals, and architectural request decisions.',
+        category: 'MEETING_MINUTES',
+        fileUrl: `${PLACEHOLDER_BASE}/minutes-jan-2026.pdf`,
+        fileName: 'Board-Meeting-Minutes-Jan-2026.pdf',
+        uploadedById: firstAdmin.id,
+      },
+      {
+        title: 'Annual Members Meeting Minutes — December 2025',
+        description: 'Minutes from the annual homeowners meeting held December 10, 2025. Includes election results, financial report summary, and open discussion items.',
+        category: 'MEETING_MINUTES',
+        fileUrl: `${PLACEHOLDER_BASE}/annual-meeting-dec-2025.pdf`,
+        fileName: 'Annual-Meeting-Minutes-Dec-2025.pdf',
+        uploadedById: firstAdmin.id,
+      },
+      {
+        title: '2025 Annual Financial Report',
+        description: 'Audited financial statements for fiscal year 2025, including income statement, balance sheet, and notes from the CPA firm.',
+        category: 'FINANCIALS',
+        fileUrl: `${PLACEHOLDER_BASE}/financial-report-2025.pdf`,
+        fileName: 'Annual-Financial-Report-2025.pdf',
+        uploadedById: firstAdmin.id,
+      },
+      {
+        title: '2026 Adopted Annual Budget',
+        description: 'Board-approved operating and reserve budget for calendar year 2026. Includes line-item detail and reserve fund contribution schedule.',
+        category: 'FINANCIALS',
+        fileUrl: `${PLACEHOLDER_BASE}/budget-2026.pdf`,
+        fileName: 'Budget-2026-Adopted.pdf',
+        uploadedById: firstAdmin.id,
+      },
+      {
+        title: 'Master Property Insurance Policy Summary 2026',
+        description: 'Summary of the community master insurance policy covering common areas, general liability, and directors & officers coverage. Policy #HOA-2026-8821.',
+        category: 'INSURANCE',
+        fileUrl: `${PLACEHOLDER_BASE}/insurance-summary-2026.pdf`,
+        fileName: 'Insurance-Policy-Summary-2026.pdf',
+        uploadedById: firstAdmin.id,
+      },
+      {
+        title: 'Architectural Change Request Form',
+        description: 'Required form for submitting any exterior modification, addition, or improvement to your property. Allow 30 days for board review.',
+        category: 'COMMUNITY_FORMS',
+        fileUrl: `${PLACEHOLDER_BASE}/arch-change-request.pdf`,
+        fileName: 'Architectural-Change-Request-Form.pdf',
+        uploadedById: firstAdmin.id,
+      },
+      {
+        title: 'Move-In / Move-Out Notification Form',
+        description: 'Residents must submit this form at least 48 hours before a scheduled move. Includes elevator reservation and common area usage agreement.',
+        category: 'COMMUNITY_FORMS',
+        fileUrl: `${PLACEHOLDER_BASE}/move-in-out-form.pdf`,
+        fileName: 'Move-In-Out-Notification-Form.pdf',
+        uploadedById: firstAdmin.id,
+      },
+      {
+        title: 'Pool & Amenity Maintenance Schedule 2026',
+        description: 'Annual schedule for pool chemical treatments, equipment inspections, and seasonal closures. Posted for resident awareness.',
+        category: 'MAINTENANCE',
+        fileUrl: `${PLACEHOLDER_BASE}/maintenance-schedule-2026.pdf`,
+        fileName: 'Pool-Maintenance-Schedule-2026.pdf',
+        uploadedById: firstAdmin.id,
+      },
+      {
+        title: 'Community Emergency Contact Directory',
+        description: 'List of key contacts including property management, emergency maintenance, local fire and police non-emergency lines, and board member contacts.',
+        category: 'OTHER',
+        fileUrl: `${PLACEHOLDER_BASE}/emergency-contacts.pdf`,
+        fileName: 'Emergency-Contact-Directory.pdf',
+        uploadedById: firstAdmin.id,
+      },
+    ],
+  });
+
   console.log('\nSeed complete!');
   console.log('─────────────────────────────────');
   console.log('Demo credentials (password: password123)');
