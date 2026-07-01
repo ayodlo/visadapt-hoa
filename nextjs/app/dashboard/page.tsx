@@ -6,7 +6,7 @@ export default async function DashboardPage() {
 
   const [announcements, events, maintenance] = await Promise.all([
     prisma.announcement.count(),
-    prisma.event.count(),
+    prisma.event.count({ where: { startAt: { gte: new Date() } } }),
     prisma.maintenanceRequest.count({ where: { status: 'OPEN' } }),
   ]);
 
