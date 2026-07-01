@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useSession } from '@/context/session';
 
 type DuesStatus = 'PENDING' | 'PAID' | 'OVERDUE' | 'WAIVED';
 interface User { id: string; firstName: string; lastName: string; email: string; }
@@ -18,6 +19,9 @@ function fmt(cents: number) {
 }
 
 export default function DuesPage() {
+  const { role } = useSession();
+  const isAdmin = role === 'ADMIN' || role === 'BOARD_MEMBER';
+
   const [records, setRecords] = useState<DuesRecord[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -70,10 +74,12 @@ export default function DuesPage() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Dues</h1>
-        <button onClick={() => setShowForm(!showForm)} className="bg-blue-600 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">+ New Record</button>
+        {isAdmin && (
+          <button onClick={() => setShowForm(!showForm)} className="bg-blue-600 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">+ New Record</button>
+        )}
       </div>
 
-      {showForm && (
+      {isAdmin && showForm && (
         <form onSubmit={handleCreate} className="bg-white border border-gray-200 rounded-xl p-5 mb-6 space-y-3">
           <select required value={form.userId} onChange={(e) => setForm((f) => ({ ...f, userId: e.target.value }))} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
             <option value="">Select resident…</option>
@@ -105,11 +111,19 @@ export default function DuesPage() {
                   <td className="px-4 py-3 font-medium">{fmt(r.amountCents)}</td>
                   <td className="px-4 py-3 text-gray-600">{new Date(r.dueDate).toLocaleDateString()}</td>
                   <td className="px-4 py-3">
-                    <select value={r.status} onChange={(e) => updateStatus(r.id, e.target.value as DuesStatus)} className={`text-xs font-medium px-2 py-1 rounded-full border-0 cursor-pointer ${STATUS_COLORS[r.status]}`}>
-                      {(['PENDING', 'PAID', 'OVERDUE', 'WAIVED'] as DuesStatus[]).map((s) => <option key={s} value={s}>{s}</option>)}
-                    </select>
+                    {isAdmin ? (
+                      <select value={r.status} onChange={(e) => updateStatus(r.id, e.target.value as DuesStatus)} className={`text-xs font-medium px-2 py-1 rounded-full border-0 cursor-pointer ${STATUS_COLORS[r.status]}`}>
+                        {(['PENDING', 'PAID', 'OVERDUE', 'WAIVED'] as DuesStatus[]).map((s) => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                    ) : (
+                      <span className={`text-xs font-medium px-2 py-1 rounded-full ${STATUS_COLORS[r.status]}`}>{r.status}</span>
+                    )}
                   </td>
-                  <td className="px-4 py-3 text-right"><button onClick={() => handleDelete(r.id)} className="text-xs text-gray-400 hover:text-red-500">Delete</button></td>
+                  <td className="px-4 py-3 text-right">
+                    {isAdmin && (
+                      <button onClick={() => handleDelete(r.id)} className="text-xs text-gray-400 hover:text-red-500">Delete</button>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>

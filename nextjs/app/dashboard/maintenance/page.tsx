@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useSession } from '@/context/session';
 
 type Status = 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED';
 type Priority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
@@ -22,6 +23,9 @@ const PRIORITY_COLORS: Record<Priority, string> = {
 };
 
 export default function MaintenancePage() {
+  const { role } = useSession();
+  const isAdmin = role === 'ADMIN' || role === 'BOARD_MEMBER';
+
   const [items, setItems] = useState<Request[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -98,12 +102,14 @@ export default function MaintenancePage() {
                   <p className="text-sm text-gray-500">{item.submittedBy.firstName} {item.submittedBy.lastName} · {new Date(item.createdAt).toLocaleDateString()}</p>
                   <p className="mt-2 text-sm text-gray-700">{item.description}</p>
                 </div>
-                <div className="flex flex-col gap-1 flex-shrink-0">
-                  <select value={item.status} onChange={(e) => updateStatus(item.id, e.target.value as Status)} className="text-xs border border-gray-300 rounded px-2 py-1">
-                    {(['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'] as Status[]).map((s) => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
-                  </select>
-                  <button onClick={() => handleDelete(item.id)} className="text-xs text-gray-400 hover:text-red-500 transition-colors text-right">Delete</button>
-                </div>
+                {isAdmin && (
+                  <div className="flex flex-col gap-1 flex-shrink-0">
+                    <select value={item.status} onChange={(e) => updateStatus(item.id, e.target.value as Status)} className="text-xs border border-gray-300 rounded px-2 py-1">
+                      {(['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'] as Status[]).map((s) => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
+                    </select>
+                    <button onClick={() => handleDelete(item.id)} className="text-xs text-gray-400 hover:text-red-500 transition-colors text-right">Delete</button>
+                  </div>
+                )}
               </div>
             </div>
           ))}

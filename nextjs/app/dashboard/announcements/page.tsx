@@ -1,11 +1,15 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useSession } from '@/context/session';
 
 interface Author { id: string; firstName: string; lastName: string; }
 interface Announcement { id: string; title: string; body: string; author: Author; createdAt: string; }
 
 export default function AnnouncementsPage() {
+  const { role } = useSession();
+  const isAdmin = role === 'ADMIN' || role === 'BOARD_MEMBER';
+
   const [items, setItems] = useState<Announcement[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -46,13 +50,15 @@ export default function AnnouncementsPage() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Announcements</h1>
-        <button onClick={() => setShowForm(!showForm)}
-          className="bg-blue-600 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
-          + New
-        </button>
+        {isAdmin && (
+          <button onClick={() => setShowForm(!showForm)}
+            className="bg-blue-600 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+            + New
+          </button>
+        )}
       </div>
 
-      {showForm && (
+      {isAdmin && showForm && (
         <form onSubmit={handleCreate} className="bg-white border border-gray-200 rounded-xl p-5 mb-6 space-y-3">
           <input required placeholder="Title" value={form.title}
             onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
@@ -86,8 +92,10 @@ export default function AnnouncementsPage() {
                     {item.author.firstName} {item.author.lastName} · {new Date(item.createdAt).toLocaleDateString()}
                   </p>
                 </div>
-                <button onClick={() => handleDelete(item.id)}
-                  className="text-xs text-gray-400 hover:text-red-500 transition-colors flex-shrink-0">Delete</button>
+                {isAdmin && (
+                  <button onClick={() => handleDelete(item.id)}
+                    className="text-xs text-gray-400 hover:text-red-500 transition-colors flex-shrink-0">Delete</button>
+                )}
               </div>
               <p className="mt-3 text-sm text-gray-700 whitespace-pre-wrap">{item.body}</p>
             </div>

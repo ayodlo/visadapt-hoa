@@ -1,11 +1,15 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useSession } from '@/context/session';
 
 interface Option { id: string; text: string; _count: { votes: number }; }
 interface Poll { id: string; question: string; description?: string; closesAt?: string; options: Option[]; _count: { votes: number }; createdBy: { firstName: string; lastName: string }; }
 
 export default function PollsPage() {
+  const { role } = useSession();
+  const isAdmin = role === 'ADMIN' || role === 'BOARD_MEMBER';
+
   const [polls, setPolls] = useState<Poll[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -59,10 +63,12 @@ export default function PollsPage() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Polls</h1>
-        <button onClick={() => setShowForm(!showForm)} className="bg-blue-600 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">+ New Poll</button>
+        {isAdmin && (
+          <button onClick={() => setShowForm(!showForm)} className="bg-blue-600 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">+ New Poll</button>
+        )}
       </div>
 
-      {showForm && (
+      {isAdmin && showForm && (
         <form onSubmit={handleCreate} className="bg-white border border-gray-200 rounded-xl p-5 mb-6 space-y-3">
           <input required placeholder="Question" value={form.question} onChange={(e) => setForm((f) => ({ ...f, question: e.target.value }))} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
           <textarea placeholder="Description (optional)" rows={2} value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
@@ -98,7 +104,9 @@ export default function PollsPage() {
                     {poll.description && <p className="text-sm text-gray-500 mt-0.5">{poll.description}</p>}
                     <p className="text-xs text-gray-400 mt-1">{total} vote{total !== 1 ? 's' : ''}{closed ? ' · Closed' : ''}</p>
                   </div>
-                  <button onClick={() => handleDelete(poll.id)} className="text-xs text-gray-400 hover:text-red-500 flex-shrink-0">Delete</button>
+                  {isAdmin && (
+                    <button onClick={() => handleDelete(poll.id)} className="text-xs text-gray-400 hover:text-red-500 flex-shrink-0">Delete</button>
+                  )}
                 </div>
                 <div className="space-y-2">
                   {poll.options.map((opt) => {

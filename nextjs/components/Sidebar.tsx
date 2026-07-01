@@ -60,7 +60,9 @@ export default function Sidebar({ user }: Props) {
       </nav>
 
       <div className="px-4 py-4 border-t border-gray-200">
-        <p className="text-xs font-medium text-gray-900 truncate">{user.firstName} {user.lastName}</p>
+        <Link href="/dashboard/profile" className="block mb-0.5 text-xs font-medium text-gray-900 truncate hover:text-blue-600 transition-colors">
+          {user.firstName} {user.lastName}
+        </Link>
         <p className="text-xs text-gray-500 truncate mb-3">{user.email}</p>
         <button
           onClick={handleLogout}

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { useSession } from '@/context/session';
 
 type DocCategory = 'GENERAL' | 'MEETING_MINUTES' | 'RULES_AND_BYLAWS' | 'FINANCIALS' | 'FORMS';
 interface Uploader { id: string; firstName: string; lastName: string; }
@@ -15,6 +16,9 @@ function fmtSize(bytes: number) {
 }
 
 export default function DocumentsPage() {
+  const { role } = useSession();
+  const isAdmin = role === 'ADMIN' || role === 'BOARD_MEMBER';
+
   const [docs, setDocs] = useState<Doc[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -64,10 +68,12 @@ export default function DocumentsPage() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Documents</h1>
-        <button onClick={() => setShowForm(!showForm)} className="bg-blue-600 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">+ Upload</button>
+        {isAdmin && (
+          <button onClick={() => setShowForm(!showForm)} className="bg-blue-600 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">+ Upload</button>
+        )}
       </div>
 
-      {showForm && (
+      {isAdmin && showForm && (
         <form onSubmit={handleUpload} className="bg-white border border-gray-200 rounded-xl p-5 mb-6 space-y-3">
           <input ref={fileRef} required type="file" onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="w-full text-sm text-gray-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-blue-50 file:text-blue-700 file:text-sm file:font-medium hover:file:bg-blue-100" />
           <input placeholder="Display name (optional)" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
@@ -95,9 +101,11 @@ export default function DocumentsPage() {
                   <td className="px-4 py-3 text-gray-500">{fmtSize(doc.sizeBytes)}</td>
                   <td className="px-4 py-3 text-gray-600">{doc.uploadedBy.firstName} {doc.uploadedBy.lastName}</td>
                   <td className="px-4 py-3 text-gray-500">{new Date(doc.createdAt).toLocaleDateString()}</td>
-                  <td className="px-4 py-3 text-right">
-                    <button onClick={() => handleDownload(doc.id)} className="text-xs text-blue-600 hover:underline mr-3">Download</button>
-                    <button onClick={() => handleDelete(doc.id)} className="text-xs text-gray-400 hover:text-red-500">Delete</button>
+                  <td className="px-4 py-3 text-right flex items-center justify-end gap-3">
+                    <button onClick={() => handleDownload(doc.id)} className="text-xs text-blue-600 hover:underline">Download</button>
+                    {isAdmin && (
+                      <button onClick={() => handleDelete(doc.id)} className="text-xs text-gray-400 hover:text-red-500">Delete</button>
+                    )}
                   </td>
                 </tr>
               ))}
