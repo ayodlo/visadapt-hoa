@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
 import { ok, err, unauthorized, forbidden, notFound } from '@/lib/api';
+import { sendMaintenanceStatusEmail } from '@/lib/email';
 
 const schema = z.object({
   status: z.enum(['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED']).optional(),
@@ -28,8 +29,18 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   const updated = await prisma.maintenanceRequest.update({
     where: { id },
     data: parsed.data,
-    include: { submittedBy: { select: { id: true, firstName: true, lastName: true } } },
+    include: { submittedBy: { select: { id: true, email: true, firstName: true, lastName: true } } },
   });
+
+  if (parsed.data.status && parsed.data.status !== existing.status) {
+    sendMaintenanceStatusEmail(
+      updated.submittedBy.email,
+      updated.submittedBy.firstName,
+      updated.title,
+      parsed.data.status
+    ).catch(() => {});
+  }
+
   return ok(updated);
 }
 

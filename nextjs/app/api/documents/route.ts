@@ -28,6 +28,7 @@ export async function POST(req: NextRequest) {
   const category = (formData.get('category') as string | null) ?? 'GENERAL';
 
   if (!file || !name) return err('file and name are required', 400);
+  if (!BUCKET) return err('S3 not configured', 500);
 
   const buffer = Buffer.from(await file.arrayBuffer());
   const ext = file.name.split('.').pop() ?? 'bin';
@@ -47,6 +48,5 @@ export async function POST(req: NextRequest) {
     include: { uploadedBy: { select: { id: true, firstName: true, lastName: true } } },
   });
 
-  if (!BUCKET) return err('S3 not configured', 500);
   return ok(doc, 201);
 }
