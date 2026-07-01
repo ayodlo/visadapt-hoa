@@ -1,36 +1,117 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# CommunityHQ
 
-## Getting Started
+HOA community management platform built with Next.js, Neon PostgreSQL, and Vercel.
 
-First, run the development server:
+## Tech Stack
+
+- **Framework**: Next.js (App Router)
+- **Database**: Neon (PostgreSQL) via Prisma
+- **Auth**: JWT in httpOnly cookies
+- **Email**: Resend
+- **Storage**: AWS S3 (document uploads)
+- **Hosting**: Vercel
+
+## Local Development
+
+### Prerequisites
+
+- Node.js 20+
+- A Neon database (or any PostgreSQL instance)
+
+### Setup
+
+```bash
+cd nextjs
+npm install
+```
+
+Create `nextjs/.env.local`:
+
+```env
+DATABASE_URL=postgresql://...
+JWT_SECRET=your-local-secret-at-least-32-chars
+JWT_EXPIRES_IN=7d
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+
+# Optional — required for document uploads
+AWS_ACCESS_KEY_ID=
+AWS_SECRET_ACCESS_KEY=
+AWS_REGION=us-east-1
+AWS_S3_BUCKET=
+
+# Optional — required for email features
+RESEND_API_KEY=
+EMAIL_FROM=noreply@yourdomain.com
+```
+
+### Database
+
+```bash
+# Run migrations
+npx prisma migrate deploy
+
+# Seed demo data
+npx prisma db seed
+```
+
+### Run
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Authentication
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+JWT tokens are stored in an httpOnly cookie (`token`). All dashboard routes are protected server-side via the `getSession()` helper in `lib/auth.ts`. Unauthenticated requests are redirected to `/login`.
 
-## Learn More
+### Roles
 
-To learn more about Next.js, take a look at the following resources:
+| Role | Access |
+|------|--------|
+| `RESIDENT` | Read-only on most features; can submit maintenance requests |
+| `BOARD_MEMBER` | Full access except user management |
+| `ADMIN` | Full access including user role management |
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+All authenticated users share a single `/dashboard`. Role-based UI gating hides or shows controls depending on the user's role.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Demo Credentials
 
-## Deploy on Vercel
+All seeded accounts use the password: **`password123`**
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+| Role | Email |
+|------|-------|
+| Resident | `resident@communityhq.local` |
+| Admin | `admin@communityhq.local` |
+| Board Member | `board@communityhq.local` |
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Demo account buttons on the login page fill these credentials automatically.
+
+## Seed Data
+
+The seed creates:
+- 20 residents (including the demo resident account)
+- 2 admins
+- 3 board members
+- 5 vendors
+- 10 properties
+- Sample announcements
+
+## Testing
+
+```bash
+# Unit tests
+npm test
+
+# Lint + type-check
+npm run lint
+npx tsc --noEmit
+
+# E2E (requires dev server)
+npm run test:e2e
+```
+
+## Deployment
+
+Deployed on Vercel. Environment variables are set in the Vercel dashboard. The Vercel project's **Root Directory** must be set to `nextjs`.
