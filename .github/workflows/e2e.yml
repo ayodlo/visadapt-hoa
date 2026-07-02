@@ -41,6 +41,11 @@ jobs:
           cache: npm
           cache-dependency-path: nextjs/package-lock.json
 
+      # npm implementations disagree on optional wasm deps in the lockfile;
+      # pin to the version that generates it locally so `npm ci` validates.
+      - name: Pin npm to match lockfile
+        run: npm install -g npm@11.6.1
+
       - name: Install dependencies
         run: npm ci
 
