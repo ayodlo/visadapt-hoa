@@ -32,7 +32,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const colorMap: Record<ToastType, string> = {
     success: 'bg-green-600',
     error: 'bg-red-600',
-    info: 'bg-gray-800',
+    info: 'bg-slate-800', // slate, not gray: gray-800 is remapped light in dark mode, this must stay dark under text-white
   };
 
   return (

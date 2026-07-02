@@ -1,26 +1,162 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/* Enables `dark:` utilities, keyed off the data-theme attribute set on <html>
+   by the inline script in app/layout.tsx (defaults to dark). */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+:root {
+  color-scheme: light;
+}
+
+/*
+ * Dark theme.
+ *
+ * Tailwind v4 utilities resolve colors through var(--color-*), so the whole
+ * app re-themes by overriding those variables here — pages keep using the
+ * light-palette class names (bg-gray-50, text-gray-900, …) and never need
+ * per-component dark: variants.
+ *
+ * Token roles, derived from an audit of every color class in app/ and
+ * components/:
+ *   gray 50–300   backgrounds, fills, borders   → darken
+ *   gray 400–900  text ramp                     → lighten
+ *   *-50/100      tinted chip/alert backgrounds → deep tints
+ *   *-200/300     tinted borders                → mid tints
+ *   *-600..900    tinted text                   → lighten, EXCEPT tokens also
+ *                 used as solid button backgrounds (blue-600/700, red-500/600/700,
+ *                 green-600), which stay saturated; their text-* usages are
+ *                 corrected by the utility overrides at the bottom.
+ */
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  /* neutrals — slate-tinted ramp */
+  --color-gray-50: #0d1424;   /* page background, recessed fills, table headers */
+  --color-gray-100: #1b2949;  /* hover fills, dividers */
+  --color-gray-200: #263757;  /* borders */
+  --color-gray-300: #35496e;  /* input borders, disabled text */
+  --color-gray-400: #7d8fb3;  /* placeholders, faint text */
+  --color-gray-500: #94a5c4;  /* secondary text */
+  --color-gray-600: #adbcd6;
+  --color-gray-700: #c5d0e4;  /* labels */
+  --color-gray-800: #dce4f1;
+  --color-gray-900: #eef2f9;  /* headings */
+
+  /* blue (brand) — 600/700 unchanged: solid button bg + hover */
+  --color-blue-50: #182a4d;
+  --color-blue-100: #1e3560;
+  --color-blue-200: #2a4680;
+  --color-blue-300: #365799;
+  --color-blue-800: #93c5fd;
+  --color-blue-900: #bfdbfe;
+
+  /* red — 500/600/700 unchanged: danger buttons + hover */
+  --color-red-50: #331a22;
+  --color-red-100: #47222e;
+  --color-red-200: #602e3d;
+  --color-red-300: #763848;
+  --color-red-800: #fca5a5;
+
+  /* green — 500/600 unchanged: success buttons/dots */
+  --color-green-50: #14291e;
+  --color-green-100: #1b3a2a;
+  --color-green-200: #25523b;
+  --color-green-300: #2f6a4b;
+  --color-green-700: #4ade80;
+  --color-green-800: #86efac;
+
+  /* amber — 400/500/600 unchanged: dots, warning buttons */
+  --color-amber-50: #2e2311;
+  --color-amber-100: #3f2f14;
+  --color-amber-200: #57421d;
+  --color-amber-300: #6f5424;
+  --color-amber-700: #fcd34d;
+  --color-amber-800: #fde68a;
+
+  /* yellow — 400/500 unchanged: dots, focus rings */
+  --color-yellow-50: #2c2609;
+  --color-yellow-100: #3d340e;
+  --color-yellow-200: #564b16;
+  --color-yellow-600: #facc15;
+  --color-yellow-700: #fde047;
+  --color-yellow-800: #fef08a;
+
+  /* orange — 400 unchanged: status dots */
+  --color-orange-50: #301d0f;
+  --color-orange-100: #422913;
+  --color-orange-200: #5d3b1b;
+  --color-orange-300: #774c23;
+  --color-orange-600: #fb923c;
+  --color-orange-700: #fdba74;
+  --color-orange-800: #fed7aa;
+
+  /* indigo / sky / purple / teal / emerald — chip tints + text */
+  --color-indigo-50: #1f2248;
+  --color-indigo-100: #292d5f;
+  --color-indigo-200: #3a4082;
+  --color-indigo-600: #818cf8;
+  --color-indigo-700: #a5b4fc;
+  --color-indigo-800: #c7d2fe;
+  --color-sky-50: #11293e;
+  --color-sky-100: #153652;
+  --color-sky-200: #1e4b70;
+  --color-sky-800: #7dd3fc;
+  --color-purple-100: #382355;
+  --color-purple-800: #d8b4fe;
+  --color-teal-100: #133d39;
+  --color-teal-800: #5eead4;
+  --color-emerald-100: #133d2d;
+  --color-emerald-800: #6ee7b7;
+}
+
+/*
+ * Role-conflict corrections. These tokens double as solid backgrounds
+ * (buttons keep them saturated with white labels) and as text colors
+ * (which need lighter values on dark surfaces). Backgrounds win the
+ * variable; text usages are corrected per-utility here. These rules are
+ * unlayered, so they take precedence over Tailwind's utilities layer.
+ */
+[data-theme="dark"] {
+  /* white: cards/panels vs. text-white button labels */
+  .bg-white {
+    background-color: #141d33;
+  }
+
+  /* blue-400 / red-400 / green-400 are not remapped above, so the vars still
+     hold their light-palette values, which read well on dark surfaces.
+     blue-300 / red-300 ARE remapped (to border tints), so those text
+     corrections use literal palette values instead. */
+  .text-blue-600,
+  .hover\:text-blue-600:hover {
+    color: var(--color-blue-400);
+  }
+
+  .text-blue-700,
+  .hover\:text-blue-700:hover,
+  :where(.group):hover .group-hover\:text-blue-700 {
+    color: #93c5fd; /* blue-300 */
+  }
+
+  .text-red-500,
+  .hover\:text-red-500:hover,
+  .text-red-600,
+  .hover\:text-red-600:hover {
+    color: var(--color-red-400);
+  }
+
+  .text-red-700 {
+    color: #fca5a5; /* red-300 */
+  }
+
+  .text-green-600 {
+    color: var(--color-green-400);
   }
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans, ui-sans-serif, system-ui, sans-serif);
 }

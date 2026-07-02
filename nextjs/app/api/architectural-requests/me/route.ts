@@ -1,9 +1,8 @@
-import { NextRequest } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { ok, unauthorized, forbidden } from '@/lib/api';
 
-export async function GET(_req: NextRequest) {
+export async function GET() {
   const session = await getSession();
   if (!session) return unauthorized();
   if (session.role !== 'RESIDENT') return forbidden();

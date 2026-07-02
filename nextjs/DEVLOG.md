@@ -1,5 +1,32 @@
 # CommunityHQ Dev Log
 
+## 2026-07-02 — Dark mode (default) + light toggle, UI revision pass
+
+**Files touched:**
+- `app/globals.css` — full theming layer: dark palette via `--color-*` variable overrides under `[data-theme="dark"]`, `@custom-variant dark`, utility-level corrections for role-conflicted tokens, `color-scheme` for native controls
+- `app/layout.tsx` — `data-theme="dark"` default on `<html>` + inline no-FOUC script (reads localStorage before first paint), `suppressHydrationWarning`, Geist font exposed as `--font-geist-sans`
+- `components/ThemeToggle.tsx` — new; CSS-driven sun/moon icons (`dark:hidden`/`dark:block`) so there is no hydration mismatch
+- `lib/nav.ts` — new; nav building + active-state logic extracted from Sidebar/MobileNav (was duplicated ~70 lines)
+- `components/Sidebar.tsx` — uses `lib/nav`, brand is now a link to the role dashboard, ThemeToggle in header
+- `components/MobileNav.tsx` — uses `lib/nav`, ThemeToggle in top bar, `aria-current` on active drawer links
+- `app/(auth)/` — login/register/forgot-password/reset-password moved into a route group (URLs unchanged) with a shared layout that adds a fixed ThemeToggle
+- `context/toast.tsx` — info toast `bg-gray-800` → `bg-slate-800` (gray-800 is remapped light in dark mode; slate stays constant)
+- `app/api/violations/me/route.ts`, `app/api/architectural-requests/me/route.ts` — removed unused `_req` params (lint now clean)
+- `e2e/announcements.spec.ts` — updated to the current admin announcements UI (placeholders, Publish button, ConfirmDialog delete); was failing before this session
+
+**Decisions:**
+- Theming works by remapping Tailwind v4 `--color-*` variables in one file, NOT by adding `dark:` variants to 58 route files. Tailwind v4 utilities compile to `var(--color-*)`, so pages keep using light-palette class names everywhere.
+- Tokens used as BOTH solid button backgrounds and text (white, blue-600/700, red-500/600/700, green-600) keep the variable for backgrounds; text usages are corrected by unlayered per-utility rules at the bottom of globals.css. If you add a new `text-blue-600`-style usage it just works; if you add a new *conflicted* token, add it there.
+- Dark is the default (`data-theme="dark"` in SSR HTML); saved preference is applied by an inline head script before paint per the Next.js "preventing flash before hydration" guide.
+- Never use `bg-gray-800`/`bg-gray-900` for "always dark" surfaces — grays invert in dark mode. Use slate (unmapped) instead.
+
+**Verified:** production build passes, eslint clean, tsc clean, 100/100 unit tests, 23/23 Playwright e2e, screenshots of login/dashboard/violations in both themes (toggle + persistence across reload confirmed).
+
+**Next steps:**
+- Unit + e2e test expansion for production readiness (user's next session goal)
+- Consider swapping emoji nav/stat icons for SVG (lucide-react) for consistent cross-platform rendering
+- See session recommendations in chat for the full list
+
 ## 2026-07-02 — Sprint 9: Live dashboards, reports, tests, README
 
 **Files touched:**
