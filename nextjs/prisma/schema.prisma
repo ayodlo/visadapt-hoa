@@ -41,9 +41,15 @@ model User {
   assignedIssues       Issue[]              @relation("AssignedIssues")
   issueComments        IssueComment[]
   issueActivities      IssueActivity[]
-  architecturalRequests         ArchitecturalRequest[]          @relation("ResidentArchRequests")
-  architecturalRequestComments  ArchitecturalRequestComment[]   @relation("ArchRequestComments")
-  architecturalRequestActivities ArchitecturalRequestActivity[] @relation("ArchRequestActivities")
+  architecturalRequests          ArchitecturalRequest[]          @relation("ResidentArchRequests")
+  architecturalRequestComments   ArchitecturalRequestComment[]   @relation("ArchRequestComments")
+  architecturalRequestActivities ArchitecturalRequestActivity[]  @relation("ArchRequestActivities")
+  violations                     Violation[]                     @relation("ResidentViolations")
+  createdViolations              Violation[]                     @relation("CreatedViolations")
+  violationComments              ViolationComment[]
+  violationActivities            ViolationActivity[]
+  violationAppeals               ViolationAppeal[]               @relation("AppealSubmitter")
+  reviewedAppeals                ViolationAppeal[]               @relation("AppealReviewer")
 
   @@map("users")
 }
@@ -75,6 +81,7 @@ model Property {
   payments               Payment[]
   issues                 Issue[]
   architecturalRequests  ArchitecturalRequest[]
+  violations             Violation[]
 
   @@map("properties")
 }
@@ -497,4 +504,104 @@ model ArchitecturalRequestAttachment {
   createdAt DateTime             @default(now())
 
   @@map("architectural_request_attachments")
+}
+
+// ─── Violations & Appeals ─────────────────────────────────────────────────────
+
+enum ViolationType {
+  LANDSCAPING_MAINTENANCE
+  PARKING
+  NOISE
+  PROPERTY_APPEARANCE
+  UNAUTHORIZED_MODIFICATION
+  PET_VIOLATION
+  TRASH_AND_DEBRIS
+  OTHER
+}
+
+enum ViolationStatus {
+  DRAFT
+  NOTICE_SENT
+  RESIDENT_RESPONDED
+  UNDER_REVIEW
+  RESOLVED
+  ESCALATED
+  CLOSED
+}
+
+enum ViolationAppealStatus {
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  DENIED
+  WITHDRAWN
+}
+
+model Violation {
+  id              String          @id @default(cuid())
+  residentId      String
+  resident        User            @relation("ResidentViolations", fields: [residentId], references: [id])
+  propertyId      String?
+  property        Property?       @relation(fields: [propertyId], references: [id])
+  createdById     String
+  createdBy       User            @relation("CreatedViolations", fields: [createdById], references: [id])
+  violationType   ViolationType
+  ruleCitation    String
+  description     String
+  observedAt      DateTime
+  deadline        DateTime?
+  status          ViolationStatus @default(DRAFT)
+  resolutionSteps String?
+  evidenceUrl     String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  comments        ViolationComment[]
+  activities      ViolationActivity[]
+  appeal          ViolationAppeal?
+
+  @@map("violations")
+}
+
+model ViolationComment {
+  id          String    @id @default(cuid())
+  violationId String
+  violation   Violation @relation(fields: [violationId], references: [id], onDelete: Cascade)
+  authorId    String
+  author      User      @relation(fields: [authorId], references: [id])
+  body        String
+  isInternal  Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+
+  @@map("violation_comments")
+}
+
+model ViolationActivity {
+  id          String    @id @default(cuid())
+  violationId String
+  violation   Violation @relation(fields: [violationId], references: [id], onDelete: Cascade)
+  actorId     String?
+  actor       User?     @relation(fields: [actorId], references: [id])
+  action      String
+  details     String?
+  createdAt   DateTime  @default(now())
+
+  @@map("violation_activities")
+}
+
+model ViolationAppeal {
+  id           String               @id @default(cuid())
+  violationId  String               @unique
+  violation    Violation            @relation(fields: [violationId], references: [id], onDelete: Cascade)
+  submittedById String
+  submittedBy  User                 @relation("AppealSubmitter", fields: [submittedById], references: [id])
+  reason       String
+  status       ViolationAppealStatus @default(SUBMITTED)
+  outcome      String?
+  reviewedById String?
+  reviewedBy   User?                @relation("AppealReviewer", fields: [reviewedById], references: [id])
+  reviewedAt   DateTime?
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+
+  @@map("violation_appeals")
 }

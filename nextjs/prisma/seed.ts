@@ -980,6 +980,250 @@ async function main() {
     }
   }
 
+  // ─── Violations ────────────────────────────────────────────────────────────
+  console.log('Seeding violations…');
+  await prisma.violationAppeal.deleteMany({});
+  await prisma.violationActivity.deleteMany({});
+  await prisma.violationComment.deleteMany({});
+  await prisma.violation.deleteMany({});
+
+  type ViolationStatus = 'DRAFT' | 'NOTICE_SENT' | 'RESIDENT_RESPONDED' | 'UNDER_REVIEW' | 'RESOLVED' | 'ESCALATED' | 'CLOSED';
+  type ViolationType = 'LANDSCAPING_MAINTENANCE' | 'PARKING' | 'NOISE' | 'PROPERTY_APPEARANCE' | 'UNAUTHORIZED_MODIFICATION' | 'PET_VIOLATION' | 'TRASH_AND_DEBRIS' | 'OTHER';
+
+  const vDefs: {
+    residentIdx: number;
+    violationType: ViolationType;
+    ruleCitation: string;
+    description: string;
+    resolutionSteps?: string;
+    deadline?: Date;
+    status: ViolationStatus;
+    daysAgo: number;
+    appeal?: { reason: string; status: 'SUBMITTED' | 'UNDER_REVIEW' | 'APPROVED' | 'DENIED'; outcome?: string };
+    comment?: { body: string; isInternal: boolean };
+    internalNote?: string;
+  }[] = [
+    {
+      residentIdx: 0,
+      violationType: 'LANDSCAPING_MAINTENANCE',
+      ruleCitation: "CC&Rs Section 5.1 — Landscaping Maintenance Standards",
+      description: "The front lawn at this property has not been mowed in approximately four weeks. Grass is significantly overgrown and extends into the sidewalk easement. This is visible from the street and affects the appearance of the community.",
+      resolutionSteps: "Please mow and trim the lawn to a height of 3 inches or less. Edging along the sidewalk and driveway is also required. This should be completed within the deadline below.",
+      deadline: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
+      status: 'NOTICE_SENT',
+      daysAgo: 5,
+    },
+    {
+      residentIdx: 1,
+      violationType: 'PARKING',
+      ruleCitation: "Community Rules Section 3.2 — Vehicle Parking",
+      description: "An RV belonging to this household has been parked in the community parking lot for 22 consecutive days, exceeding the 72-hour maximum for recreational vehicles. The vehicle is taking up two spaces.",
+      resolutionSteps: "The recreational vehicle must be removed from the community parking lot within 7 days. RVs may only be parked in designated storage areas with prior approval. Please contact the office to inquire about RV storage availability.",
+      deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      status: 'RESIDENT_RESPONDED',
+      daysAgo: 10,
+      comment: { body: "We understand the concern. We have arranged for the RV to be moved to off-site storage within 3 days. We were unaware of the 72-hour limit — thank you for the information.", isInternal: false },
+    },
+    {
+      residentIdx: 2,
+      violationType: 'UNAUTHORIZED_MODIFICATION',
+      ruleCitation: "CC&Rs Section 7.4 — Exterior Modifications Require Prior Approval",
+      description: "A wood pergola structure has been installed in the rear yard without an architectural review approval. The structure appears to be approximately 12×14 feet and is visible over the fence line from the adjacent property. No architectural review application was submitted or approved prior to installation.",
+      resolutionSteps: "You may submit a retroactive architectural review application for the pergola within 30 days. If the application is approved, no further action is needed. If the application is denied or not submitted within the timeframe, the structure will need to be removed.",
+      deadline: new Date(Date.now() + 25 * 24 * 60 * 60 * 1000),
+      status: 'UNDER_REVIEW',
+      daysAgo: 14,
+      internalNote: "Resident has submitted a retroactive arch request (ID on file). Putting this on hold pending board decision.",
+    },
+    {
+      residentIdx: 3,
+      violationType: 'PET_VIOLATION',
+      ruleCitation: "Community Rules Section 6.1 — Pet Registration and Leash Requirements",
+      description: "A large dog from this unit was observed off-leash in the common area green space on two separate occasions: June 15 and June 18. The dog approached other residents and their pets. All pets must be on a leash no longer than 6 feet when in any common area.",
+      resolutionSteps: "Please ensure your pet is on a leash at all times in common areas. All pets must also be registered with the management office. If your pet is not yet registered, please submit a pet registration form within 15 days.",
+      deadline: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+      status: 'ESCALATED',
+      daysAgo: 20,
+      appeal: {
+        reason: "Our dog was in a designated off-leash area both times. We believe the notices reference the wrong location. We would like to appeal this violation and request a review of the specific areas involved.",
+        status: 'SUBMITTED',
+      },
+    },
+    {
+      residentIdx: 4,
+      violationType: 'NOISE',
+      ruleCitation: "Community Rules Section 4.3 — Quiet Hours (10pm–8am)",
+      description: "Multiple neighbors reported loud music and outdoor gathering noise originating from this property on Saturday, June 14 from approximately 11pm to 2am. This is the second noise complaint for this address in 60 days.",
+      resolutionSteps: "Please ensure all outdoor gatherings and amplified music end by 10:00 PM. Repeated noise violations may result in fines per the community's enforcement schedule.",
+      status: 'RESOLVED',
+      daysAgo: 25,
+      comment: { body: "We apologize for the disturbance. We were hosting a graduation party and lost track of the time. It will not happen again.", isInternal: false },
+    },
+    {
+      residentIdx: 5,
+      violationType: 'TRASH_AND_DEBRIS',
+      ruleCitation: "CC&Rs Section 5.5 — Trash Enclosures and Debris",
+      description: "Trash cans and a collection of broken furniture and cardboard boxes have been left at the curb for approximately 8 days since the last collection date. Non-collection items should be taken to the bulk waste area or scheduled for pickup.",
+      resolutionSteps: "Please remove all non-collection debris and store trash cans within the garage or behind the gate. Bulk items can be scheduled for removal by calling the city at 555-CLEAN-UP or using the city's online portal.",
+      deadline: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
+      status: 'NOTICE_SENT',
+      daysAgo: 3,
+    },
+    {
+      residentIdx: 6,
+      violationType: 'PROPERTY_APPEARANCE',
+      ruleCitation: "CC&Rs Section 5.2 — Property Upkeep and Appearance",
+      description: "The exterior paint on the garage door and front facade of this property is severely faded, chipping, and peeling in multiple areas. The condition has been ongoing for more than six months and has been noted in two prior drive-through inspections.",
+      resolutionSteps: "A fresh coat of paint must be applied to all affected exterior surfaces within 60 days. Any new paint color must comply with the approved community color palette. Please submit an Exterior Paint application if choosing a new color.",
+      deadline: new Date(Date.now() + 55 * 24 * 60 * 60 * 1000),
+      status: 'UNDER_REVIEW',
+      daysAgo: 8,
+      appeal: {
+        reason: "We scheduled a painting contractor two months ago but they cancelled. We have a new appointment booked for next week. We are working on this and respectfully ask that the violation be withdrawn or the deadline extended.",
+        status: 'UNDER_REVIEW',
+        outcome: "Board acknowledged scheduling difficulty. Extended deadline by 30 days. Appeal under review pending completion.",
+      },
+    },
+    {
+      residentIdx: 19, // demo resident
+      violationType: 'LANDSCAPING_MAINTENANCE',
+      ruleCitation: "CC&Rs Section 5.1 — Landscaping Maintenance Standards",
+      description: "Hedges along the side yard fence line have grown significantly over the neighboring property line and above the permitted fence height of 6 feet. This affects both the neighbor's property and the appearance of the community boundary.",
+      resolutionSteps: "Please trim all hedges so they do not exceed the 6-foot fence height and do not extend over the property line. This should be completed within the deadline.",
+      deadline: new Date(Date.now() + 21 * 24 * 60 * 60 * 1000),
+      status: 'DRAFT',
+      daysAgo: 1,
+    },
+  ];
+
+  const secondAdmin = createdAdmins[1] ?? firstAdmin;
+
+  for (const def of vDefs) {
+    const observedAt = new Date(Date.now() - def.daysAgo * 24 * 60 * 60 * 1000);
+    const v = await prisma.violation.create({
+      data: {
+        residentId: createdResidents[def.residentIdx].id,
+        createdById: def.status === 'DRAFT' ? firstAdmin.id : secondAdmin.id,
+        violationType: def.violationType,
+        ruleCitation: def.ruleCitation,
+        description: def.description,
+        resolutionSteps: def.resolutionSteps ?? null,
+        deadline: def.deadline ?? null,
+        status: def.status,
+        observedAt,
+        createdAt: observedAt,
+        updatedAt: observedAt,
+      },
+    });
+
+    await prisma.violationActivity.create({
+      data: {
+        violationId: v.id,
+        actorId: def.status === 'DRAFT' ? firstAdmin.id : secondAdmin.id,
+        action: 'created',
+        details: def.status === 'DRAFT' ? 'Draft created' : 'Violation recorded',
+        createdAt: observedAt,
+      },
+    });
+
+    if (def.status !== 'DRAFT') {
+      await prisma.violationActivity.create({
+        data: {
+          violationId: v.id,
+          actorId: secondAdmin.id,
+          action: 'notice_sent',
+          details: 'Notice sent to resident via email',
+          createdAt: new Date(observedAt.getTime() + 1 * 60 * 60 * 1000),
+        },
+      });
+    }
+
+    if (def.comment) {
+      const authorId = def.comment.isInternal ? firstAdmin.id : createdResidents[def.residentIdx].id;
+      await prisma.violationComment.create({
+        data: {
+          violationId: v.id,
+          authorId,
+          body: def.comment.body,
+          isInternal: def.comment.isInternal,
+          createdAt: new Date(observedAt.getTime() + 48 * 60 * 60 * 1000),
+        },
+      });
+      if (!def.comment.isInternal) {
+        await prisma.violationActivity.create({
+          data: {
+            violationId: v.id,
+            actorId: authorId,
+            action: 'resident_responded',
+            details: 'Resident submitted a written response',
+            createdAt: new Date(observedAt.getTime() + 48 * 60 * 60 * 1000),
+          },
+        });
+      }
+    }
+
+    if (def.internalNote) {
+      await prisma.violationComment.create({
+        data: {
+          violationId: v.id,
+          authorId: firstAdmin.id,
+          body: def.internalNote,
+          isInternal: true,
+          createdAt: new Date(observedAt.getTime() + 72 * 60 * 60 * 1000),
+        },
+      });
+    }
+
+    if (['UNDER_REVIEW', 'RESOLVED', 'ESCALATED', 'CLOSED'].includes(def.status)) {
+      await prisma.violationActivity.create({
+        data: {
+          violationId: v.id,
+          actorId: firstAdmin.id,
+          action: 'status_changed',
+          details: `Status updated to ${def.status.toLowerCase().replace(/_/g, ' ')}`,
+          createdAt: new Date(observedAt.getTime() + 4 * 24 * 60 * 60 * 1000),
+        },
+      });
+    }
+
+    if (def.appeal) {
+      const appeal = await prisma.violationAppeal.create({
+        data: {
+          violationId: v.id,
+          submittedById: createdResidents[def.residentIdx].id,
+          reason: def.appeal.reason,
+          status: def.appeal.status,
+          outcome: def.appeal.outcome ?? null,
+          reviewedById: ['APPROVED', 'DENIED'].includes(def.appeal.status) ? firstAdmin.id : null,
+          reviewedAt: ['APPROVED', 'DENIED'].includes(def.appeal.status) ? new Date(observedAt.getTime() + 6 * 24 * 60 * 60 * 1000) : null,
+          createdAt: new Date(observedAt.getTime() + 5 * 24 * 60 * 60 * 1000),
+          updatedAt: new Date(observedAt.getTime() + 5 * 24 * 60 * 60 * 1000),
+        },
+      });
+      await prisma.violationActivity.create({
+        data: {
+          violationId: v.id,
+          actorId: createdResidents[def.residentIdx].id,
+          action: 'appeal_filed',
+          details: 'Resident filed an appeal',
+          createdAt: new Date(observedAt.getTime() + 5 * 24 * 60 * 60 * 1000),
+        },
+      });
+      if (['APPROVED', 'DENIED'].includes(def.appeal.status)) {
+        await prisma.violationActivity.create({
+          data: {
+            violationId: v.id,
+            actorId: firstAdmin.id,
+            action: 'appeal_reviewed',
+            details: `Appeal ${def.appeal.status.toLowerCase()}`,
+            createdAt: new Date(observedAt.getTime() + 6 * 24 * 60 * 60 * 1000),
+          },
+        });
+      }
+      void appeal;
+    }
+  }
+
   console.log('\nSeed complete!');
   console.log('─────────────────────────────────');
   console.log('Demo credentials (password: password123)');
