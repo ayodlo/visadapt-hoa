@@ -22,16 +22,23 @@ function paymentsHref(role: SessionUser['role']) {
   return '/dashboard/dues';
 }
 
+function issuesHref(role: SessionUser['role']) {
+  if (role === 'ADMIN' || role === 'BOARD_MEMBER') return '/admin/issues';
+  return '/resident/issues';
+}
+
 function buildNav(role: SessionUser['role']) {
   const home = dashboardHref(role);
   const docs = documentsHref(role);
   const payments = paymentsHref(role);
+  const issues = issuesHref(role);
   const paymentsLabel = role === 'BOARD_MEMBER' ? 'Dues' : 'Payments';
   const isAdmin = role === 'ADMIN' || role === 'BOARD_MEMBER';
   const items = [
     { href: home, label: 'Dashboard', icon: '🏠' },
     { href: '/dashboard/announcements', label: 'Announcements', icon: '📢' },
     { href: '/dashboard/events', label: 'Events', icon: '📅' },
+    { href: issues, label: 'Issues', icon: '🔨' },
     { href: '/dashboard/maintenance', label: 'Maintenance', icon: '🔧' },
     { href: '/dashboard/polls', label: 'Polls', icon: '📊' },
     { href: payments, label: paymentsLabel, icon: '💰' },

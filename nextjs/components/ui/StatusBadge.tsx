@@ -11,6 +11,10 @@ const COLORS: Record<string, string> = {
   MEDIUM: 'bg-blue-100 text-blue-800',
   HIGH: 'bg-orange-100 text-orange-800',
   URGENT: 'bg-red-100 text-red-800',
+  SUBMITTED: 'bg-sky-100 text-sky-800',
+  UNDER_REVIEW: 'bg-yellow-100 text-yellow-800',
+  ASSIGNED: 'bg-blue-100 text-blue-800',
+  WAITING_ON_VENDOR: 'bg-orange-100 text-orange-800',
   ADMIN: 'bg-purple-100 text-purple-800',
   BOARD_MEMBER: 'bg-indigo-100 text-indigo-800',
   RESIDENT: 'bg-gray-100 text-gray-600',
@@ -26,6 +30,8 @@ const COLORS: Record<string, string> = {
 
 const LABELS: Record<string, string> = {
   IN_PROGRESS: 'In Progress',
+  UNDER_REVIEW: 'Under Review',
+  WAITING_ON_VENDOR: 'Waiting on Vendor',
   BOARD_MEMBER: 'Board Member',
   CC_AND_RS: 'CC&Rs',
   RULES_AND_REGS: 'Rules & Regulations',

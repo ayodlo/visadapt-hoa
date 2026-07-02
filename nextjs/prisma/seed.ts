@@ -181,6 +181,8 @@ async function main() {
   });
 
   console.log('Seeding charges and payments…');
+  await prisma.payment.deleteMany({});
+  await prisma.charge.deleteMany({});
   const HOA_DUES = 25000; // $250.00 in cents
   const now = new Date();
 
@@ -385,6 +387,294 @@ async function main() {
       },
     ],
   });
+
+  console.log('Seeding issues…');
+  await prisma.issueActivity.deleteMany({});
+  await prisma.issueComment.deleteMany({});
+  await prisma.issue.deleteMany({});
+  const createdVendors = await prisma.vendor.findMany({ take: 5, orderBy: { createdAt: 'asc' } });
+  const [vendorLandscape, vendorPlumbing, , , vendorSecurity] = createdVendors;
+
+  const issueDefs: {
+    residentIdx: number;
+    category: 'LANDSCAPING' | 'MAINTENANCE' | 'PARKING' | 'SAFETY' | 'NOISE' | 'GATE_ACCESS' | 'TRASH' | 'OTHER';
+    title: string;
+    description: string;
+    location: string;
+    priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+    status: 'SUBMITTED' | 'UNDER_REVIEW' | 'ASSIGNED' | 'IN_PROGRESS' | 'WAITING_ON_VENDOR' | 'RESOLVED' | 'CLOSED';
+    preferredContactMethod: string;
+    daysAgo: number;
+    vendorId?: string;
+    assignedToId?: string;
+    dueDate?: Date;
+  }[] = [
+    {
+      residentIdx: 0,
+      category: 'MAINTENANCE',
+      title: 'Broken sprinkler head near Building A entrance',
+      description: 'The sprinkler head at the main entrance to Building A is broken and spraying water onto the sidewalk. It has been like this for about a week and is creating a slip hazard when temperatures drop.',
+      location: 'Building A, Main Entrance — east sidewalk',
+      priority: 'HIGH',
+      status: 'IN_PROGRESS',
+      preferredContactMethod: 'Email',
+      daysAgo: 18,
+      vendorId: vendorLandscape?.id,
+      assignedToId: firstAdmin.id,
+      dueDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
+    },
+    {
+      residentIdx: 1,
+      category: 'NOISE',
+      title: 'Loud music from unit 3B every weekend night',
+      description: 'The tenant in unit 3B has been playing loud music until 2–3 AM on Friday and Saturday nights. I have knocked on the door twice but the noise continues. This has been ongoing for the past month.',
+      location: 'Building C, Unit 3B',
+      priority: 'HIGH',
+      status: 'UNDER_REVIEW',
+      preferredContactMethod: 'Phone',
+      daysAgo: 12,
+    },
+    {
+      residentIdx: 2,
+      category: 'PARKING',
+      title: 'Unknown vehicle parked in my assigned spot (#47)',
+      description: 'A white Honda Civic with no HOA permit sticker has been parked in my assigned parking spot #47 for three days straight. I cannot park in my own space.',
+      location: 'Parking Level 1, Spot #47',
+      priority: 'URGENT',
+      status: 'RESOLVED',
+      preferredContactMethod: 'Text',
+      daysAgo: 25,
+      assignedToId: firstAdmin.id,
+    },
+    {
+      residentIdx: 3,
+      category: 'LANDSCAPING',
+      title: 'Dead shrubs along the south fence need removal',
+      description: 'Several large shrubs along the south boundary fence have died and are now brown and unsightly. They appear to have died during the dry spell last month. Removal and replanting would greatly improve the area.',
+      location: 'South boundary fence, between Gates 2 and 3',
+      priority: 'LOW',
+      status: 'SUBMITTED',
+      preferredContactMethod: 'Email',
+      daysAgo: 5,
+    },
+    {
+      residentIdx: 4,
+      category: 'SAFETY',
+      title: 'Burned-out streetlight on Maple Path',
+      description: 'The streetlight at the bend in Maple Path has been out for about two weeks. This section of the path is completely dark at night and is a safety concern, especially for residents walking dogs in the evening.',
+      location: 'Maple Path, approximately 50 feet past the mailbox cluster',
+      priority: 'HIGH',
+      status: 'ASSIGNED',
+      preferredContactMethod: 'Email',
+      daysAgo: 14,
+      assignedToId: firstAdmin.id,
+      dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    },
+    {
+      residentIdx: 5,
+      category: 'GATE_ACCESS',
+      title: 'Main gate keypad not accepting my access code',
+      description: 'My access code for the main vehicle entry gate stopped working on Monday evening. I had to wait for another resident to let me in. I have not changed my code recently.',
+      location: 'Main vehicle entry gate — north entrance',
+      priority: 'URGENT',
+      status: 'RESOLVED',
+      preferredContactMethod: 'Phone',
+      daysAgo: 30,
+      vendorId: vendorSecurity?.id,
+      assignedToId: firstAdmin.id,
+    },
+    {
+      residentIdx: 6,
+      category: 'TRASH',
+      title: 'Overflowing trash bins at the dog waste station',
+      description: 'The dog waste bin near the dog park has been overflowing for three days. Bags and waste are accumulating on the ground around the station. This is an odor and sanitation issue for nearby residents.',
+      location: 'Dog park area, near the water fountain',
+      priority: 'MEDIUM',
+      status: 'CLOSED',
+      preferredContactMethod: 'Email',
+      daysAgo: 40,
+    },
+    {
+      residentIdx: 7,
+      category: 'MAINTENANCE',
+      title: 'Pool gate latch is broken — gate swings open',
+      description: 'The latch on the pool area gate is no longer functioning correctly. The gate will not stay latched and swings open on its own, meaning the pool area is accessible without a key fob. This is a safety concern especially with children in the complex.',
+      location: 'Pool area, main entry gate',
+      priority: 'URGENT',
+      status: 'WAITING_ON_VENDOR',
+      preferredContactMethod: 'Email',
+      daysAgo: 8,
+      vendorId: vendorPlumbing?.id,
+      assignedToId: firstAdmin.id,
+      dueDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000),
+    },
+    {
+      residentIdx: 8,
+      category: 'LANDSCAPING',
+      title: 'Tree branches overhanging parking area — vehicle damage risk',
+      description: 'A large oak tree near visitor parking has several dead branches hanging directly over the parking spaces. One branch looks like it could fall in heavy winds. I am concerned about damage to my vehicle and those of visitors.',
+      location: 'Visitor parking lot, northeast corner',
+      priority: 'HIGH',
+      status: 'IN_PROGRESS',
+      preferredContactMethod: 'Email',
+      daysAgo: 10,
+      vendorId: vendorLandscape?.id,
+      assignedToId: firstAdmin.id,
+      dueDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
+    },
+    {
+      residentIdx: 9,
+      category: 'NOISE',
+      title: 'Construction noise starting before 7 AM',
+      description: 'The renovation work happening in unit 4A has been starting before 7 AM multiple days this week. According to the community rules, construction noise is not allowed before 8 AM on weekdays and not at all on weekends.',
+      location: 'Building D, Unit 4A',
+      priority: 'MEDIUM',
+      status: 'UNDER_REVIEW',
+      preferredContactMethod: 'Text',
+      daysAgo: 6,
+    },
+    {
+      residentIdx: 10,
+      category: 'SAFETY',
+      title: 'Cracked sidewalk is a trip hazard near Building B',
+      description: 'There is a section of sidewalk near the main entrance to Building B that has cracked and lifted significantly. I nearly tripped on it last week. An elderly neighbor also had difficulty navigating it with her walker.',
+      location: 'Building B, north sidewalk entrance — approximately 10 feet from the door',
+      priority: 'HIGH',
+      status: 'ASSIGNED',
+      preferredContactMethod: 'Email',
+      daysAgo: 20,
+      assignedToId: firstAdmin.id,
+      dueDate: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000),
+    },
+    {
+      residentIdx: 11,
+      category: 'PARKING',
+      title: 'Resident consistently blocking fire lane on weekends',
+      description: 'A resident vehicle (dark blue SUV) is regularly parked in the fire lane on Saturday and Sunday mornings, apparently during a regular visitor pickup. The fire lane must remain clear at all times per city code.',
+      location: 'Fire lane adjacent to Building A side entrance',
+      priority: 'HIGH',
+      status: 'CLOSED',
+      preferredContactMethod: 'Email',
+      daysAgo: 45,
+    },
+    {
+      residentIdx: 12,
+      category: 'OTHER',
+      title: 'Request for additional bike rack near Building C',
+      description: 'The existing bike rack near Building C is always full. Several residents including myself have started locking bikes to the fence or trees nearby, which is not ideal. Requesting one additional rack be installed.',
+      location: 'Building C, near the south entrance',
+      priority: 'LOW',
+      status: 'UNDER_REVIEW',
+      preferredContactMethod: 'Email',
+      daysAgo: 15,
+    },
+    {
+      residentIdx: 13,
+      category: 'MAINTENANCE',
+      title: 'Common area hallway light flickering in Building D',
+      description: 'The fluorescent light fixture in the second-floor hallway of Building D has been flickering on and off for about a week. It goes dark for several minutes at a time, making the hallway difficult to navigate safely at night.',
+      location: 'Building D, 2nd floor hallway, near elevator',
+      priority: 'MEDIUM',
+      status: 'RESOLVED',
+      preferredContactMethod: 'Email',
+      daysAgo: 22,
+      assignedToId: firstAdmin.id,
+    },
+    {
+      residentIdx: 14,
+      category: 'GATE_ACCESS',
+      title: 'Pedestrian gate remote not working after battery replacement',
+      description: 'I replaced the battery in my pedestrian gate remote as suggested but it still does not work. The remote is less than a year old. I need either a replacement remote or to have my current one reprogrammed.',
+      location: 'Pedestrian side gate — west side of property',
+      priority: 'MEDIUM',
+      status: 'SUBMITTED',
+      preferredContactMethod: 'Phone',
+      daysAgo: 3,
+    },
+    {
+      residentIdx: 15,
+      category: 'TRASH',
+      title: 'Bulk item abandoned next to recycling bins',
+      description: 'Someone has left a large mattress and a broken dresser next to the recycling bins for the past five days. They are blocking access to the bins and look very messy.',
+      location: 'Recycling enclosure, Building B side',
+      priority: 'MEDIUM',
+      status: 'IN_PROGRESS',
+      preferredContactMethod: 'Text',
+      daysAgo: 7,
+      assignedToId: firstAdmin.id,
+    },
+    {
+      residentIdx: 16,
+      category: 'MAINTENANCE',
+      title: 'Gym treadmill #2 making grinding noise and vibrating excessively',
+      description: 'The second treadmill in the fitness center has been making a loud grinding noise and shaking during use. I am concerned it may be unsafe. I have seen other residents using it and wanted to report it before someone gets hurt.',
+      location: 'Fitness center, treadmill station #2',
+      priority: 'HIGH',
+      status: 'WAITING_ON_VENDOR',
+      preferredContactMethod: 'Email',
+      daysAgo: 11,
+      assignedToId: firstAdmin.id,
+      dueDate: new Date(Date.now() + 4 * 24 * 60 * 60 * 1000),
+    },
+  ];
+
+  for (const def of issueDefs) {
+    const createdAt = new Date(Date.now() - def.daysAgo * 24 * 60 * 60 * 1000);
+    const issue = await prisma.issue.create({
+      data: {
+        residentId: createdResidents[def.residentIdx].id,
+        vendorId: def.vendorId ?? null,
+        assignedToId: def.assignedToId ?? null,
+        category: def.category,
+        title: def.title,
+        description: def.description,
+        location: def.location,
+        priority: def.priority,
+        status: def.status,
+        preferredContactMethod: def.preferredContactMethod,
+        dueDate: def.dueDate ?? null,
+        createdAt,
+        updatedAt: createdAt,
+      },
+    });
+
+    // Seed initial activity
+    await prisma.issueActivity.create({
+      data: {
+        issueId: issue.id,
+        actorId: createdResidents[def.residentIdx].id,
+        action: 'created',
+        details: 'Issue submitted',
+        createdAt,
+      },
+    });
+
+    // Seed a status-change activity for non-submitted issues
+    if (def.status !== 'SUBMITTED') {
+      await prisma.issueActivity.create({
+        data: {
+          issueId: issue.id,
+          actorId: firstAdmin.id,
+          action: 'status_changed',
+          details: `Status updated to ${def.status.replace(/_/g, ' ').toLowerCase()}`,
+          createdAt: new Date(createdAt.getTime() + 2 * 60 * 60 * 1000),
+        },
+      });
+    }
+
+    // Seed a sample comment for resolved/closed issues
+    if (def.status === 'RESOLVED' || def.status === 'CLOSED') {
+      await prisma.issueComment.create({
+        data: {
+          issueId: issue.id,
+          authorId: firstAdmin.id,
+          body: 'This issue has been reviewed and addressed. Please let us know if you experience any further problems.',
+          isInternal: false,
+          createdAt: new Date(createdAt.getTime() + 48 * 60 * 60 * 1000),
+        },
+      });
+    }
+  }
 
   console.log('\nSeed complete!');
   console.log('─────────────────────────────────');

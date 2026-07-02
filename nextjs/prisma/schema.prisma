@@ -36,6 +36,10 @@ model User {
   payments             Payment[]
   auditLogs            AuditLog[]
   passwordResetTokens  PasswordResetToken[]
+  issues               Issue[]              @relation("ResidentIssues")
+  assignedIssues       Issue[]              @relation("AssignedIssues")
+  issueComments        IssueComment[]
+  issueActivities      IssueActivity[]
 
   @@map("users")
 }
@@ -65,6 +69,7 @@ model Property {
   updatedAt     DateTime @updatedAt
   charges       Charge[]
   payments      Payment[]
+  issues        Issue[]
 
   @@map("properties")
 }
@@ -92,8 +97,91 @@ model Vendor {
   notes       String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  issues      Issue[]
 
   @@map("vendors")
+}
+
+// ─── Issue Tracking ───────────────────────────────────────────────────────────
+
+enum IssueCategory {
+  LANDSCAPING
+  MAINTENANCE
+  PARKING
+  SAFETY
+  NOISE
+  GATE_ACCESS
+  TRASH
+  OTHER
+}
+
+enum IssueStatus {
+  SUBMITTED
+  UNDER_REVIEW
+  ASSIGNED
+  IN_PROGRESS
+  WAITING_ON_VENDOR
+  RESOLVED
+  CLOSED
+}
+
+enum IssuePriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+model Issue {
+  id                   String          @id @default(cuid())
+  residentId           String
+  resident             User            @relation("ResidentIssues", fields: [residentId], references: [id])
+  propertyId           String?
+  property             Property?       @relation(fields: [propertyId], references: [id])
+  vendorId             String?
+  vendor               Vendor?         @relation(fields: [vendorId], references: [id])
+  assignedToId         String?
+  assignedTo           User?           @relation("AssignedIssues", fields: [assignedToId], references: [id])
+  category             IssueCategory   @default(OTHER)
+  title                String
+  description          String
+  location             String
+  priority             IssuePriority   @default(MEDIUM)
+  status               IssueStatus     @default(SUBMITTED)
+  preferredContactMethod String
+  dueDate              DateTime?
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+  comments             IssueComment[]
+  activities           IssueActivity[]
+
+  @@map("issues")
+}
+
+model IssueComment {
+  id         String   @id @default(cuid())
+  issueId    String
+  issue      Issue    @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  authorId   String
+  author     User     @relation(fields: [authorId], references: [id])
+  body       String
+  isInternal Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@map("issue_comments")
+}
+
+model IssueActivity {
+  id        String   @id @default(cuid())
+  issueId   String
+  issue     Issue    @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  actorId   String?
+  actor     User?    @relation(fields: [actorId], references: [id])
+  action    String
+  details   String?
+  createdAt DateTime @default(now())
+
+  @@map("issue_activities")
 }
 
 model AuditLog {
