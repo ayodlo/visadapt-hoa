@@ -3,94 +3,135 @@ import { getSession } from '@/lib/auth';
 import { StatCard } from '@/components/ui/StatCard';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { residentMock, formatDollars } from '@/lib/mock-dashboard';
+import { getResidentDashboard, formatDollars } from '@/lib/dashboard';
+import { violationTypeLabel, residentStatusLabel } from '@/lib/violations';
 
 const QUICK_ACTIONS = [
-  { href: '/dashboard/dues', label: 'Pay Dues', icon: '💰', description: 'View and pay your balance' },
-  { href: '/dashboard/maintenance', label: 'Submit Issue', icon: '🔧', description: 'Report a maintenance problem' },
-  { href: '/dashboard/documents', label: 'Browse Documents', icon: '📄', description: 'Rules, minutes & forms' },
-  { href: '/dashboard/announcements', label: 'Announcements', icon: '📢', description: "What's happening in the community" },
+  { href: '/resident/payments', label: 'Pay Dues', icon: '💰', description: 'View and pay your balance' },
+  { href: '/resident/issues', label: 'Submit Issue', icon: '🔨', description: 'Report a maintenance problem' },
+  { href: '/resident/documents', label: 'Browse Documents', icon: '📄', description: 'Rules, minutes & forms' },
+  { href: '/resident/announcements', label: 'Announcements', icon: '📢', description: "What's happening in the community" },
 ];
 
 export default async function ResidentDashboardPage() {
   const session = await getSession();
 
+  let data: Awaited<ReturnType<typeof getResidentDashboard>> | null = null;
+  try {
+    if (session?.id) {
+      data = await getResidentDashboard(session.id);
+    }
+  } catch {
+    // show partial UI
+  }
+
   return (
-    <div className="max-w-4xl mx-auto">
+    <div className="max-w-4xl mx-auto space-y-8">
       <PageHeader
-        title={`Welcome back, ${session?.firstName} 👋`}
+        title={`Welcome back, ${session?.firstName}`}
         subtitle="Here's what's going on in your community."
       />
 
+      {!data && session && (
+        <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700" role="alert">
+          Dashboard data could not be loaded. Please refresh the page.
+        </div>
+      )}
+
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <StatCard
           label="Current Balance"
-          value={formatDollars(residentMock.balanceCents)}
+          value={data ? formatDollars(data.balanceCents) : '—'}
           icon="💰"
-          color={residentMock.balanceCents > 0 ? 'red' : 'green'}
-          href="/dashboard/dues"
+          color={(data?.balanceCents ?? 0) > 0 ? 'red' : 'green'}
+          href="/resident/payments"
         />
         <StatCard
           label="Next Due Date"
-          value={residentMock.nextDueDateLabel}
+          value={data?.nextDueDateLabel ?? '—'}
           icon="📅"
-          subtext="Quarterly dues"
+          subtext={data?.nextDueAmountCents ? formatDollars(data.nextDueAmountCents) : 'Quarterly dues'}
         />
         <StatCard
           label="Open Issues"
-          value={residentMock.openIssues}
-          icon="🔧"
-          href="/dashboard/maintenance"
+          value={data?.openIssues ?? '—'}
+          icon="🔨"
+          href="/resident/issues"
         />
         <StatCard
           label="Arch Requests"
-          value={residentMock.openArchRequests}
+          value={data?.openArchRequests ?? '—'}
           icon="🏗️"
+          href="/resident/architectural-requests"
         />
       </div>
 
-      <div className="grid md:grid-cols-2 gap-6 mb-8">
+      <div className="grid md:grid-cols-2 gap-6">
         {/* Recent Announcements */}
         <section aria-labelledby="announcements-heading">
           <div className="flex items-center justify-between mb-3">
             <h2 id="announcements-heading" className="text-base font-semibold text-gray-900">
               Recent Announcements
             </h2>
-            <Link href="/dashboard/announcements" className="text-sm text-blue-600 hover:underline focus:outline-none focus:ring-2 focus:ring-blue-500 rounded">
+            <Link href="/resident/announcements" className="text-sm text-blue-600 hover:underline focus:outline-none focus:ring-2 focus:ring-blue-500 rounded">
               View all
             </Link>
           </div>
           <div className="bg-white border border-gray-200 rounded-xl divide-y divide-gray-100">
-            {residentMock.recentAnnouncements.map((a) => (
-              <div key={a.id} className="px-4 py-3">
-                <p className="text-sm font-medium text-gray-900">{a.title}</p>
-                <p className="text-xs text-gray-500 mt-0.5">{a.date}</p>
-              </div>
-            ))}
+            {!data || data.recentAnnouncements.length === 0 ? (
+              <p className="px-4 py-6 text-sm text-gray-400 text-center">No announcements yet.</p>
+            ) : (
+              data.recentAnnouncements.map((a) => (
+                <Link
+                  key={a.id}
+                  href={`/resident/announcements/${a.id}`}
+                  className="block px-4 py-3 hover:bg-gray-50 transition-colors focus:outline-none focus:ring-inset focus:ring-2 focus:ring-blue-500"
+                >
+                  <p className="text-sm font-medium text-gray-900">{a.title}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{a.date}</p>
+                </Link>
+              ))
+            )}
           </div>
         </section>
 
-        {/* Recent Violations */}
+        {/* Active Violations */}
         <section aria-labelledby="violations-heading">
-          <h2 id="violations-heading" className="text-base font-semibold text-gray-900 mb-3">
-            Recent Violations
-          </h2>
-          {residentMock.recentViolations.length === 0 ? (
+          <div className="flex items-center justify-between mb-3">
+            <h2 id="violations-heading" className="text-base font-semibold text-gray-900">
+              Community Standards
+            </h2>
+            {(data?.activeViolations?.length ?? 0) > 0 && (
+              <Link href="/resident/violations" className="text-sm text-blue-600 hover:underline focus:outline-none focus:ring-2 focus:ring-blue-500 rounded">
+                View all
+              </Link>
+            )}
+          </div>
+          {!data || data.activeViolations.length === 0 ? (
             <div className="bg-white border border-gray-200 rounded-xl">
               <EmptyState
                 icon="✅"
                 title="You're all clear"
-                description="No open violations on your account."
+                description="No open community standards notices on your account."
               />
             </div>
           ) : (
             <div className="bg-white border border-gray-200 rounded-xl divide-y divide-gray-100">
-              {residentMock.recentViolations.map((v) => (
-                <div key={v.id} className="px-4 py-3">
-                  <p className="text-sm text-gray-900">{v.description}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">{v.date}</p>
-                </div>
+              {data.activeViolations.map((v) => (
+                <Link
+                  key={v.id}
+                  href={`/resident/violations/${v.id}`}
+                  className="block px-4 py-3 hover:bg-gray-50 transition-colors focus:outline-none focus:ring-inset focus:ring-2 focus:ring-blue-500"
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-xs bg-orange-50 text-orange-700 border border-orange-200 px-2 py-0.5 rounded-full font-medium">
+                      {residentStatusLabel(v.status)}
+                    </span>
+                  </div>
+                  <p className="text-sm font-medium text-gray-900">{violationTypeLabel(v.violationType)} Notice</p>
+                  <p className="text-xs text-gray-400 mt-0.5">{v.date}</p>
+                </Link>
               ))}
             </div>
           )}
