@@ -20,12 +20,28 @@ test('users list shows role selects for each user', async ({ page }) => {
   await expect(residentRow.getByRole('combobox')).toHaveValue('RESIDENT');
 });
 
+test.describe('as board member', () => {
+  test.use({ storageState: path.join(__dirname, '.auth/board.json') });
+
+  test('board member sees a read-only roster (no role selects, no delete)', async ({ page }) => {
+    await page.goto('/dashboard/users');
+    await expect(page.getByRole('heading', { name: 'Users' })).toBeVisible();
+    await expect(page.getByText('resident@communityhq.local')).toBeVisible();
+    await expect(page.getByRole('combobox')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Delete' })).toHaveCount(0);
+  });
+});
+
 test.describe('as resident', () => {
   test.use({ storageState: path.join(__dirname, '.auth/resident.json') });
 
-  test('resident can access the users page', async ({ page }) => {
+  test('resident is redirected away from the users page', async ({ page }) => {
     await page.goto('/dashboard/users');
-    await expect(page).not.toHaveURL(/login/);
-    await expect(page.getByRole('heading', { name: 'Users' })).toBeVisible();
+    await expect(page).toHaveURL(/\/resident\/dashboard/);
+  });
+
+  test('resident cannot fetch the users roster API', async ({ page }) => {
+    const res = await page.request.get('/api/users');
+    expect(res.status()).toBe(403);
   });
 });

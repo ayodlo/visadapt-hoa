@@ -4,10 +4,14 @@ import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { sendPasswordResetEmail } from '@/lib/email';
 import { ok, err } from '@/lib/api';
+import { rateLimit } from '@/lib/rate-limit';
 
 const schema = z.object({ email: z.string().email() });
 
 export async function POST(req: NextRequest) {
+  const limited = rateLimit(req, 'forgot-password', 5, 15 * 60 * 1000);
+  if (limited) return limited;
+
   const body = await req.json().catch(() => null);
   const parsed = schema.safeParse(body);
   if (!parsed.success) return err('Invalid email', 400);

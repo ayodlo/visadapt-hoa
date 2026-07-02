@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useSession } from '@/context/session';
 
 type Role = 'ADMIN' | 'BOARD_MEMBER' | 'RESIDENT';
 interface User { id: string; firstName: string; lastName: string; email: string; role: Role; createdAt: string; }
@@ -12,6 +13,8 @@ const ROLE_COLORS: Record<Role, string> = {
 };
 
 export default function UsersPage() {
+  const session = useSession();
+  const isAdmin = session.role === 'ADMIN';
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -59,14 +62,20 @@ export default function UsersPage() {
                   <td className="px-4 py-3 font-medium text-gray-900">{user.firstName} {user.lastName}</td>
                   <td className="px-4 py-3 text-gray-600">{user.email}</td>
                   <td className="px-4 py-3">
-                    <select value={user.role} onChange={(e) => updateRole(user.id, e.target.value as Role)}
-                      className={`text-xs font-medium px-2 py-1 rounded-full border-0 cursor-pointer ${ROLE_COLORS[user.role]}`}>
-                      {(['ADMIN', 'BOARD_MEMBER', 'RESIDENT'] as Role[]).map((r) => <option key={r} value={r}>{r.replace('_', ' ')}</option>)}
-                    </select>
+                    {isAdmin ? (
+                      <select value={user.role} onChange={(e) => updateRole(user.id, e.target.value as Role)}
+                        className={`text-xs font-medium px-2 py-1 rounded-full border-0 cursor-pointer ${ROLE_COLORS[user.role]}`}>
+                        {(['ADMIN', 'BOARD_MEMBER', 'RESIDENT'] as Role[]).map((r) => <option key={r} value={r}>{r.replace('_', ' ')}</option>)}
+                      </select>
+                    ) : (
+                      <span className={`inline-block text-xs font-medium px-2 py-1 rounded-full ${ROLE_COLORS[user.role]}`}>{user.role.replace('_', ' ')}</span>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-gray-500">{new Date(user.createdAt).toLocaleDateString()}</td>
                   <td className="px-4 py-3 text-right">
-                    <button onClick={() => handleDelete(user.id, `${user.firstName} ${user.lastName}`)} className="text-xs text-gray-400 hover:text-red-500">Delete</button>
+                    {isAdmin && (
+                      <button onClick={() => handleDelete(user.id, `${user.firstName} ${user.lastName}`)} className="text-xs text-gray-400 hover:text-red-500">Delete</button>
+                    )}
                   </td>
                 </tr>
               ))}

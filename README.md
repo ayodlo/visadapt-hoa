@@ -20,7 +20,7 @@ An HOA and community management platform for residents, board members, and admin
 ```bash
 cd nextjs
 cp .env.example .env.local   # point DATABASE_URL at a local or Neon Postgres
-npx prisma db push            # migration history is stale — this project uses db push
+npx prisma migrate deploy     # migrations baselined at 0_init
 npx prisma db seed            # demo logins: admin@/board@/resident@communityhq.local, password123
 npm run dev
 ```

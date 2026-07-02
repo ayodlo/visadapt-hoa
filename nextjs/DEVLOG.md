@@ -1,5 +1,24 @@
 # CommunityHQ Dev Log
 
+## 2026-07-02 — Security hardening + migration baseline
+
+**Files touched:**
+- `app/api/users/route.ts` — GET is now staff-only (was: any authenticated user could pull every member's name/email/role)
+- `app/dashboard/users/layout.tsx` — new server guard; residents are redirected to their dashboard
+- `app/dashboard/users/page.tsx` — board members get a read-only roster (no role selects / delete buttons — the write APIs were already admin-only); uses `useSession()`
+- `lib/rate-limit.ts` — new in-memory fixed-window limiter (factory + `rateLimit(req, route, limit, windowMs)` helper returning a 429 with Retry-After)
+- `app/api/auth/{login,register,forgot-password,reset-password}/route.ts` — per-IP limits: 20/15min, 10/hr, 5/15min, 10/15min
+- `__tests__/lib/rate-limit.test.ts` — 6 unit tests (106 total now)
+- `e2e/users.spec.ts` — resident test now asserts redirect + API 403; new board read-only test (27 e2e total)
+- `prisma/migrations/` — stale history replaced with a single `0_init` baseline generated via `prisma migrate diff --from-empty`; dev DB marked applied with `migrate resolve --applied 0_init`; `migrate diff` against the live DB confirms zero drift
+- READMEs — setup/deploy switched from `db push` to `migrate deploy`; security section updated
+
+**Gotchas / decisions:**
+- The dev `.env.local` DATABASE_URL points at **Neon**, not the local `communityhq_postgres` Docker container. Prisma CLI does not read `.env.local` — export DATABASE_URL first (e.g. `export DATABASE_URL=$(grep '^DATABASE_URL' .env.local | cut -d= -f2- | tr -d '\"')`).
+- Rate limiter is in-memory: per-instance on Vercel serverless (documented as friction, not a guarantee; Upstash Redis is the upgrade path).
+- Any DB previously set up via `db push` must be baselined once: `npx prisma migrate resolve --applied 0_init`. From now on use `migrate dev --name <change>` for schema changes.
+- `/api/users/[id]` uses PUT (not PATCH) — the README API table was wrong; fixed.
+
 ## 2026-07-02 — Recommendations follow-up: lucide icons, legacy cleanup, theme e2e
 
 **Files touched:**

@@ -33,7 +33,7 @@ A full-stack HOA (homeowners association) management platform built with Next.js
 cd nextjs
 npm install
 cp .env.example .env.local     # fill in values — see table below
-npx prisma db push             # create tables (dev)
+npx prisma migrate deploy      # apply migrations (baselined at 0_init)
 npx prisma db seed             # load demo data
 npm run dev                    # http://localhost:3000
 ```
@@ -238,14 +238,16 @@ Practical capacity: at a realistic single-HOA scale (hundreds of residents, thou
 - **No logout-everywhere / token revocation:** JWTs are stateless; a stolen or stale token is valid until expiry. Changing a password does **not** invalidate existing sessions.
 - **Audit logging** on financially/legally sensitive actions (see above).
 
+- **Rate limiting (auth endpoints):** per-IP fixed windows — login 20/15 min, register 10/hr, forgot-password 5/15 min, reset-password 10/15 min; excess requests get 429 with `Retry-After`. ⚠️ The limiter is in-memory (`lib/rate-limit.ts`): a real global limit on a single Node server, but per-instance on serverless — treat it as brute-force friction there, and move to a shared store (e.g. Upstash Redis) for hard guarantees.
+- **User roster (`GET /api/users`) is staff-only.** Board members see a read-only roster; only admins can change roles or delete. Residents are redirected away from the Users page and get 403 from the API.
+
 ### Security items to address before selling this
 
-1. **`GET /api/users` is not role-restricted.** Any authenticated user — including any self-registered resident — can retrieve every user's full name, email address, and role. The Users *page* is admin-only in the UI, but the API is open to all logged-in users (an e2e test currently pins this behavior). This is a personal-data exposure and should be locked to admins.
-2. **No rate limiting or brute-force protection** on login, registration, or password reset. (The retired Express backend had rate limits; the Next.js app has none.)
-3. **Open self-registration** with no email verification — anyone can create a resident account and immediately see announcements, documents, events, polls, and the users list.
-4. **No CSRF tokens.** `SameSite=Lax` mitigates cross-site POSTs in modern browsers, but there is no secondary defense.
-5. **Violation "evidence" and document links are unvalidated URLs** entered by staff — they can point anywhere.
-6. **No account lockout, session listing, 2FA, or password complexity policy.**
+1. **Open self-registration** with no email verification — anyone can create a resident account and immediately see announcements, documents, events, and polls.
+2. **No CSRF tokens.** `SameSite=Lax` mitigates cross-site POSTs in modern browsers, but there is no secondary defense.
+3. **Violation "evidence" and document links are unvalidated URLs** entered by staff — they can point anywhere.
+4. **No account lockout, session listing, 2FA, or password complexity policy.**
+5. **Rate limiting is per-instance on serverless** (see above) — upgrade to a shared store before relying on it.
 
 ---
 
@@ -352,8 +354,8 @@ All routes are cookie-authenticated (except `/api/auth/*` where noted) and retur
 | GET | `/api/documents/[id]/download` | Any authenticated — returns stored URL |
 | GET/POST | `/api/events`, PATCH/DELETE `/api/events/[id]` | GET any; writes staff |
 | GET/POST | `/api/polls`, DELETE `/api/polls/[id]`, POST `/api/polls/[id]/vote` | GET/vote any; create/delete staff |
-| GET | `/api/users` | ⚠️ Any authenticated user (see Security) |
-| PATCH/DELETE | `/api/users/[id]` | Admin (no self-delete; delete fails for users with history) |
+| GET | `/api/users` | Staff only (residents get 403) |
+| PUT/DELETE | `/api/users/[id]` | Admin (no self-delete; delete fails for users with history) |
 | GET/POST `/api/maintenance`, PATCH/DELETE `/api/maintenance/[id]` | Legacy maintenance | Resident create; staff update (sends email if configured) |
 | GET/POST `/api/dues`, PATCH/DELETE `/api/dues/[id]` | Legacy dues records | Residents see own; writes staff |
 
@@ -381,12 +383,12 @@ Dark mode is the default; a sun/moon toggle (sidebar, mobile top bar, auth pages
 1. Import the repo into Vercel; set the project **Root Directory** to `nextjs`.
 2. Add the environment variables above in project settings (Neon `DATABASE_URL` recommended).
 3. Build command is already `prisma generate && next build` via `package.json`.
-4. Initialize the production schema once: `npx prisma db push` with the production `DATABASE_URL`. Only seed non-production databases — the seed wipes all data.
+4. Initialize the production schema once: `npx prisma migrate deploy` with the production `DATABASE_URL`. Only seed non-production databases — the seed wipes all data.
 
 ## Operations Notes
 
 - **npm version is pinned in CI (11.6.1).** npm releases disagree about optional wasm dependencies in the lockfile; the workflows pin the version that writes `package-lock.json` locally. If you upgrade local Node/npm, regenerate the lockfile and bump the pin in `.github/workflows/{ci,e2e}.yml`.
 - **Prisma on Windows:** if `prisma generate` fails with `EPERM … query_engine-windows.dll.node`, an orphaned `next dev` child process is holding the engine DLL — kill the stray `node` process.
 - **Prisma binary targets** include `rhel-openssl-3.0.x` for Vercel's runtime.
-- **The migration history is stale — do not use `prisma migrate`.** `prisma/migrations/` only covers the schema as of the early sprints; every later model (issues, charges/payments, architectural requests, violations, …) was applied with `prisma db push` and has no migration. Running `prisma migrate dev` will report drift and offer to reset. Either keep using `db push` (current practice) or baseline a fresh migration history before production, where tracked migrations are strongly recommended.
+- **Migrations are baselined at `0_init`** (generated from the full current schema; the earlier stale history was removed). Fresh databases: `npx prisma migrate deploy`. Schema changes: `npx prisma migrate dev --name <change>`. A database that was previously set up with `db push` must be baselined once: `npx prisma migrate resolve --applied 0_init`.
 - The seed is idempotent but destructive (delete-then-recreate). `DEVLOG.md` in this directory is the running engineering log.
