@@ -15,6 +15,7 @@
 - StatCard/EmptyState still use emoji icons passed as string props from pages — deliberate, larger sweep; swap when touching those pages
 - GitHub Actions CI (unit) and E2E (gated on `vars.E2E_ENABLED`) already target `nextjs/` — unchanged
 - Gotcha: Windows EPERM on `prisma generate` during build = a leftover `next dev` child process holding query_engine DLL; find it via module list and kill (TaskStop/Ctrl-C on npm may orphan the child)
+- Gotcha: CI `npm ci` had failed on EVERY push since the workflows were added — npm 10 (Node 20) and npm 11 (Node 24, local) disagree about `@emnapi/*` optional deps of the Tailwind/Next wasm fallback packages, and no lockfile satisfies both. Fixed by bumping CI to Node 24 to match the machine that writes the lockfile. If local Node changes, keep CI's node-version in sync.
 
 **Verified:** build, tsc, eslint (0 warnings), 100/100 unit, 25/25 e2e (23 prior + 2 theme), screenshot of new icons in dark mode.
 
