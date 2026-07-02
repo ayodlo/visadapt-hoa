@@ -1,207 +1,34 @@
 # CommunityHQ
 
-An HOA and community management platform.
+An HOA and community management platform for residents, board members, and admins — announcements, events, maintenance issues, architectural requests, violations & appeals, dues/payments, documents, polls, and role-based dashboards.
 
-## Tech Stack
+**The application lives in [`nextjs/`](nextjs/) — see [`nextjs/README.md`](nextjs/README.md) for full setup, demo credentials, and the API overview.**
+
+## Tech stack
 
 | Layer | Technology |
 |-------|-----------|
-| Frontend | Vite + React + TypeScript |
-| Styling | Tailwind CSS |
-| Routing | React Router v6 |
-| Server state | TanStack Query v5 |
-| Forms | React Hook Form + Zod |
-| Backend | Express + TypeScript |
-| Database | PostgreSQL 16 via Docker |
+| Framework | Next.js 16 (App Router) + React 19 + TypeScript |
+| Styling | Tailwind CSS v4 (dark mode default, light/dark toggle) |
+| Database | PostgreSQL 16 (Neon in production) |
 | ORM | Prisma |
-| Auth | JWT (local dev) |
-| Testing | Vitest |
+| Auth | JWT session cookies |
+| Testing | Vitest (unit) + Playwright (e2e) |
 
-## Prerequisites
-
-- [Node.js](https://nodejs.org/) >= 20
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (for PostgreSQL)
-- npm >= 10 (comes with Node 20)
-
----
-
-## First-time setup
-
-### 1. Install dependencies
+## Quick start
 
 ```bash
-npm install
-```
-
-### 2. Configure environment
-
-```bash
-cp .env.example .env
-# Edit .env if you need non-default values
-cp .env server/.env
-```
-
-### 3. Start the database
-
-```bash
-docker compose up -d
-```
-
-### 4. Run Prisma migrations and generate the client
-
-```bash
-npm run db:generate
-npm run db:migrate
-```
-
-When prompted for a migration name, enter something like `init`.
-
-### 5. (Optional) Seed the database
-
-```bash
-npm run db:seed
-# Creates admin@communityhq.local / password123
-```
-
----
-
-## Running the app
-
-### Development (both client + server with hot reload)
-
-```bash
+cd nextjs
+cp .env.example .env.local   # point DATABASE_URL at a local or Neon Postgres
+npx prisma migrate dev
+npx prisma db seed           # demo logins: admin@/board@/resident@communityhq.local, password123
 npm run dev
 ```
 
-- Client: http://localhost:5173
-- API: http://localhost:3000
-- Health check: http://localhost:3000/api/health
+## Deployment
 
-### Client only
+Deploy on Vercel with the project **Root Directory set to `nextjs/`** (Settings → General). Set the environment variables from `nextjs/.env.example` in the Vercel dashboard; use a Neon `DATABASE_URL` in production.
 
-```bash
-npm run dev:client
-```
+## Repository history
 
-### Server only
-
-```bash
-npm run dev:server
-```
-
----
-
-## Building for production
-
-```bash
-npm run build
-```
-
-Outputs:
-- Server: `server/dist/`
-- Client: `client/dist/`
-
----
-
-## Testing
-
-```bash
-# All tests
-npm test
-
-# Client tests only
-npm run test:client
-
-# Server tests only
-npm run test:server
-```
-
----
-
-## Database commands
-
-| Command | Description |
-|---------|-------------|
-| `npm run db:generate` | Regenerate Prisma client after schema changes |
-| `npm run db:migrate` | Create and run a new migration |
-| `npm run db:seed` | Seed the database with initial data |
-| `npm run db:reset` | Drop all data and re-run migrations |
-| `npm run db:studio` | Open Prisma Studio in the browser |
-
----
-
-## Project structure
-
-```
-/
-├── client/                # Vite + React + TypeScript frontend
-│   └── src/
-│       ├── api/           # API client utility
-│       ├── components/    # Shared reusable components
-│       ├── features/      # Feature-scoped modules
-│       ├── layouts/       # Page layout shells
-│       ├── pages/         # Route-level page components
-│       ├── routes/        # React Router configuration
-│       ├── types/         # Shared TypeScript types
-│       └── utils/         # Pure utility helpers
-│
-├── server/                # Express + TypeScript API
-│   ├── prisma/            # Prisma schema, migrations, seed
-│   └── src/
-│       ├── controllers/   # Route handler functions
-│       ├── middleware/     # Express middleware (auth, errors, etc.)
-│       ├── routes/        # Express router definitions
-│       ├── schemas/       # Zod validation schemas
-│       ├── services/      # Business logic
-│       └── utils/         # Utility helpers (prisma client, etc.)
-│
-├── docker-compose.yml     # PostgreSQL service
-├── .env.example           # Environment variable template
-└── package.json           # npm workspace root
-```
-
----
-
-## Authentication
-
-### Demo credentials
-
-All demo accounts use the password `password123`.
-
-| Role | Email |
-|------|-------|
-| Resident | `resident@communityhq.local` |
-| Admin | `admin@communityhq.local` |
-| Board Member | `board@communityhq.local` |
-
-Use the **Demo accounts** buttons on the login page to pre-fill credentials.
-
-### How it works
-
-- Passwords are hashed with bcrypt (12 rounds) and stored in the `password_hash` column.
-- On login, the server issues a signed JWT (`JWT_SECRET` from `.env`) with a 7-day expiry.
-- The token is stored in `localStorage` under the key `chq_token` and sent as `Authorization: Bearer <token>` on every API request.
-- The `authenticate` middleware verifies the token on all protected routes.
-- The `requireRole` middleware enforces role-based access (e.g., only `ADMIN` can access `/api/users`).
-
-### Roles and redirects
-
-| Role | Dashboard path |
-|------|---------------|
-| `RESIDENT` | `/resident/dashboard` |
-| `ADMIN` | `/admin/dashboard` |
-| `BOARD_MEMBER` | `/board/dashboard` |
-
-Users who try to access a dashboard route for a different role are redirected to their own dashboard automatically.
-
----
-
-## Linting and formatting
-
-```bash
-# Lint all packages
-npm run lint
-
-# Format all files
-npm run format
-```
+The project began as a Vite + React client with an Express API (`client/` and `server/`, now removed) and was migrated to a single Next.js app. See `DEVLOG.md` and `nextjs/DEVLOG.md` for the running log.

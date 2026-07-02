@@ -1,5 +1,23 @@
 # CommunityHQ Dev Log
 
+## 2026-07-02 — Recommendations follow-up: lucide icons, legacy cleanup, theme e2e
+
+**Files touched:**
+- `package.json` — added `lucide-react`
+- `lib/nav.ts` — nav items now carry `LucideIcon` components (LayoutDashboard, Megaphone, Calendar, Hammer, PencilRuler, TriangleAlert, Wrench, ChartColumn, Wallet, FileText, Users) instead of emoji strings
+- `components/Sidebar.tsx`, `components/MobileNav.tsx` — render `<item.icon>`; icons inherit text color (active/hover states now tint the icon too)
+- `components/ThemeToggle.tsx` — hand-rolled SVGs replaced with lucide `Sun`/`Moon`
+- `eslint.config.mjs` — `no-unused-vars` now ignores `_`-prefixed args/vars/caught errors
+- `e2e/theme.spec.ts` — new: dark default, toggle to light, persistence across reload
+- Repo root: deleted legacy `client/` and `server/` artifact dirs (untracked leftovers — only dist/node_modules remained), root `node_modules/`, empty `vercel.json`, stale Express-era `.env.example`; rewrote root `README.md` to point at `nextjs/` with Vercel root-directory instructions
+
+**Notes:**
+- StatCard/EmptyState still use emoji icons passed as string props from pages — deliberate, larger sweep; swap when touching those pages
+- GitHub Actions CI (unit) and E2E (gated on `vars.E2E_ENABLED`) already target `nextjs/` — unchanged
+- Gotcha: Windows EPERM on `prisma generate` during build = a leftover `next dev` child process holding query_engine DLL; find it via module list and kill (TaskStop/Ctrl-C on npm may orphan the child)
+
+**Verified:** build, tsc, eslint (0 warnings), 100/100 unit, 25/25 e2e (23 prior + 2 theme), screenshot of new icons in dark mode.
+
 ## 2026-07-02 — Dark mode (default) + light toggle, UI revision pass
 
 **Files touched:**

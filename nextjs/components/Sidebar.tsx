@@ -45,7 +45,7 @@ export default function Sidebar({ user }: Props) {
               }`}
               aria-current={active ? 'page' : undefined}
             >
-              <span aria-hidden="true">{item.icon}</span>
+              <item.icon className="w-4 h-4 flex-shrink-0" aria-hidden="true" />
               {item.label}
             </Link>
           );
