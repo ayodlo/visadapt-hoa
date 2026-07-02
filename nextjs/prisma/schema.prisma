@@ -32,6 +32,8 @@ model User {
   pollVotes            PollVote[]
   duesRecords          DuesRecord[]
   documents            Document[]
+  charges              Charge[]
+  payments             Payment[]
   auditLogs            AuditLog[]
   passwordResetTokens  PasswordResetToken[]
 
@@ -61,6 +63,8 @@ model Property {
   owner         User     @relation(fields: [ownerId], references: [id])
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+  charges       Charge[]
+  payments      Payment[]
 
   @@map("properties")
 }
@@ -207,6 +211,49 @@ enum DuesStatus {
   PAID
   OVERDUE
   WAIVED
+}
+
+model Charge {
+  id          String       @id @default(cuid())
+  residentId  String
+  resident    User         @relation(fields: [residentId], references: [id])
+  propertyId  String?
+  property    Property?    @relation(fields: [propertyId], references: [id])
+  description String
+  amount      Int
+  dueDate     DateTime
+  status      ChargeStatus @default(PENDING)
+  createdAt   DateTime     @default(now())
+
+  @@map("charges")
+}
+
+enum ChargeStatus {
+  PENDING
+  PAID
+  OVERDUE
+}
+
+model Payment {
+  id                 String        @id @default(cuid())
+  residentId         String
+  resident           User          @relation(fields: [residentId], references: [id])
+  propertyId         String?
+  property           Property?     @relation(fields: [propertyId], references: [id])
+  amount             Int
+  paymentMethod      String
+  status             PaymentStatus @default(PAID)
+  paidAt             DateTime?
+  confirmationNumber String        @unique
+  createdAt          DateTime      @default(now())
+
+  @@map("payments")
+}
+
+enum PaymentStatus {
+  PAID
+  PENDING
+  FAILED
 }
 
 model Poll {

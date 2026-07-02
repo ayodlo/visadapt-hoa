@@ -180,6 +180,108 @@ async function main() {
     ],
   });
 
+  console.log('Seeding charges and payments…');
+  const HOA_DUES = 25000; // $250.00 in cents
+  const now = new Date();
+
+  // Months: March, April, May (always PAID), June (mixed), July (always PENDING upcoming)
+  const months = [
+    { label: 'March 2026 HOA Dues',    due: new Date('2026-03-01'), status: 'PAID' as const },
+    { label: 'April 2026 HOA Dues',    due: new Date('2026-04-01'), status: 'PAID' as const },
+    { label: 'May 2026 HOA Dues',      due: new Date('2026-05-01'), status: 'PAID' as const },
+    { label: 'July 2026 HOA Dues',     due: new Date('2026-07-01'), status: 'PENDING' as const },
+  ];
+
+  // Special seed helpers
+  const specialCharges: { idx: number; description: string; amount: number; dueDate: Date; status: 'PAID' | 'OVERDUE' | 'PENDING' }[] = [
+    { idx: 0,  description: 'Capital Improvement Assessment', amount: 50000, dueDate: new Date('2026-04-15'), status: 'PAID' },
+    { idx: 5,  description: 'Capital Improvement Assessment', amount: 50000, dueDate: new Date('2026-04-15'), status: 'PAID' },
+    { idx: 10, description: 'Capital Improvement Assessment', amount: 50000, dueDate: new Date('2026-04-15'), status: 'PAID' },
+    { idx: 15, description: 'Late Payment Fee',              amount:  5000, dueDate: new Date('2026-05-15'), status: 'OVERDUE' },
+    { idx: 16, description: 'Late Payment Fee',              amount:  5000, dueDate: new Date('2026-05-15'), status: 'OVERDUE' },
+    { idx: 19, description: 'Special Assessment — Roof Repair', amount: 75000, dueDate: new Date('2026-06-01'), status: 'PENDING' },
+  ];
+
+  let confCounter = 1000;
+  function nextConf() { return `CHQ-2026-${String(confCounter++).padStart(6, '0')}`; }
+
+  for (let i = 0; i < createdResidents.length; i++) {
+    const resident = createdResidents[i];
+    // June status varies by index
+    const juneStatus: 'PAID' | 'OVERDUE' | 'PENDING' =
+      i < 15 ? 'PAID' : i < 18 ? 'OVERDUE' : 'PENDING';
+
+    await prisma.charge.create({
+      data: {
+        residentId: resident.id,
+        description: 'June 2026 HOA Dues',
+        amount: HOA_DUES,
+        dueDate: new Date('2026-06-01'),
+        status: juneStatus,
+      },
+    });
+
+    // Monthly charges
+    for (const month of months) {
+      await prisma.charge.create({
+        data: {
+          residentId: resident.id,
+          description: month.label,
+          amount: HOA_DUES,
+          dueDate: month.due,
+          status: month.status,
+        },
+      });
+    }
+
+    // Special charges for certain residents
+    const special = specialCharges.find((s) => s.idx === i);
+    if (special) {
+      await prisma.charge.create({
+        data: {
+          residentId: resident.id,
+          description: special.description,
+          amount: special.amount,
+          dueDate: special.dueDate,
+          status: special.status,
+        },
+      });
+    }
+
+    // Create payments for each PAID charge (regular months + June if paid + special if paid)
+    const paidMonths = [...months.filter((m) => m.status === 'PAID')];
+    if (juneStatus === 'PAID') paidMonths.push({ label: 'June 2026 HOA Dues', due: new Date('2026-06-01'), status: 'PAID' });
+
+    for (const month of paidMonths) {
+      await prisma.payment.create({
+        data: {
+          residentId: resident.id,
+          amount: HOA_DUES,
+          paymentMethod: i % 3 === 0 ? 'Bank Transfer' : i % 3 === 1 ? 'Credit Card' : 'Check',
+          status: 'PAID',
+          paidAt: new Date(month.due.getTime() - 2 * 24 * 60 * 60 * 1000), // 2 days before due
+          confirmationNumber: nextConf(),
+        },
+      });
+    }
+
+    // Payment for special assessment if paid
+    if (special?.status === 'PAID') {
+      await prisma.payment.create({
+        data: {
+          residentId: resident.id,
+          amount: special.amount,
+          paymentMethod: 'Bank Transfer',
+          status: 'PAID',
+          paidAt: new Date(special.dueDate.getTime() - 3 * 24 * 60 * 60 * 1000),
+          confirmationNumber: nextConf(),
+        },
+      });
+    }
+  }
+
+  void now; // suppress unused warning
+
   console.log('Seeding sample documents…');
   const PLACEHOLDER_BASE = 'https://cdn.example.com/hoa-docs';
   await prisma.document.createMany({
