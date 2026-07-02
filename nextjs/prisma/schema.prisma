@@ -41,6 +41,9 @@ model User {
   assignedIssues       Issue[]              @relation("AssignedIssues")
   issueComments        IssueComment[]
   issueActivities      IssueActivity[]
+  architecturalRequests         ArchitecturalRequest[]          @relation("ResidentArchRequests")
+  architecturalRequestComments  ArchitecturalRequestComment[]   @relation("ArchRequestComments")
+  architecturalRequestActivities ArchitecturalRequestActivity[] @relation("ArchRequestActivities")
 
   @@map("users")
 }
@@ -68,9 +71,10 @@ model Property {
   owner         User     @relation(fields: [ownerId], references: [id])
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
-  charges       Charge[]
-  payments      Payment[]
-  issues        Issue[]
+  charges                Charge[]
+  payments               Payment[]
+  issues                 Issue[]
+  architecturalRequests  ArchitecturalRequest[]
 
   @@map("properties")
 }
@@ -413,4 +417,84 @@ model PollVote {
 
   @@unique([pollId, userId])
   @@map("poll_votes")
+}
+
+// ─── Architectural Review ─────────────────────────────────────────────────────
+
+enum ArchitecturalRequestType {
+  FENCE
+  EXTERIOR_PAINT
+  LANDSCAPING
+  SOLAR
+  ROOF
+  SHED
+  OTHER
+}
+
+enum ArchitecturalRequestStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  NEEDS_MORE_INFORMATION
+  APPROVED
+  DENIED
+  WITHDRAWN
+}
+
+model ArchitecturalRequest {
+  id                     String                         @id @default(cuid())
+  residentId             String
+  resident               User                           @relation("ResidentArchRequests", fields: [residentId], references: [id])
+  propertyId             String?
+  property               Property?                      @relation(fields: [propertyId], references: [id])
+  requestType            ArchitecturalRequestType
+  description            String
+  desiredStartDate       DateTime?
+  status                 ArchitecturalRequestStatus     @default(DRAFT)
+  governingRuleReference String?
+  decisionReason         String?
+  createdAt              DateTime                       @default(now())
+  updatedAt              DateTime                       @updatedAt
+  comments               ArchitecturalRequestComment[]
+  activities             ArchitecturalRequestActivity[]
+  attachments            ArchitecturalRequestAttachment[]
+
+  @@map("architectural_requests")
+}
+
+model ArchitecturalRequestComment {
+  id        String               @id @default(cuid())
+  requestId String
+  request   ArchitecturalRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User                 @relation("ArchRequestComments", fields: [authorId], references: [id])
+  body      String
+  isInternal Boolean             @default(false)
+  createdAt DateTime             @default(now())
+
+  @@map("architectural_request_comments")
+}
+
+model ArchitecturalRequestActivity {
+  id        String               @id @default(cuid())
+  requestId String
+  request   ArchitecturalRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  actorId   String?
+  actor     User?                @relation("ArchRequestActivities", fields: [actorId], references: [id])
+  action    String
+  details   String?
+  createdAt DateTime             @default(now())
+
+  @@map("architectural_request_activities")
+}
+
+model ArchitecturalRequestAttachment {
+  id        String               @id @default(cuid())
+  requestId String
+  request   ArchitecturalRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  label     String
+  fileName  String?
+  createdAt DateTime             @default(now())
+
+  @@map("architectural_request_attachments")
 }

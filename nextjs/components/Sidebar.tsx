@@ -32,12 +32,19 @@ function issuesHref(role: SessionUser['role']) {
   return '/resident/issues';
 }
 
+function archRequestsHref(role: SessionUser['role']) {
+  if (role === 'ADMIN') return '/admin/architectural-requests';
+  if (role === 'BOARD_MEMBER') return '/board/architectural-requests';
+  return '/resident/architectural-requests';
+}
+
 function buildNav(role: SessionUser['role']) {
   const home = dashboardHref(role);
   const docs = documentsHref(role);
   const payments = paymentsHref(role);
   const announcements = announcementsHref(role);
   const issues = issuesHref(role);
+  const arch = archRequestsHref(role);
   const paymentsLabel = role === 'BOARD_MEMBER' ? 'Dues' : 'Payments';
   const isAdmin = role === 'ADMIN' || role === 'BOARD_MEMBER';
   const items = [
@@ -45,6 +52,7 @@ function buildNav(role: SessionUser['role']) {
     { href: announcements, label: 'Announcements', icon: '📢' },
     { href: '/dashboard/events', label: 'Events', icon: '📅' },
     { href: issues, label: 'Issues', icon: '🔨' },
+    { href: arch, label: 'Arch. Requests', icon: '🏗️' },
     { href: '/dashboard/maintenance', label: 'Maintenance', icon: '🔧' },
     { href: '/dashboard/polls', label: 'Polls', icon: '📊' },
     { href: payments, label: paymentsLabel, icon: '💰' },

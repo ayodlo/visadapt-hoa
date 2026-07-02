@@ -790,6 +790,196 @@ async function main() {
     }
   }
 
+  console.log('Seeding architectural requests…');
+  await prisma.architecturalRequestActivity.deleteMany({});
+  await prisma.architecturalRequestComment.deleteMany({});
+  await prisma.architecturalRequestAttachment.deleteMany({});
+  await prisma.architecturalRequest.deleteMany({});
+
+  const [boardUser] = await prisma.user.findMany({ where: { role: 'BOARD_MEMBER' }, take: 1 });
+
+  type ArchStatus = 'DRAFT' | 'SUBMITTED' | 'UNDER_REVIEW' | 'NEEDS_MORE_INFORMATION' | 'APPROVED' | 'DENIED' | 'WITHDRAWN';
+  type ArchType = 'FENCE' | 'EXTERIOR_PAINT' | 'LANDSCAPING' | 'SOLAR' | 'ROOF' | 'SHED' | 'OTHER';
+
+  const archDefs: {
+    residentIdx: number;
+    requestType: ArchType;
+    description: string;
+    desiredStartDate?: Date;
+    status: ArchStatus;
+    governingRuleReference?: string;
+    decisionReason?: string;
+    daysAgo: number;
+    comments?: { body: string; isInternal: boolean; authorIsBoard?: boolean }[];
+  }[] = [
+    {
+      residentIdx: 0,
+      requestType: 'FENCE',
+      description: 'I would like to install a 6-foot cedar privacy fence along the rear property line (approximately 80 linear feet). The fence will be stained in a natural cedar tone to match the existing landscape. All posts will be set in concrete per local code. I have obtained bids from two licensed contractors and the work is planned to begin in mid-August, weather permitting. I have reviewed the CC&Rs and believe this modification complies with Section 7.2.',
+      desiredStartDate: new Date('2026-08-15'),
+      status: 'APPROVED',
+      governingRuleReference: 'CC&Rs Section 7.2.1 — Rear Fence Allowance (max 6 ft, natural materials)',
+      decisionReason: 'Request approved. The proposed cedar fence meets height, material, and style requirements. Contractor must obtain required city permit before work begins.',
+      daysAgo: 45,
+      comments: [
+        { body: 'Your fence request is approved. Please ensure the contractor pulls the required city permit before work begins.', isInternal: false, authorIsBoard: true },
+      ],
+    },
+    {
+      residentIdx: 1,
+      requestType: 'EXTERIOR_PAINT',
+      description: 'I am requesting approval to repaint the front door and shutters of my unit. The current color is faded and peeling. I would like to change to Benjamin Moore HC-172 (Newburyport Blue, a deep navy). All other exterior surfaces will remain unchanged. A professional painter will complete the work over one weekend.',
+      status: 'UNDER_REVIEW',
+      governingRuleReference: 'CC&Rs Section 6.1 — Approved Exterior Color Palette',
+      daysAgo: 12,
+      comments: [
+        { body: 'The board is reviewing this color selection against the current approved palette. We will have an answer within the next two weeks.', isInternal: false, authorIsBoard: true },
+        { body: 'Need to verify if navy blue is on the 2024 approved palette — checking with the PM.', isInternal: true, authorIsBoard: true },
+      ],
+    },
+    {
+      residentIdx: 2,
+      requestType: 'SOLAR',
+      description: 'I am requesting approval to install a rooftop solar PV system consisting of 18 panels (SunPower Maxeon 6 AC) mounted flush to the south-facing roof slope. Total system size: 7.2 kW. Installation will be performed by SunRise Solar LLC (licensed contractor). All equipment meets UL and NEC standards. Panel layout diagram and specs are available upon request.',
+      desiredStartDate: new Date('2026-09-01'),
+      status: 'SUBMITTED',
+      daysAgo: 4,
+    },
+    {
+      residentIdx: 3,
+      requestType: 'LANDSCAPING',
+      description: 'I would like to convert approximately 400 sq ft of front yard lawn to drought-tolerant native landscaping. Plan includes decomposed granite, lavender, sage, penstemon, and a small decorative boulder arrangement. This aligns with the city water conservation program and should significantly reduce water usage.',
+      desiredStartDate: new Date('2026-07-20'),
+      status: 'NEEDS_MORE_INFORMATION',
+      daysAgo: 21,
+      comments: [
+        { body: 'To complete our review, please provide: (1) a scaled site plan showing placement of all new plantings and hardscape elements, and (2) a list of all plant species with their mature heights. Our concern is maintaining adequate sightlines from the street to the entrance.', isInternal: false, authorIsBoard: true },
+        { body: 'Resident was notified. Follow-up needed by 6/25.', isInternal: true, authorIsBoard: true },
+      ],
+    },
+    {
+      residentIdx: 4,
+      requestType: 'SHED',
+      description: 'I would like to install a prefabricated storage shed (Tuff Shed TR-700, 10x12 feet) in the rear left corner of my backyard to store lawn equipment and sports gear. It will be painted to match the existing house color. Location is set back 3 feet from both property lines per local code.',
+      desiredStartDate: new Date('2026-08-01'),
+      status: 'DENIED',
+      governingRuleReference: 'CC&Rs Section 8.4.2 — Accessory Structures (max 100 sq ft, 8 ft height)',
+      decisionReason: 'Request denied. The proposed 10x12 ft shed (120 sq ft) exceeds the maximum allowable footprint of 100 sq ft per CC&Rs Section 8.4.2. Additionally, the proposed location would be visible from a common area walkway, which is not permitted. Please revise your application with a smaller shed in a non-visible location.',
+      daysAgo: 35,
+      comments: [
+        { body: 'Is there any possibility of an exception if I use a smaller 8x12 model? That would be 96 sq ft and under the limit.', isInternal: false },
+        { body: 'A revised application with a compliant shed size and revised location would be considered. An 8x10 or smaller shed placed against the rear fence line (not the side) would likely be approvable.', isInternal: false, authorIsBoard: true },
+      ],
+    },
+    {
+      residentIdx: 5,
+      requestType: 'ROOF',
+      description: 'My roof is approximately 22 years old and has reached end-of-life. I am requesting approval for a full replacement using Owens Corning Duration Premium asphalt shingles in Driftwood (medium gray-brown), which matches several other homes in the community. The project will be completed by Apex Roofing Co. and is expected to take 2-3 days.',
+      desiredStartDate: new Date('2026-07-28'),
+      status: 'APPROVED',
+      governingRuleReference: 'CC&Rs Section 6.3 — Roofing Materials and Colors',
+      decisionReason: 'Request approved. Owens Corning Duration in Driftwood is on the approved roofing material list per Section 6.3. Please coordinate with the management office if crane staging in common areas is needed.',
+      daysAgo: 28,
+    },
+    {
+      residentIdx: 6,
+      requestType: 'OTHER',
+      description: 'I would like to install a 12x16 ft wooden pergola in the rear patio area of my backyard. The pergola will be constructed from pressure-treated lumber, painted white to match existing trim, and will have a fabric shade canopy. No electrical work is planned. Contractor quote and drawings available upon request.',
+      status: 'DRAFT',
+      daysAgo: 2,
+    },
+    {
+      residentIdx: 7,
+      requestType: 'FENCE',
+      description: 'I was planning to extend my side yard fence to enclose a larger area for my dog. However, after speaking with my neighbor, we have decided to pursue a joint fence project instead. I am withdrawing this individual request.',
+      status: 'WITHDRAWN',
+      daysAgo: 18,
+      comments: [
+        { body: 'Withdrawal acknowledged. No action required.', isInternal: true, authorIsBoard: true },
+      ],
+    },
+    {
+      residentIdx: 8,
+      requestType: 'EXTERIOR_PAINT',
+      description: 'I would like to repaint the entire exterior of my home using the same color scheme as the existing paint (SW 7015 Repose Gray body, SW 7004 Snowbound trim, SW 6258 Tricorn Black accents) — a refreshed version of the current colors. The current paint is from 2008 and is significantly faded. A licensed painter will complete the work.',
+      desiredStartDate: new Date('2026-08-10'),
+      status: 'UNDER_REVIEW',
+      daysAgo: 9,
+    },
+    {
+      residentIdx: 9,
+      requestType: 'SHED',
+      description: 'Requesting approval for a small metal storage shed (Arrow Shed Classic, 8x6 feet, 48 sq ft) in the far rear corner of my backyard, fully behind the existing privacy fence and not visible from any common area or neighboring property. The shed will store seasonal items and a lawn mower.',
+      desiredStartDate: new Date('2026-07-15'),
+      status: 'SUBMITTED',
+      daysAgo: 6,
+    },
+  ];
+
+  for (const def of archDefs) {
+    const createdAt = new Date(Date.now() - def.daysAgo * 24 * 60 * 60 * 1000);
+    const request = await prisma.architecturalRequest.create({
+      data: {
+        residentId: createdResidents[def.residentIdx].id,
+        requestType: def.requestType,
+        description: def.description,
+        desiredStartDate: def.desiredStartDate ?? null,
+        status: def.status,
+        governingRuleReference: def.governingRuleReference ?? null,
+        decisionReason: def.decisionReason ?? null,
+        createdAt,
+        updatedAt: createdAt,
+      },
+    });
+
+    await prisma.architecturalRequestActivity.create({
+      data: {
+        requestId: request.id,
+        actorId: createdResidents[def.residentIdx].id,
+        action: 'created',
+        details: def.status === 'DRAFT' ? 'Draft saved' : 'Request submitted for review',
+        createdAt,
+      },
+    });
+
+    if (def.status !== 'DRAFT' && def.status !== 'SUBMITTED') {
+      await prisma.architecturalRequestActivity.create({
+        data: {
+          requestId: request.id,
+          actorId: firstAdmin.id,
+          action: 'status_changed',
+          details: `Status changed to ${def.status.replace(/_/g, ' ').toLowerCase()}`,
+          createdAt: new Date(createdAt.getTime() + 3 * 24 * 60 * 60 * 1000),
+        },
+      });
+    }
+
+    if (def.governingRuleReference) {
+      await prisma.architecturalRequestActivity.create({
+        data: {
+          requestId: request.id,
+          actorId: boardUser?.id ?? firstAdmin.id,
+          action: 'rule_referenced',
+          details: `Governing rule referenced`,
+          createdAt: new Date(createdAt.getTime() + 4 * 24 * 60 * 60 * 1000),
+        },
+      });
+    }
+
+    for (const c of def.comments ?? []) {
+      const authorId = c.authorIsBoard ? (boardUser?.id ?? firstAdmin.id) : createdResidents[def.residentIdx].id;
+      await prisma.architecturalRequestComment.create({
+        data: {
+          requestId: request.id,
+          authorId,
+          body: c.body,
+          isInternal: c.isInternal,
+          createdAt: new Date(createdAt.getTime() + 5 * 24 * 60 * 60 * 1000),
+        },
+      });
+    }
+  }
+
   console.log('\nSeed complete!');
   console.log('─────────────────────────────────');
   console.log('Demo credentials (password: password123)');
