@@ -23,10 +23,11 @@ model User {
   role                 UserRole              @default(RESIDENT)
   createdAt            DateTime              @default(now())
   updatedAt            DateTime              @updatedAt
-  properties           Property[]
-  residentProfile      ResidentProfile?
-  announcements        Announcement[]
-  maintenanceRequests  MaintenanceRequest[]
+  properties              Property[]
+  residentProfile         ResidentProfile?
+  createdAnnouncements    Announcement[]
+  announcementReads       AnnouncementRead[]
+  maintenanceRequests     MaintenanceRequest[]
   events               Event[]
   polls                Poll[]
   pollVotes            PollVote[]
@@ -197,16 +198,47 @@ model AuditLog {
   @@map("audit_logs")
 }
 
+enum AnnouncementPriority {
+  NORMAL
+  IMPORTANT
+  EMERGENCY
+}
+
+enum AnnouncementAudience {
+  ALL_RESIDENTS
+  BOARD_MEMBERS
+  SPECIFIC_LOCATION
+}
+
 model Announcement {
-  id        String   @id @default(cuid())
-  title     String
-  body      String
-  authorId  String
-  author    User     @relation(fields: [authorId], references: [id])
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id             String               @id @default(cuid())
+  title          String
+  body           String
+  priority       AnnouncementPriority @default(NORMAL)
+  audience       AnnouncementAudience @default(ALL_RESIDENTS)
+  targetLocation String?
+  isPinned       Boolean              @default(false)
+  publishAt      DateTime             @default(now())
+  expiresAt      DateTime?
+  createdById    String
+  createdBy      User                 @relation(fields: [createdById], references: [id])
+  reads          AnnouncementRead[]
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
 
   @@map("announcements")
+}
+
+model AnnouncementRead {
+  id             String       @id @default(cuid())
+  announcementId String
+  announcement   Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id])
+  readAt         DateTime     @default(now())
+
+  @@unique([announcementId, userId])
+  @@map("announcement_reads")
 }
 
 model Event {

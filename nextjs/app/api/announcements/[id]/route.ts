@@ -1,44 +1,35 @@
 import { NextRequest } from 'next/server';
-import { z } from 'zod';
-import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
-import { ok, err, unauthorized, forbidden, notFound } from '@/lib/api';
+import { prisma } from '@/lib/prisma';
+import { ok, unauthorized, forbidden, notFound } from '@/lib/api';
 
-const schema = z.object({
-  title: z.string().min(1).optional(),
-  body: z.string().min(1).optional(),
-});
-
-export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
   if (!session) return unauthorized();
-  if (session.role === 'RESIDENT') return forbidden();
 
   const { id } = await params;
-  const existing = await prisma.announcement.findUnique({ where: { id } });
-  if (!existing) return notFound('Announcement');
-
-  const body = await req.json().catch(() => null);
-  const parsed = schema.safeParse(body);
-  if (!parsed.success) return err(parsed.error.issues[0].message, 400);
-
-  const updated = await prisma.announcement.update({
+  const a = await prisma.announcement.findUnique({
     where: { id },
-    data: parsed.data,
-    include: { author: { select: { id: true, firstName: true, lastName: true } } },
+    include: {
+      createdBy: { select: { firstName: true, lastName: true } },
+      reads: {
+        where: { userId: session.id },
+        select: { id: true },
+      },
+    },
   });
-  return ok(updated);
-}
 
-export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const session = await getSession();
-  if (!session) return unauthorized();
-  if (session.role === 'RESIDENT') return forbidden();
+  if (!a) return notFound('Announcement');
 
-  const { id } = await params;
-  const existing = await prisma.announcement.findUnique({ where: { id } });
-  if (!existing) return notFound('Announcement');
+  // Residents cannot see BOARD_MEMBERS-only announcements
+  if (session.role === 'RESIDENT' && a.audience === 'BOARD_MEMBERS') return forbidden();
 
-  await prisma.announcement.delete({ where: { id } });
-  return ok({ deleted: true });
+  const now = new Date();
+  // Admins can view all; residents/board cannot see unpublished or expired
+  if (session.role !== 'ADMIN') {
+    if (a.publishAt > now) return notFound('Announcement');
+    if (a.expiresAt && a.expiresAt < now) return notFound('Announcement');
+  }
+
+  return ok({ announcement: { ...a, isRead: a.reads.length > 0, reads: undefined } });
 }
