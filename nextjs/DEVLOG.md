@@ -1,5 +1,28 @@
 # CommunityHQ Dev Log
 
+## 2026-07-08 — Session close: product documentation
+
+**Files changed:**
+- `README.md` (repo root) — now holds the complete product documentation: roles/permission matrix, every module's workflow states and rules, validation limits (all Zod constraints), pagination capacities, security model, known-limitations table for product owners, full API reference, testing, deployment, operations notes. Every claim verified against code, not prior docs.
+- `nextjs/README.md` — reduced to a quick-reference pointer back to the root README (avoids two diverging copies).
+
+**Decisions made:**
+- The detailed docs live at the **repo root** (what GitHub renders and what the owner reads); `nextjs/README.md` is the pointer. Initially done the other way round — corrected after user feedback.
+- Documentation is written for a product owner/vendor audience: gaps are stated plainly (simulated payments, no charge creation, metadata-only documents, single-tenant, no notifications) rather than buried.
+
+**Next steps (agreed priority order):**
+1. Test expansion — e2e for issues/violations/arch-requests/payments/documents flows; unit tests for payment application logic; optionally enable `E2E_ENABLED` in GitHub.
+2. Billing gap — admin charge creation, recurring dues generator (Vercel Cron), PENDING→OVERDUE job; consolidate legacy Dues Records + Maintenance modules.
+3. Notifications via Resend (violation notice, appeal/arch decisions, payment receipt).
+4. Real S3 uploads (documents → violation evidence → arch attachments).
+5. Vercel staging deploy.
+6. Security backlog: email verification, CSRF, lockout/2FA, shared-store rate limiting.
+
+**Gotchas:**
+- Root README documents behavior that tests pin (e.g. `/api/users` 403 for residents, rate-limit windows) — update both when changing either.
+- Doc facts current as of 08547cd: 106 unit / 27 e2e tests; auth rate limits login 20/15min, register 10/hr, forgot 5/15min, reset 10/15min.
+- User is writing a CLAUDE.md to manage context growth; start fresh conversations per task.
+
 ## 2026-07-02 — Security hardening + migration baseline
 
 **Files touched:**

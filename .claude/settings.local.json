@@ -105,7 +105,8 @@
       "Bash(cp package-lock.json /tmp/lock-backup.json)",
       "Bash(rm package-lock.json)",
       "Bash(git checkout *)",
-      "Bash(git commit -q -m ' *)"
+      "Bash(git commit -q -m ' *)",
+      "Bash(git commit *)"
     ]
   }
 }
