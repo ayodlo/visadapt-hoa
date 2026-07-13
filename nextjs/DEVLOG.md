@@ -1,5 +1,22 @@
 # CommunityHQ Dev Log
 
+## 2026-07-13 — Mobile overflow fixes
+
+**Files changed:**
+- `components/ui/StatCard.tsx` — the value span (e.g. dollar amounts like "$7,100.00") could overflow past the card's border on mobile because the flex row had no `min-w-0`/wrap. Added `gap-2`, `min-w-0 break-words text-right` on the value, `shrink-0` on the icon, `text-2xl sm:text-3xl` responsive sizing, and `min-w-0 overflow-hidden` on the card itself. Used by all three dashboards (admin/board/resident).
+- `components/ui/PageHeader.tsx` — the title/subtitle block had no `min-w-0`, so on narrow screens it couldn't shrink and pushed the `action` button off-screen (reproduced on `/admin/announcements`'s "+ New Announcement" button). Added `flex-wrap` to the row, `min-w-0` + `break-words` to the title block.
+- `app/dashboard/users/page.tsx`, `app/dashboard/dues/page.tsx` — both had a `<table>` inside a wrapper with only `overflow-hidden` (no scroll), so on mobile the Role/Joined/Delete (users) and Status/Delete (dues) columns were silently clipped off-screen with no way to reach them. Wrapped the `<table>` in an inner `overflow-x-auto` div (keeping `overflow-hidden` on the outer rounded/bordered card) and added `whitespace-nowrap` to cells so the table scrolls horizontally within its own container instead of clipping or leaking into page-level scroll.
+
+**Decisions made:**
+- Found via a screenshot the user provided showing "$7,100.00" spilling out of its stat-card container on `/admin/dashboard` at mobile width. Rather than fix just that one card, audited every other route for the same class of bug using a headless Playwright pass (checked `getBoundingClientRect().right` against viewport width across all admin/resident routes at 375px) — found two more real bugs (announcements header button, users/dues tables) that weren't visible in the one screenshot.
+- Long unbreakable values (currency, table cells) get `break-words`/`overflow-x-auto` rather than `truncate` — an ellipsis would silently hide financial figures or role/email data, which is worse than wrapping or scrolling.
+
+**Next steps:** none outstanding for this fix; confirmed page-level `scrollWidth === clientWidth` at 375px on every audited route (no more horizontal page scroll anywhere).
+
+**Gotchas:**
+- `StatCard` and `PageHeader` are shared across many pages — bugs in them are the highest-leverage places to look first for "text overflows on mobile"-type reports.
+- Flex children default to `min-width: auto`, which uses the *unwrapped* content width for wrap-eligible text and the full string width for unbreakable strings (currency, emails, URLs). Without `min-w-0` on the item, `break-words`/`truncate` do nothing and the item just overflows its container. This is the root cause behind all three bugs fixed here.
+
 ## 2026-07-13 — SUPER_ADMIN role + user creation
 
 **Files changed:**

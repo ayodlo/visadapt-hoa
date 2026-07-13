@@ -22,13 +22,13 @@ const valueColors: Record<Color, string> = {
 export function StatCard({ label, value, icon, href, color = 'default', subtext }: Props) {
   const inner = (
     <div
-      className={`bg-white rounded-xl border border-gray-200 p-5 h-full ${
+      className={`bg-white rounded-xl border border-gray-200 p-5 h-full min-w-0 overflow-hidden ${
         href ? 'hover:border-blue-300 hover:shadow-sm transition-all' : ''
       }`}
     >
-      <div className="flex items-start justify-between mb-2">
-        {icon && <span className="text-2xl" aria-hidden="true">{icon}</span>}
-        <span className={`text-3xl font-bold ml-auto ${valueColors[color]}`}>{value}</span>
+      <div className="flex items-start justify-between gap-2 mb-2">
+        {icon && <span className="text-2xl shrink-0" aria-hidden="true">{icon}</span>}
+        <span className={`text-2xl sm:text-3xl font-bold ml-auto min-w-0 break-words text-right ${valueColors[color]}`}>{value}</span>
       </div>
       <p className="text-sm text-gray-500">{label}</p>
       {subtext && <p className="text-xs text-gray-400 mt-1">{subtext}</p>}

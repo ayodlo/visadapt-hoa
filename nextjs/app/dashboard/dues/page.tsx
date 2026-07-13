@@ -100,35 +100,37 @@ export default function DuesPage() {
 
       {loading ? <p className="text-gray-500 text-sm">Loading…</p> : records.length === 0 ? <p className="text-gray-500 text-sm">No dues records yet.</p> : (
         <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>{['Resident', 'Label', 'Amount', 'Due Date', 'Status', ''].map((h) => <th key={h} className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">{h}</th>)}</tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {records.map((r) => (
-                <tr key={r.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 font-medium text-gray-900">{r.user.firstName} {r.user.lastName}</td>
-                  <td className="px-4 py-3 text-gray-600">{r.label}</td>
-                  <td className="px-4 py-3 font-medium">{fmt(r.amountCents)}</td>
-                  <td className="px-4 py-3 text-gray-600">{new Date(r.dueDate).toLocaleDateString()}</td>
-                  <td className="px-4 py-3">
-                    {isAdmin ? (
-                      <select value={r.status} onChange={(e) => updateStatus(r.id, e.target.value as DuesStatus)} className={`text-xs font-medium px-2 py-1 rounded-full border-0 cursor-pointer ${STATUS_COLORS[r.status]}`}>
-                        {(['PENDING', 'PAID', 'OVERDUE', 'WAIVED'] as DuesStatus[]).map((s) => <option key={s} value={s}>{s}</option>)}
-                      </select>
-                    ) : (
-                      <span className={`text-xs font-medium px-2 py-1 rounded-full ${STATUS_COLORS[r.status]}`}>{r.status}</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    {isAdmin && (
-                      <button onClick={() => handleDelete(r.id)} className="text-xs text-gray-400 hover:text-red-500">Delete</button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>{['Resident', 'Label', 'Amount', 'Due Date', 'Status', ''].map((h) => <th key={h} className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">{h}</th>)}</tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {records.map((r) => (
+                  <tr key={r.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3 font-medium text-gray-900 whitespace-nowrap">{r.user.firstName} {r.user.lastName}</td>
+                    <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{r.label}</td>
+                    <td className="px-4 py-3 font-medium whitespace-nowrap">{fmt(r.amountCents)}</td>
+                    <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{new Date(r.dueDate).toLocaleDateString()}</td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      {isAdmin ? (
+                        <select value={r.status} onChange={(e) => updateStatus(r.id, e.target.value as DuesStatus)} className={`text-xs font-medium px-2 py-1 rounded-full border-0 cursor-pointer ${STATUS_COLORS[r.status]}`}>
+                          {(['PENDING', 'PAID', 'OVERDUE', 'WAIVED'] as DuesStatus[]).map((s) => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                      ) : (
+                        <span className={`text-xs font-medium px-2 py-1 rounded-full ${STATUS_COLORS[r.status]}`}>{r.status}</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-right whitespace-nowrap">
+                      {isAdmin && (
+                        <button onClick={() => handleDelete(r.id)} className="text-xs text-gray-400 hover:text-red-500">Delete</button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>
