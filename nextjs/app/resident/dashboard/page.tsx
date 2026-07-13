@@ -39,7 +39,7 @@ export default async function ResidentDashboardPage() {
       )}
 
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
         <StatCard
           label="Current Balance"
           value={data ? formatDollars(data.balanceCents) : '—'}

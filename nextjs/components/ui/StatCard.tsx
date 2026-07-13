@@ -26,12 +26,12 @@ export function StatCard({ label, value, icon, href, color = 'default', subtext 
         href ? 'hover:border-blue-300 hover:shadow-sm transition-all' : ''
       }`}
     >
-      <div className="flex items-start justify-between gap-2 mb-2">
+      <div className="flex flex-col items-center text-center gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-2 sm:text-left mb-2">
         {icon && <span className="text-2xl shrink-0" aria-hidden="true">{icon}</span>}
-        <span className={`text-2xl sm:text-3xl font-bold ml-auto min-w-0 break-words text-right ${valueColors[color]}`}>{value}</span>
+        <span className={`text-2xl sm:text-3xl font-bold sm:ml-auto min-w-0 break-words text-center sm:text-right ${valueColors[color]}`}>{value}</span>
       </div>
-      <p className="text-sm text-gray-500">{label}</p>
-      {subtext && <p className="text-xs text-gray-400 mt-1">{subtext}</p>}
+      <p className="text-sm text-gray-500 text-center sm:text-left">{label}</p>
+      {subtext && <p className="text-xs text-gray-400 mt-1 text-center sm:text-left">{subtext}</p>}
     </div>
   );
 
