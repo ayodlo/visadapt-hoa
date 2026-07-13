@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useSession } from '@/context/session';
+import { isStaff } from '@/lib/roles';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { ErrorState } from '@/components/ui/ErrorState';
@@ -128,7 +129,7 @@ export default function ResidentAnnouncementsPage() {
   }, []);
 
   useEffect(() => {
-    if (session.role === 'ADMIN' || session.role === 'BOARD_MEMBER') {
+    if (isStaff(session.role)) {
       router.replace('/admin/announcements');
       return;
     }

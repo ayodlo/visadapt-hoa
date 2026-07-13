@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { getSession } from '@/lib/auth';
+import { isAdmin } from '@/lib/roles';
 import { prisma } from '@/lib/prisma';
 import { ok, err, unauthorized, forbidden, notFound } from '@/lib/api';
 import { createAuditLog } from '@/lib/audit';
@@ -16,7 +17,7 @@ const schema = z.object({
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
   if (!session) return unauthorized();
-  if (session.role !== 'ADMIN') return forbidden();
+  if (!isAdmin(session.role)) return forbidden();
 
   const { id } = await params;
   const request = await prisma.architecturalRequest.findUnique({
@@ -43,7 +44,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
   if (!session) return unauthorized();
-  if (session.role !== 'ADMIN') return forbidden();
+  if (!isAdmin(session.role)) return forbidden();
 
   const { id } = await params;
   const existing = await prisma.architecturalRequest.findUnique({ where: { id } });

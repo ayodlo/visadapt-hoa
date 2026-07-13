@@ -23,6 +23,7 @@ const COLORS: Record<string, string> = {
   NOTICE_SENT: 'bg-orange-100 text-orange-800',
   RESIDENT_RESPONDED: 'bg-sky-100 text-sky-800',
   ESCALATED: 'bg-red-100 text-red-800',
+  SUPER_ADMIN: 'bg-fuchsia-100 text-fuchsia-800',
   ADMIN: 'bg-purple-100 text-purple-800',
   BOARD_MEMBER: 'bg-indigo-100 text-indigo-800',
   RESIDENT: 'bg-gray-100 text-gray-600',

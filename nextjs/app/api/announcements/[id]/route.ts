@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import { getSession } from '@/lib/auth';
+import { isAdmin } from '@/lib/roles';
 import { prisma } from '@/lib/prisma';
 import { ok, unauthorized, forbidden, notFound } from '@/lib/api';
 
@@ -26,7 +27,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 
   const now = new Date();
   // Admins can view all; residents/board cannot see unpublished or expired
-  if (session.role !== 'ADMIN') {
+  if (!isAdmin(session.role)) {
     if (a.publishAt > now) return notFound('Announcement');
     if (a.expiresAt && a.expiresAt < now) return notFound('Announcement');
   }

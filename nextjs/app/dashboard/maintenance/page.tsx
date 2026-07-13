@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useSession } from '@/context/session';
+import { isStaff } from '@/lib/roles';
 
 type Status = 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED';
 type Priority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
@@ -24,7 +25,7 @@ const PRIORITY_COLORS: Record<Priority, string> = {
 
 export default function MaintenancePage() {
   const { role } = useSession();
-  const isAdmin = role === 'ADMIN' || role === 'BOARD_MEMBER';
+  const isAdmin = isStaff(role);
 
   const [items, setItems] = useState<Request[]>([]);
   const [loading, setLoading] = useState(true);

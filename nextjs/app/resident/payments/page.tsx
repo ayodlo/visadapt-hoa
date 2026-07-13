@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useSession } from '@/context/session';
+import { isStaff } from '@/lib/roles';
 import { useToast } from '@/context/toast';
 import { useRouter } from 'next/navigation';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -86,7 +87,7 @@ export default function ResidentPaymentsPage() {
   }, []);
 
   useEffect(() => {
-    if (session.role === 'ADMIN' || session.role === 'BOARD_MEMBER') {
+    if (isStaff(session.role)) {
       router.replace('/admin/payments');
       return;
     }

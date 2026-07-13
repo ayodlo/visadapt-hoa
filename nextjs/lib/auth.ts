@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken';
 import { cookies } from 'next/headers';
 import { prisma } from './prisma';
+import type { UserRole } from './roles';
 
 const SECRET = process.env.JWT_SECRET!;
 const COOKIE = 'token';
@@ -10,7 +11,7 @@ export interface SessionUser {
   email: string;
   firstName: string;
   lastName: string;
-  role: 'ADMIN' | 'BOARD_MEMBER' | 'RESIDENT';
+  role: UserRole;
 }
 
 export function signToken(payload: SessionUser): string {

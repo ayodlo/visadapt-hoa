@@ -14,7 +14,8 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "test:e2e:report": "playwright show-report"
+    "test:e2e:report": "playwright show-report",
+    "create-super-admin": "npx tsx prisma/create-super-admin.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1075.0",

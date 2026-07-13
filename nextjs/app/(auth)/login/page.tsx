@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { isAdmin } from '@/lib/roles';
 
 const DEMO_ACCOUNTS = [
   { label: 'Resident', email: 'resident@communityhq.local' },
@@ -30,7 +31,7 @@ export default function LoginPage() {
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? 'Login failed'); return; }
       const role = data.user?.role;
-      const dest = role === 'ADMIN' ? '/admin/dashboard' : role === 'BOARD_MEMBER' ? '/board/dashboard' : '/resident/dashboard';
+      const dest = isAdmin(role) ? '/admin/dashboard' : role === 'BOARD_MEMBER' ? '/board/dashboard' : '/resident/dashboard';
       router.push(dest);
       router.refresh();
     } catch {

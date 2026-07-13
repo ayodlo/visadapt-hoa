@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useSession } from '@/context/session';
+import { isStaff } from '@/lib/roles';
 
 type DuesStatus = 'PENDING' | 'PAID' | 'OVERDUE' | 'WAIVED';
 interface User { id: string; firstName: string; lastName: string; email: string; }
@@ -20,7 +21,7 @@ function fmt(cents: number) {
 
 export default function DuesPage() {
   const { role } = useSession();
-  const isAdmin = role === 'ADMIN' || role === 'BOARD_MEMBER';
+  const isAdmin = isStaff(role);
 
   const [records, setRecords] = useState<DuesRecord[]>([]);
   const [users, setUsers] = useState<User[]>([]);

@@ -152,7 +152,7 @@ export default function AdminIssueDetailPage({ params }: { params: Promise<{ id:
     fetch('/api/users')
       .then((r) => r.json())
       .then((users: AdminUser[]) => {
-        setAdmins(users.filter((u) => u.role === 'ADMIN' || u.role === 'BOARD_MEMBER'));
+        setAdmins(users.filter((u) => u.role !== 'RESIDENT'));
       })
       .catch(() => {});
     loadVendors();

@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import { useSession } from '@/context/session';
+import { isStaff } from '@/lib/roles';
 
 interface Option { id: string; text: string; _count: { votes: number }; }
 interface Poll { id: string; question: string; description?: string; closesAt?: string; options: Option[]; _count: { votes: number }; createdBy: { firstName: string; lastName: string }; }
 
 export default function PollsPage() {
   const { role } = useSession();
-  const isAdmin = role === 'ADMIN' || role === 'BOARD_MEMBER';
+  const isAdmin = isStaff(role);
 
   const [polls, setPolls] = useState<Poll[]>([]);
   const [loading, setLoading] = useState(true);

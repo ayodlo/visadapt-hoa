@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import { getSession } from '@/lib/auth';
+import { isStaff } from '@/lib/roles';
 import { prisma } from '@/lib/prisma';
 import { ok, unauthorized, forbidden, notFound } from '@/lib/api';
 
@@ -8,7 +9,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   if (!session) return unauthorized();
 
   const { id } = await params;
-  const isAdmin = session.role === 'ADMIN' || session.role === 'BOARD_MEMBER';
+  const isAdmin = isStaff(session.role);
 
   const violation = await prisma.violation.findUnique({
     where: { id },

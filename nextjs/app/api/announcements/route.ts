@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import { getSession } from '@/lib/auth';
+import { isAdmin } from '@/lib/roles';
 import { prisma } from '@/lib/prisma';
 import { ok, unauthorized } from '@/lib/api';
 
@@ -14,7 +15,7 @@ export async function GET(req: NextRequest) {
 
   // Audience filter: residents cannot see BOARD_MEMBERS-only announcements
   const audienceFilter =
-    session.role === 'ADMIN'
+    isAdmin(session.role)
       ? {}
       : session.role === 'BOARD_MEMBER'
       ? { audience: { in: ['ALL_RESIDENTS', 'BOARD_MEMBERS', 'SPECIFIC_LOCATION'] as never[] } }

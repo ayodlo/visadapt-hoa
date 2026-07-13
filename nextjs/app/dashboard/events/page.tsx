@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import { useSession } from '@/context/session';
+import { isStaff } from '@/lib/roles';
 
 interface Creator { id: string; firstName: string; lastName: string; }
 interface Event { id: string; title: string; description?: string; location?: string; startAt: string; endAt?: string; createdBy: Creator; }
 
 export default function EventsPage() {
   const { role } = useSession();
-  const isAdmin = role === 'ADMIN' || role === 'BOARD_MEMBER';
+  const isAdmin = isStaff(role);
 
   const [items, setItems] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);

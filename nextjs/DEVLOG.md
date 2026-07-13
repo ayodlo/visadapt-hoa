@@ -1,5 +1,32 @@
 # CommunityHQ Dev Log
 
+## 2026-07-13 — SUPER_ADMIN role + user creation
+
+**Files changed:**
+- `prisma/schema.prisma` — added `SUPER_ADMIN` to `UserRole` enum; migration `20260713161358_add_super_admin_role` applied to Neon.
+- `lib/roles.ts` — new; client-safe `UserRole` type + `isAdmin`/`isStaff` helpers (kept out of `lib/auth.ts` because that file imports `next/headers`/Prisma and can't be pulled into client components).
+- `lib/auth.ts` — `SessionUser.role` now uses the shared `UserRole` type.
+- `lib/nav.ts`, `app/dashboard/page.tsx`, `app/dashboard/documents/page.tsx`, `app/(auth)/login/page.tsx`, and every client dashboard page with a local `isAdmin`/staff check (events, polls, dues, maintenance, announcements, resident payments/announcements redirects) — swapped hardcoded `role === 'ADMIN'` / `role === 'ADMIN' || role === 'BOARD_MEMBER'` checks for the shared `isAdmin`/`isStaff` helpers so SUPER_ADMIN inherits full ADMIN access everywhere.
+- `app/api/users/route.ts` — added `POST` (create user: firstName/lastName/email/password/role, ADMIN or SUPER_ADMIN only; role field only accepts ADMIN/BOARD_MEMBER/RESIDENT).
+- `app/api/users/[id]/route.ts`, `app/api/documents/route.ts`, `app/api/documents/[id]/route.ts`, `app/api/announcements/route.ts`, `app/api/announcements/[id]/route.ts`, `app/api/admin/violations/route.ts`, `app/api/admin/architectural-requests/route.ts`, `app/api/admin/architectural-requests/[id]/route.ts`, `app/api/admin/architectural-requests/[id]/comments/route.ts`, `app/api/violations/[id]/route.ts` — same ADMIN→`isAdmin()`/staff→`isStaff()` swap server-side. `PUT`/`DELETE` on `/api/users/[id]` also reject the request if the target user is SUPER_ADMIN and the actor isn't.
+- `app/dashboard/users/page.tsx` — added "+ Add User" form (POSTs to the new endpoint); SUPER_ADMIN rows render as a locked badge (no role dropdown, no Delete button) regardless of viewer.
+- `components/ui/StatusBadge.tsx` — added a fuchsia color for SUPER_ADMIN badges.
+- `prisma/create-super-admin.ts` — new standalone script; `SUPER_ADMIN_EMAIL`/`SUPER_ADMIN_PASSWORD` (+ optional first/last name) env vars create or promote a SUPER_ADMIN account. Run via `npm run create-super-admin`.
+- `.env.example` — documented the create-super-admin one-off env vars (comment only, no defaults — deliberately not something to persist in `.env.local`).
+
+**Decisions made:**
+- SUPER_ADMIN is scoped as "full ADMIN + user creation," not a separate restricted screen — matches how the rest of the role system already layers (BOARD_MEMBER ⊂ staff, ADMIN ⊂ staff+ops). Confirmed with user before implementing broadly.
+- SUPER_ADMIN is intentionally **not** assignable through any UI or API — the role enum accepted by `PUT /api/users/[id]` and `POST /api/users` is still `['ADMIN','BOARD_MEMBER','RESIDENT']` only. The only way to mint one is `prisma/create-super-admin.ts`, run by an engineer with DB access. This was a deliberate security choice: the role represents "us, the software engineers," not a rank any admin can hand out.
+- New user creation sets a temp password immediately (no email/invite flow) — Resend isn't wired up yet, so an invite-link flow would need a manual hand-off anyway.
+
+**Next steps:**
+- If Resend gets wired up, consider switching create-user to an invite-link flow instead of admin-set temp passwords.
+- No e2e coverage yet for the create-user form or SUPER_ADMIN lockout behavior — worth adding alongside the test-expansion work already tracked from 2026-07-08.
+
+**Gotchas:**
+- Any new "staff only" or "admin only" gate must use `isStaff()`/`isAdmin()` from `lib/roles.ts`, not a literal `role === 'ADMIN'` comparison — otherwise SUPER_ADMIN silently gets locked out of it.
+- `lib/roles.ts` exists specifically so role-check helpers can be imported from client components (`'use client'` files can't import `lib/auth.ts` at runtime — only its types).
+
 ## 2026-07-08 — Session close: product documentation
 
 **Files changed:**
