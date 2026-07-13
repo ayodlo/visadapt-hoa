@@ -1,5 +1,7 @@
 {
   "permissions": {
+    "defaultMode": "bypassPermissions",
+    "skipDangerousModePermissionPrompt": true,
     "allow": [
       "Bash(npm install *)",
       "Bash(npx prisma *)",
@@ -106,7 +108,9 @@
       "Bash(rm package-lock.json)",
       "Bash(git checkout *)",
       "Bash(git commit -q -m ' *)",
-      "Bash(git commit *)"
+      "Bash(git commit *)",
+      "Bash(npx eslint *)",
+      "Bash(NODE_PATH=\"$\\(pwd\\)/node_modules\" node \"C:/Users/theek/AppData/Local/Temp/claude/C--Users-theek-OneDrive-Desktop-projects-javascript-visadapt-hoa/b4ff2f64-cd03-4df2-b0fb-a121a3bab3e3/scratchpad/mobile-check.js\")"
     ]
   }
 }
