@@ -20,6 +20,28 @@
 
 **Verification:** Not yet — this fix is unverified against a real CI run at the time of this entry (see Next steps). Diagnosis (lockfile entry correctness, cache-restore theory) was verified by direct inspection of `package-lock.json`, not just inference.
 
+**Correction (see part 3 below): the caching theory in this entry was wrong.** Pushing the no-cache fix (`6ee58dc`) hit the *identical* error on the next run. The real cause and working fix are in the next entry — this one is left as-is rather than rewritten, since the reproduction process (and getting a plausible-but-wrong theory disproven by an actual CI run) is itself worth keeping visible.
+
+## 2026-07-14 (Fix, part 3: the actual root cause — npm workspaces + rolldown on Linux)
+
+**Files changed:**
+- `.github/workflows/ci.yml` — restored `cache: npm` (part 2's removal didn't fix anything, so no reason to keep paying the speed cost); added a step after `npm ci` that explicitly reinstalls `@rolldown/binding-linux-x64-gnu` at whatever version `rolldown` itself resolved to (read dynamically via `node -p`, not hardcoded).
+
+**Decisions made:**
+- Root-caused for real this time, via direct reproduction rather than theory: copied the **full repo** (not just `nextjs/`, which is what part 1's Docker reproduction had done, accidentally sidestepping the real trigger) into a `node:24-bookworm` container and ran the exact CI steps. This reproduced the failure deterministically. Systematically ruled out alternatives in the same container: removing the npm cache didn't help; running from the repo root with `npm ci -w nextjs` didn't help; `npm install` instead of `npm ci` didn't help. Every variant failed identically, *as long as the ancestor root `package.json`'s `"workspaces": ["nextjs", "mobile"]` was present* — a standalone copy of `nextjs/` (no ancestor workspace) never reproduces it, on the same OS/npm/Node version.
+- Confirmed directly (not inferred) that `npm ci` was leaving `node_modules/@rolldown/` with **zero** linux-gnu binding present at all after a "successful" install — this is npm's own documented optional-dependency bug (npm/cli#4828): when a package (here, `rolldown`, Vite's bundler binding, shipping 15 OS/CPU platform variants) is installed inside an npm workspace, npm's resolver can silently fail to link the correct platform variant, even though the lockfile entry for it is completely correct.
+- Fix: rather than restructuring the workspace (bigger, riskier change) or switching install commands (tested, doesn't help), added a targeted extra step that explicitly (re)installs the missing package by name once npm's own resolution has already dropped it. Reads the required version off the already-installed `rolldown` package rather than hardcoding a version number, so it keeps working automatically as `rolldown` gets bumped by future dependency updates.
+- This only affects Linux (the bug needs multiple same-family optional variants competing, which Windows's single `win32-x64-msvc` variant never triggers) — confirmed this is why local Windows dev was never affected, and why `nextjs/` isn't being pulled out of the workspace: the workaround is CI-only.
+
+**Next steps:**
+- Watch this push's CI run — this is the fix that was actually verified end-to-end in a full-repo container reproduction (unlike parts 1 and 2's theories).
+- If `e2e.yml` is ever changed to run `vitest` (it currently only runs Playwright against a built Next.js server, which doesn't touch Vite/rolldown at all — confirmed not affected), apply the same workaround step there.
+
+**Gotchas:**
+- Don't trust a "the fix works" conclusion from a partial reproduction — part 1's Docker container test *excluded* the parent directory (copied only `nextjs/` in isolation) and passed, which looked like confirmation but was actually testing a different, non-representative scenario. The tell should have been that a real fix ought to also be reproducible as a *failure* first; only reproducing the passing case proves nothing. Copy the **whole repo structure** (or whatever the real CI checkout actually contains) when reproducing a CI-only failure, not just the directory the failing step happens to `cd` into.
+
+**Verification:** Reproduced the exact failure in a `node:24-bookworm` container using a full-repo copy (matching CI's actual checkout), confirmed `node_modules/@rolldown/` had no linux binding after `npm ci`, then confirmed the explicit-reinstall workaround brings `npm test` back to 113/113 passing in that same container.
+
 ## 2026-07-14 (Fix: CI "Unit tests & lint" failing since ~July 5)
 
 **Files changed:**

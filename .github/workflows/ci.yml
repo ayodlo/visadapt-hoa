@@ -26,14 +26,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-
-      # No `cache: npm` here: actions/setup-node's npm cache restore can
-      # resurrect a stale ~/.npm from an earlier run and trip npm's known
-      # optional-dependency bug (npm/cli#4828) -- `npm ci` silently skips
-      # installing a valid platform-specific optional package (e.g.
-      # @rolldown/binding-linux-x64-gnu), even though the lockfile entry is
-      # correct. Confirmed happening on this exact workflow; a from-scratch
-      # npm cache avoids it. See DEVLOG 2026-07-14.
+          cache: npm
+          cache-dependency-path: nextjs/package-lock.json
 
       # npm implementations disagree on optional wasm deps in the lockfile;
       # pin to the version that generates it locally so `npm ci` validates.
@@ -42,6 +36,22 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      # Confirmed via repeated reproduction (not caching, not npm ci vs.
+      # install, not invocation style): as long as this repo's root
+      # package.json declares npm workspaces, `npm ci`/`npm install` on Linux
+      # silently drops @rolldown/binding-linux-x64-gnu -- a valid, correctly
+      # os/cpu-gated optional dependency that IS present in the lockfile.
+      # This is npm's own documented optional-dependency bug
+      # (npm/cli#4828), triggered here by rolldown (Vite's bundler binding)
+      # shipping 15 platform variants for npm's resolver to pick from inside
+      # a workspace. Reads the required version dynamically rather than
+      # hardcoding it, so this keeps working as rolldown's version changes.
+      # See DEVLOG 2026-07-14 for the full reproduction.
+      - name: Work around npm/cli#4828 (rolldown native binding)
+        run: |
+          ROLLDOWN_VERSION=$(node -p "require('./node_modules/rolldown/package.json').version")
+          npm install "@rolldown/binding-linux-x64-gnu@$ROLLDOWN_VERSION" --no-save
 
       - name: Unit tests
         run: npm test
