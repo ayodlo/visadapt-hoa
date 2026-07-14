@@ -2,6 +2,27 @@
 
 ---
 
+## 2026-07-14 (Mobile unit tests — component + screen rendering batch)
+
+**Files changed:**
+- `mobile/__tests__/components/*.test.tsx` (new, 8 files) — `Button` (label, onPress, disabled blocks press, loading hides label), `FormField` (label, value, onChangeText, forwards arbitrary `TextInputProps`), `StatusBadge` (title-cases the label, applies the correct tone color — asserted via the rendered `Text`'s style, not just presence), `ChipSelect` (renders all options, `onChange` fires with the pressed value including re-pressing the active one), `EmptyState` (default vs. custom icon, message), `ErrorView` (default vs. custom message, retry button only rendered/wired when `onRetry` is passed), `ListRow` (title/subtitle/right-content conditionals, chevron only when `onPress` exists, press handling), `Card` (renders children, `onPress` only wired when provided).
+- `mobile/__tests__/screens/AnnouncementsListScreen.test.tsx` (new) — the first full-screen integration test: empty state, error state with a working retry (re-fetches), unread-marker + priority-badge rendering, and navigation (`router.push` with the right path) on row press. Chosen as "a representative screen" since it exercises `useApi` + 5 shared components + `expo-router` together, and is reused by both `(resident)` and `(board)`.
+
+**Decisions made:**
+- Skipped `ListCard`, `LoadingView`, and `ScreenContainer` — pure style/layout wrappers with no conditional logic of their own; a render-only test there would just restate the JSX, not verify behavior.
+- For the screen test, mocked `@/api/announcements` (jest auto-mock) and `expo-router`'s `router` directly rather than mocking `useApi` itself — exercises the real hook + real components together, only stubbing the actual network/navigation boundary.
+
+**Next steps:**
+- No screens/components remain entirely untested in the sense of "zero coverage of any kind," but only one screen (`AnnouncementsListScreen`) has a full integration test — the other resident/board/admin screens (issues, payments, violations, etc.) are still uncovered at the screen level. Natural next batch if more mobile test coverage is wanted.
+- Still no E2E tooling (Maestro) for mobile.
+
+**Gotchas:**
+- **Self-inflicted, real, and worth remembering:** running `npm ci` inside `nextjs/` directly on this actual repo (not an isolated copy) — done repeatedly today while diagnosing the CI failures — silently wiped `mobile/`'s hoisted dependencies (`expo-notifications`, `jest-expo`, all of it) from the shared root `node_modules`, because npm detects the ancestor workspace root even when invoked from within a member subdirectory and reconciles the *whole* root `node_modules` against only the member's own dependency needs (confirmed: root `node_modules` dropped from ~1300 packages to ~290, and every mobile-only package was gone). This is the same underlying npm behavior that causes the `npm/cli#4828` bug fixed earlier today, just manifesting differently. **Fix/recovery: run `npm ci` from the repo root**, then `node_modules/.bin/prisma generate` inside `nextjs/` (the root install regenerates `@prisma/client` fresh, and it needs the schema re-pointed at). **Going forward: never run `npm ci` directly inside `nextjs/` on the real checkout** — use the root install (already true for local mobile dev; for CI, `ci.yml`'s `working-directory: nextjs` + `npm ci` is fine specifically *because* the runner is single-purpose and ephemeral, so there's no sibling `mobile/` install to destroy).
+- `@testing-library/react-native`'s `render()` is also `async` (same as `renderHook`, discovered in the previous test batch) — must `await render(...)` everywhere, including inside `it()` blocks that don't otherwise look async-sensitive.
+- A `fireEvent.press` that triggers an async state update in a hook (e.g. `useApi`'s `refresh()`) needs to be wrapped in `await act(async () => { fireEvent.press(...) })`, not called bare — otherwise React logs "The current testing environment is not configured to support act(...)" even though the test still passes (the assertion happens to land after the update settles by luck of the microtask queue, not because it was properly awaited).
+
+**Verification:** `npm exec -w mobile -- jest` — 14 suites, 84 tests, all passing (up from 51). `tsc --noEmit` and `expo lint` both clean on `mobile/`. Re-confirmed `nextjs/` unaffected: 113/113 vitest tests still passing after recovering from the node_modules incident above.
+
 ## 2026-07-14 (Fix, part 2: CI still failing after the lockfile fix)
 
 **Files changed:**
