@@ -2,6 +2,24 @@
 
 ---
 
+## 2026-07-14 (Mobile unit tests — useApi hook)
+
+**Files changed:**
+- `mobile/__tests__/hooks/useApi.test.ts` (new) — 7 tests covering the shared fetch/loading/error/pull-to-refresh hook: initial fetch-on-mount stays `loading` until the fetcher resolves, `ApiError` messages surface verbatim while non-`ApiError` failures fall back to a generic message, `refresh()` toggles `refreshing` (not `loading`) and updates data, `reload()` clears a previous error, re-fetches when the `fetcher` identity changes (the documented `useCallback`-at-the-call-site contract), and `setData` applies a direct optimistic update without re-fetching.
+
+**Decisions made:**
+- Used a small local `deferred<T>()` helper (a manually-resolvable promise) to assert *intermediate* states — e.g. `loading === true` while a fetch is still in flight, and `refreshing === true` mid-refresh — rather than only asserting eventual settled state. Instant `mockResolvedValue`/`mockRejectedValue` mocks can't produce an observable in-flight window.
+
+**Next steps:**
+- Component/screen rendering tests still the next natural batch (deferred twice now, by original scoping choice).
+- `eas init` remains the standalone blocker for real push delivery/builds, unrelated to test coverage.
+
+**Gotchas:**
+- **Self-inflicted, now fixed:** an `act(() => {...})` call without `await` (easy to miss since `act()` always returns a `Promise` regardless of whether the callback is sync or async) left a dangling async scope that leaked into subsequent tests in the same file, surfacing as `result.current` reading `null` in *later, unrelated* tests — a confusing action-at-a-distance failure mode worth remembering: if a `result.current` in an RTL hook test is unexpectedly `null`, check every `act(...)` call in that file (including earlier tests) for a missing `await` before assuming the hook itself is broken.
+- Passing a destructured, unannotated parameter (`({ fetcher }) => ...`) as `renderHook`'s first argument fails to typecheck when combined with `initialProps`, because `renderHook`'s type signature uses `NoInfer<Props>` on the options parameter specifically to force `Props` inference from the callback alone — an unannotated destructured parameter has nothing to infer from and collapses to `unknown`. Fix: annotate the callback parameter's type explicitly (`({ fetcher }: { fetcher: () => Promise<T> }) => ...`).
+
+**Verification:** `npm exec -w mobile -- jest` — 5 suites, 51 tests, all passing (up from 44). `tsc --noEmit` and `expo lint` both clean on `mobile/`.
+
 ## 2026-07-14 (Mobile unit test infrastructure — first batch)
 
 **Files changed:**
