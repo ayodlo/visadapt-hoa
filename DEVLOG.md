@@ -2,6 +2,33 @@
 
 ---
 
+## 2026-07-14 (Mobile unit test infrastructure — first batch)
+
+**Files changed:**
+- `mobile/package.json` — added `jest-expo`, `jest`, `@testing-library/react-native`, `@types/jest` as devDependencies (via `expo install --dev`, so versions are SDK-57-compatible); added `test`/`test:watch` scripts; added a `jest` config block (`preset: "jest-expo"`, the standard `transformIgnorePatterns` for RN/Expo modules, plus a `moduleNameMapper` — see Gotchas).
+- `mobile/tsconfig.json` — added `"types": ["jest"]` so `describe`/`it`/`expect` typecheck.
+- `mobile/__tests__/utils/format.test.ts`, `__tests__/utils/tones.test.ts` (new) — pure-function tests for `utils/format.ts`/`utils/tones.ts`.
+- `mobile/__tests__/api/client.test.ts` (new) — tests `apiFetch`'s header attachment, 401→unauthorized-handler flow, and error-message fallback, with `globalThis.fetch` mocked.
+- `mobile/__tests__/auth/AuthContext.test.tsx` (new) — tests login/logout, cold-start session restore (success and non-auth-error paths), and the 401→auto-logout wiring, with `secureStorage`, `api/client`, and `notifications/registerPushToken` all mocked.
+- `.github/workflows/mobile-ci.yml` — renamed the job to "Typecheck, lint & test" and added a `jest` step.
+
+**Decisions made:**
+- User chose to scope this first batch to pure logic + the auth/API core (no component/screen rendering tests yet) — highest value, lowest setup risk, given jest-expo's native rendering path was untested territory in this repo.
+- Followed the exact setup Expo's own docs recommend for SDK 57 (`jest-expo` preset, `@testing-library/react-native`), rather than an older pattern like `@testing-library/react-hooks` — confirmed by fetching the live versioned docs per `mobile/AGENTS.md`'s instruction.
+- Test location mirrors the nextjs convention (a top-level `__tests__/` tree shaped like `src/`), not co-located `*.test.ts` files, for consistency across the monorepo.
+
+**Next steps:**
+- Component/screen rendering tests (Button, FormField, StatusBadge, a representative screen) were explicitly deferred to a later batch.
+- `useApi.ts` (the shared fetch/loading/pull-to-refresh hook) has no tests yet — natural next target given it backs most list/detail screens.
+- No E2E test tooling (Maestro, per the original mobile plan) set up yet — still just unit tests.
+
+**Gotchas:**
+- **Real dual-React-instance bug, now fixed.** npm workspaces hoisting produced *three* separate `react` installs across the repo: `mobile/node_modules/react@19.2.3` (react-native's exact pin), `nextjs/node_modules/react@19.2.4` (nextjs's exact pin), and a *third*, freshly-hoisted `node_modules/react@19.2.7` at the repo root (satisfying some dependency's broader `^19` range — nothing pins that version anywhere directly). `jest-expo`'s `react-test-renderer` (also at root, version 19.2.3 — matching mobile's pin, confirmed via `jest-expo`'s own `package.json` dependency) still resolved its internal `require('react')` against the root copy (19.2.7) via plain Node resolution, while mobile's own components resolved `react` from the nested `mobile/node_modules/react` (19.2.3). Two live React module instances in one test run means two separate hook-dispatcher singletons — symptom was `TypeError: Cannot read properties of undefined (reading 'useState')` inside any component under test, with no other explanation in the stack trace. Fixed with a `moduleNameMapper` in `mobile/package.json`'s `jest` config forcing `react`/`react-dom` (and subpaths) to always resolve to `<rootDir>/node_modules/react(-dom)` (the mobile-local, react-native-compatible copies). If this resurfaces after a dependency bump, check `node -e "console.log(require('./node_modules/react/package.json').version)"` at root vs. `mobile/node_modules/react` before assuming it's a new bug.
+- **`@testing-library/react-native@14.0.1`'s `renderHook` is `async`** (returns a `Promise<{ result, rerender, unmount }>`), unlike the classic `@testing-library/react-hooks` API most training data assumes. Forgetting to `await` it doesn't throw — it silently returns a `Promise` object, and every property access off the (non-awaited) result reads as `undefined`, which looked at first like a broken render rather than a missing `await`. Confirmed by reading `node_modules/@testing-library/react-native/dist/render-hook.js` directly rather than guessing from docs.
+- Auto-mocking a module that imports `expo-notifications` (via `jest.mock('@/notifications/registerPushToken')` with no factory) still evaluates the real module once to derive the mock shape, which prints `expo-notifications`'s "removed from Expo Go" warning to the console during the test run. Harmless, but silenced by giving `jest.mock` an explicit factory (`() => ({ registerPushToken: jest.fn() })`) instead of relying on auto-mock.
+
+**Verification:** `npm exec -w mobile -- jest` — 4 suites, 44 tests, all passing. `tsc --noEmit` and `expo lint` both clean on `mobile/`. Confirmed the new CI step name/command locally matches what `mobile-ci.yml` now runs.
+
 ## 2026-07-14 (Phase 6 — push notifications)
 
 **Files changed:**

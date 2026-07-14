@@ -15,8 +15,8 @@ on:
       - '.github/workflows/mobile-ci.yml'
 
 jobs:
-  typecheck:
-    name: Typecheck & lint
+  test:
+    name: Typecheck, lint & test
     runs-on: ubuntu-latest
 
     steps:
@@ -44,3 +44,6 @@ jobs:
 
       - name: Lint
         run: npm exec -w mobile -- expo lint
+
+      - name: Unit tests
+        run: npm exec -w mobile -- jest
