@@ -2,6 +2,25 @@
 
 ---
 
+## 2026-07-14 (Fix: CI "Unit tests & lint" failing since ~July 5)
+
+**Files changed:**
+- `nextjs/package-lock.json` — regenerated. No dependency changes; the diff is purely optional, platform-gated transitive entries (added `@emnapi/core`/`@emnapi/runtime` — needed by Tailwind's oxide engine and Vite's rolldown binding on Linux; a few `fsevents`/`@aws-sdk`/`@smithy` sub-entries shuffled).
+
+**Decisions made:**
+- Diagnosed via GitHub's REST API (workflow runs + check-run annotations) that the `CI` workflow's "Unit tests & lint" job had failed on **every** push since at least 2026-07-05 (`08547cd`) — i.e. this predates the entire mobile app / push notifications / mobile test work from this week. Not a regression from recent sessions.
+- Confirmed root cause by reproducing the exact CI environment (Node 24, npm 11.6.1, Ubuntu/Debian) in a local Docker container (`node:24-bookworm`) rather than guessing from the (unauthenticated-API-limited) annotation text, which only said generic "Process completed with exit code 1." `npm ci` failed there with `Missing: @emnapi/core@1.11.1 from lock file` — the committed `nextjs/package-lock.json` (last touched at `880c656`, before the Phase 0 monorepo conversion) had drifted out of sync with what `nextjs/package.json`'s dependency tree resolves to on Linux. A from-scratch `npm install` in the same container regenerated a lockfile that passed `npm ci` + all 113 tests there, and was then re-verified to still pass `npm ci` + tests on Windows too (this lockfile has to serve both, since local dev is Windows and CI is Linux).
+- Left `ci.yml`/`e2e.yml` untouched — the fix is entirely in the lockfile, not the workflow.
+
+**Next steps:**
+- Watch the next CI run on `main` to confirm this actually goes green (only verified locally + in a matching container, not via an actual GitHub Actions run yet).
+- `E2E tests` shows "skipped" on every run — that's by design (`if: vars.E2E_ENABLED == 'true'` in `e2e.yml`), not a failure. Needs repo secrets (`DATABASE_URL`, `JWT_SECRET`, AWS keys, `RESEND_API_KEY`, `EMAIL_FROM`) and the `E2E_ENABLED` repo variable set to `true` — both are GitHub repo-admin actions, not something fixable from a working tree.
+
+**Gotchas:**
+- If this resurfaces after a future local `npm install` inside `nextjs/` (e.g. adding a package), regenerate on Linux (or via this same Docker approach) rather than trusting a Windows-generated lockfile — Tailwind v4's oxide engine and Vite's rolldown binding both ship platform-specific optional deps (including wasm32-wasi fallbacks needing `@emnapi/*`) that a Windows install won't necessarily record identically to what Linux CI needs.
+
+**Verification:** Reproduced the failure and the fix in a `node:24-bookworm` container matching CI's Node version and OS family: `npm ci` + `npm test` (113/113) both clean against the regenerated lockfile. Re-verified `npm ci` + `npm test` (113/113) + `tsc --noEmit` + `npm run lint` all clean on Windows with the same regenerated lockfile.
+
 ## 2026-07-14 (Mobile unit tests — useApi hook)
 
 **Files changed:**
