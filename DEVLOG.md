@@ -2,6 +2,39 @@
 
 ---
 
+## 2026-07-14 (Phase 6 — push notifications)
+
+**Files changed:**
+- `nextjs/prisma/schema.prisma` — new `PushToken` model (`userId`, unique `token`, optional `platform`, `lastSeenAt`), relation on `User`; migration `20260714124010_add_push_tokens` applied to the Neon dev DB.
+- `nextjs/lib/push.ts` (new) — `buildPushMessages`/`parseInvalidTokens` (pure, unit-tested) plus `sendPushToUsers` orchestrator. Sends via a raw `fetch` to Expo's push API (`https://exp.host/--/api/v2/push/send`) rather than adding the `expo-server-sdk` dependency — it's a plain HTTPS/JSON endpoint, so no package was needed. Swallows all errors internally so a push failure never breaks the calling route's response; auto-deletes tokens that come back `DeviceNotRegistered`.
+- `nextjs/app/api/push-tokens/route.ts` (new) — `POST` only, session-gated (cookie or Bearer), upserts by the unique token so re-login as a different user on the same device reassigns it. No DELETE route — stale tokens self-prune via the cleanup above.
+- Trigger call sites added (additive, no response-shape changes) in `app/api/admin/announcements/route.ts` (POST), `app/api/issues/[id]/comments/route.ts` (POST, resident→assigned staff), `app/api/admin/issues/[id]/comments/route.ts` (POST, staff public comment→resident), `app/api/admin/violations/[id]/route.ts` (PATCH, notice sent→resident), `app/api/admin/violations/[id]/appeal/route.ts` (PATCH, appeal decided→resident), `app/api/board/architectural-requests/[id]/route.ts` + `app/api/admin/architectural-requests/[id]/route.ts` (PATCH, decision→resident).
+- `nextjs/__tests__/lib/push.test.ts` (new) — 7 unit tests for the pure message-building/cleanup-parsing logic.
+- `mobile/package.json` — added `expo-notifications`, `expo-device` (via `expo install`, so versions are SDK-57-compatible).
+- `mobile/app.json` — added `expo-notifications` to `plugins`.
+- `mobile/src/notifications/registerPushToken.ts` (new) — `Device.isDevice` guard, permission request, `getExpoPushTokenAsync({ projectId })`, POSTs to `/api/push-tokens`. Wrapped in try/catch that only logs in dev — this call is expected to throw until a real EAS project ID exists (see Gotchas).
+- `mobile/src/auth/AuthContext.tsx` — calls `registerPushToken()` (fire-and-forget) after login and after a cold-start session restore.
+- `mobile/app/_layout.tsx` — `Notifications.setNotificationHandler` (foreground banners) and `addNotificationResponseReceivedListener` with a small `resolveNotificationRoute(type, id, role)` switch that deep-links a tapped notification to the right screen per role.
+- `nextjs/app/privacy/page.tsx` — updated to disclose push token collection (was previously stated as "not collected") and the new notification-sending purpose; bumped "Last updated" date.
+- `mobile/STORE_SUBMISSION.md` — replaced the old "push deferred" note with what's actually implemented, and flagged the EAS project ID gap as now blocking push delivery too, not just builds.
+
+**Decisions made:**
+- Chose which 4 events trigger notifications with the user up front: new announcements, issue comments, violation notices, architectural request decisions (not every possible event — e.g. no push on issue status changes without a comment, no push on poll creation).
+- Raw `fetch` to Expo's push endpoint instead of adding `expo-server-sdk` as a new nextjs dependency — kept the backend dependency footprint unchanged for something this simple.
+- Recipients for announcements reuse the exact audience→role mapping already used by the resident-facing `GET /api/announcements` route, rather than inventing new targeting logic.
+- No token-removal endpoint in v1 — relying entirely on the `DeviceNotRegistered` auto-cleanup, confirmed working against the real Expo API during verification (see below).
+- Committed Phases 0-5 (previously fully uncommitted since the prior session) before starting Phase 6, per user's choice, so this phase has a clean baseline.
+
+**Next steps:**
+- Real on-device push delivery is blocked on running `eas init` against a real Expo account (writes `extra.eas.projectId` into `app.json`) — everything server-side is built and tested, but `getExpoPushTokenAsync()` can't mint a token without it. See `mobile/STORE_SUBMISSION.md` step 5.
+- No mobile unit tests yet at all (pre-existing gap, unrelated to this phase).
+- Once a real EAS project exists, re-verify push delivery on a physical device/simulator — everything tested this session used a fake `ExponentPushToken[...]` string.
+
+**Gotchas:**
+- None new. The Turbopack `root` fix and npm-workspace `npx` caveats from earlier phases continue to apply unchanged.
+
+**Verification:** `tsc --noEmit` + full vitest suite (113 tests, up from 106) clean on `nextjs/`. `tsc --noEmit` + `expo lint` clean on `mobile/`. Applied the migration to the Neon dev DB and confirmed the `push_tokens` table. Started the real dev server and, using the demo resident/admin/board accounts, registered two fake push tokens via `POST /api/push-tokens`, then live-triggered all 6 call sites (announcement create, resident issue comment, admin issue comment, violation notice, appeal decision, both board and admin architectural-request decisions) — every route still returned its normal success status. Notably, Expo's real push API rejected the fake tokens and our `DeviceNotRegistered` cleanup logic actually deleted both rows afterward (confirmed via a direct DB query) — proof the full send/parse/cleanup pipeline works against the live Expo endpoint, not just a mock.
+
 ## 2026-07-13 (Session handoff — mobile app Phases 0-5 complete)
 
 Full-day session building the React Native/Expo mobile app for CommunityHQ

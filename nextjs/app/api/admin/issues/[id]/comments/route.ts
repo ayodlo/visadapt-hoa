@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { ok, err, unauthorized, forbidden, notFound } from '@/lib/api';
+import { sendPushToUsers } from '@/lib/push';
 
 const schema = z.object({
   body: z.string().min(1).max(2000),
@@ -15,7 +16,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (session.role === 'RESIDENT') return forbidden();
 
   const { id } = await params;
-  const issue = await prisma.issue.findUnique({ where: { id }, select: { id: true } });
+  const issue = await prisma.issue.findUnique({ where: { id }, select: { id: true, residentId: true, title: true } });
   if (!issue) return notFound('Issue');
 
   const body = await req.json().catch(() => null);
@@ -40,6 +41,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         action: 'comment_added',
         details: 'Admin added a public comment',
       },
+    });
+    await sendPushToUsers([issue.residentId], {
+      title: 'New Issue Comment',
+      body: `New comment on "${issue.title}"`,
+      data: { type: 'issue', id },
     });
   }
 

@@ -4,6 +4,7 @@ import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { ok, err, unauthorized, forbidden, notFound } from '@/lib/api';
 import { createAuditLog } from '@/lib/audit';
+import { sendPushToUsers } from '@/lib/push';
 
 const patchSchema = z.object({
   status: z.enum(['DRAFT', 'NOTICE_SENT', 'RESIDENT_RESPONDED', 'UNDER_REVIEW', 'RESOLVED', 'ESCALATED', 'CLOSED']).optional(),
@@ -108,6 +109,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   for (const act of activities) {
     await prisma.violationActivity.create({
       data: { violationId: id, actorId: session.id, ...act },
+    });
+  }
+
+  if (data.status === 'NOTICE_SENT' && existing.status === 'DRAFT') {
+    await sendPushToUsers([existing.residentId], {
+      title: 'Violation Notice',
+      body: `A violation notice has been issued: ${existing.ruleCitation}`,
+      data: { type: 'violation', id },
     });
   }
 

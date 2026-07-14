@@ -5,6 +5,7 @@ import { isAdmin } from '@/lib/roles';
 import { prisma } from '@/lib/prisma';
 import { ok, err, unauthorized, forbidden, notFound } from '@/lib/api';
 import { createAuditLog } from '@/lib/audit';
+import { sendPushToUsers } from '@/lib/push';
 
 const schema = z.object({
   status: z.enum(['SUBMITTED', 'UNDER_REVIEW', 'NEEDS_MORE_INFORMATION', 'APPROVED', 'DENIED', 'WITHDRAWN']).optional(),
@@ -120,6 +121,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     entityId: id,
     metadata: { status: data.status } as object,
   });
+
+  if (data.status === 'APPROVED' || data.status === 'DENIED') {
+    await sendPushToUsers([existing.residentId], {
+      title: 'Architectural Request Decision',
+      body: `Your request was ${data.status.toLowerCase()}`,
+      data: { type: 'architectural-request', id },
+    });
+  }
 
   return ok({ request: updated });
 }

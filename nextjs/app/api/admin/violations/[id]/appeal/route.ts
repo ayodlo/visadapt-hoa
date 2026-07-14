@@ -4,6 +4,7 @@ import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { ok, err, unauthorized, forbidden, notFound } from '@/lib/api';
 import { createAuditLog } from '@/lib/audit';
+import { sendPushToUsers } from '@/lib/push';
 
 const schema = z.object({
   status: z.enum(['UNDER_REVIEW', 'APPROVED', 'DENIED', 'WITHDRAWN']),
@@ -83,6 +84,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     entityId: violation.appeal.id,
     metadata: { status } as object,
   });
+
+  if (isDecision) {
+    await sendPushToUsers([violation.residentId], {
+      title: 'Appeal Decision',
+      body: actionLabel,
+      data: { type: 'violation', id },
+    });
+  }
 
   return ok({ appeal });
 }

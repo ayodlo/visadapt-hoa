@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { getItem, setItem, deleteItem } from './secureStorage';
 import { apiFetch, setAuthToken, setUnauthorizedHandler, ApiError } from '@/api/client';
+import { registerPushToken } from '@/notifications/registerPushToken';
 import type { SessionUser } from '@/types/auth';
 
 const TOKEN_KEY = 'communityhq_token';
@@ -48,6 +49,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const me = await apiFetch<{ user: SessionUser }>('/api/auth/me');
         setUser(me.user);
+        void registerPushToken();
       } catch (e) {
         if (!(e instanceof ApiError && e.status === 401)) {
           // Non-auth error (e.g. offline) — keep the token, let the user retry.
@@ -66,6 +68,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await setItem(TOKEN_KEY, res.token);
     setAuthToken(res.token);
     setUser(res.user);
+    void registerPushToken();
   }
 
   function updateUser(nextUser: SessionUser) {

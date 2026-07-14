@@ -4,6 +4,7 @@ import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { ok, err, unauthorized, forbidden } from '@/lib/api';
 import { createAuditLog } from '@/lib/audit';
+import { sendPushToUsers } from '@/lib/push';
 
 const schema = z.object({
   title: z.string().min(1).max(300),
@@ -96,6 +97,17 @@ export async function POST(req: NextRequest) {
     entityType: 'Announcement',
     entityId: announcement.id,
     metadata: { title: announcement.title, priority: announcement.priority, audience: announcement.audience },
+  });
+
+  const recipientRole = announcement.audience === 'BOARD_MEMBERS' ? 'BOARD_MEMBER' : 'RESIDENT';
+  const recipients = await prisma.user.findMany({
+    where: { role: recipientRole, id: { not: session.id } },
+    select: { id: true },
+  });
+  await sendPushToUsers(recipients.map((r) => r.id), {
+    title: 'New Announcement',
+    body: announcement.title,
+    data: { type: 'announcement', id: announcement.id },
   });
 
   return ok({ announcement }, 201);

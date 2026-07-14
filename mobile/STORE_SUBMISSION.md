@@ -55,6 +55,15 @@ submitted to a store; it's all local config and a plan.
   to link this project to your account — this writes a real
   `extra.eas.projectId` into `app.json` (currently absent; a fabricated one
   would break builds, so this step can't be done without your account).
+- **This is now also a push notification blocker, not just a build blocker**:
+  `Notifications.getExpoPushTokenAsync()` (in
+  `mobile/src/notifications/registerPushToken.ts`) requires this project ID
+  to mint a token. Until `eas init` runs, the registration call fails
+  silently (caught, logged in dev only, doesn't crash the app) and no device
+  ever gets a push token — the full server-side pipeline (DB model, API
+  route, all 6 trigger points) is in place and tested against the real Expo
+  push API, but nothing will actually arrive on a device until this step is
+  done.
 - First builds: `eas build --profile production --platform ios` and
   `--platform android`.
 
@@ -91,7 +100,13 @@ re-review the content if app functionality changes (e.g. if push
 notifications or file uploads are added later, the policy needs updating to
 match — it's only accurate as of what the app does today).
 
-## Explicitly deferred (not part of this checklist)
+## Push notifications
 
-- Push notifications (Phase 6+ per the mobile build plan) — once added,
-  the privacy policy and both stores' privacy declarations need updating.
+Implemented (Phase 6): new announcements, issue comments, violation notices,
+and architectural request decisions all trigger a push via `nextjs/lib/push.ts`
+(raw Expo Push API, no new server dependency) and
+`mobile/src/notifications/registerPushToken.ts`. The privacy policy
+(`nextjs/app/privacy/page.tsx`) has been updated to disclose the push token
+collection accordingly. **Real delivery to a device is blocked on the EAS
+project ID gap in step 5 above** — update store privacy declarations (step 6)
+to include push tokens once that's resolved.

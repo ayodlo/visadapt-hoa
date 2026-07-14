@@ -13,7 +13,7 @@ export default function PrivacyPolicyPage() {
         </Link>
 
         <h1 className="text-3xl font-bold text-gray-900 mt-6 mb-2">Privacy Policy</h1>
-        <p className="text-sm text-gray-500 mb-10">Last updated: July 13, 2026</p>
+        <p className="text-sm text-gray-500 mb-10">Last updated: July 14, 2026</p>
 
         <div className="space-y-8 text-sm leading-6 text-gray-700">
           <section>
@@ -38,6 +38,7 @@ export default function PrivacyPolicyPage() {
               <li><strong>Violations and appeals:</strong> violation records associated with your account and any appeal you submit in response.</li>
               <li><strong>Community activity:</strong> which announcements you&rsquo;ve read and how you&rsquo;ve voted in community polls.</li>
               <li><strong>Authentication data:</strong> a session token used to keep you signed in, stored securely on your device (in the system Keychain/Keystore on mobile, or browser storage on web).</li>
+              <li><strong>Push notification token:</strong> if you enable notifications in the mobile app, we store a device push token (issued by Apple/Google via Expo) linked to your account, used only to deliver the notifications described below. No notification content is stored by Apple/Google beyond standard platform delivery.</li>
             </ul>
           </section>
 
@@ -45,8 +46,7 @@ export default function PrivacyPolicyPage() {
             <h2 className="text-lg font-semibold text-gray-900 mb-2">Information We Do Not Collect</h2>
             <p>
               CommunityHQ does not access your device&rsquo;s camera, photo library, location, or contacts,
-              and does not use advertising identifiers, third-party analytics SDKs, or ad networks. We do
-              not send push notifications at this time.
+              and does not use advertising identifiers, third-party analytics SDKs, or ad networks.
             </p>
           </section>
 
@@ -58,6 +58,7 @@ export default function PrivacyPolicyPage() {
               <li>Let your HOA&rsquo;s board members and staff review and respond to issues, architectural requests, and violations.</li>
               <li>Maintain accurate dues and payment records for your property.</li>
               <li>Keep an internal record of account and record changes (who changed what, and when) for accountability within your HOA.</li>
+              <li>Send push notifications (mobile app only, if enabled) for events relevant to you — new announcements, comments on your issues, violation notices, and decisions on your architectural requests.</li>
             </ul>
           </section>
 

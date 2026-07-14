@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { ok, err, unauthorized, forbidden, notFound } from '@/lib/api';
+import { sendPushToUsers } from '@/lib/push';
 
 const schema = z.object({ body: z.string().min(1).max(2000) });
 
@@ -11,7 +12,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (!session) return unauthorized();
 
   const { id } = await params;
-  const issue = await prisma.issue.findUnique({ where: { id }, select: { residentId: true } });
+  const issue = await prisma.issue.findUnique({ where: { id }, select: { residentId: true, assignedToId: true, title: true } });
   if (!issue) return notFound('Issue');
 
   // Residents can only comment on their own issues
@@ -30,6 +31,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     },
     include: { author: { select: { firstName: true, lastName: true, role: true } } },
   });
+
+  if (issue.assignedToId) {
+    await sendPushToUsers([issue.assignedToId], {
+      title: 'New Issue Comment',
+      body: `New comment on "${issue.title}"`,
+      data: { type: 'issue', id },
+    });
+  }
 
   return ok({ comment }, 201);
 }
