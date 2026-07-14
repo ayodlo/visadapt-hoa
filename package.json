@@ -1,0 +1,8 @@
+{
+  "name": "visadapt-hoa",
+  "private": true,
+  "workspaces": [
+    "nextjs",
+    "mobile"
+  ]
+}

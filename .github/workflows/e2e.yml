@@ -3,6 +3,9 @@ name: E2E tests
 on:
   push:
     branches: [main]
+    paths:
+      - 'nextjs/**'
+      - '.github/workflows/e2e.yml'
   workflow_dispatch:
 
 # Requires these repository secrets to be configured:
@@ -50,10 +53,12 @@ jobs:
         run: npm ci
 
       - name: Generate Prisma client
-        run: npx prisma generate
+        # Not `npx prisma` — see note in ci.yml: npm workspaces breaks npx's
+        # local-bin resolution here, so call the installed binary directly.
+        run: node_modules/.bin/prisma generate
 
       - name: Install Playwright browsers
-        run: npx playwright install --with-deps chromium
+        run: node_modules/.bin/playwright install --with-deps chromium
 
       - name: Run E2E tests
         run: npm run test:e2e

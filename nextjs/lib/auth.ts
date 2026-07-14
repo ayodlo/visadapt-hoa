@@ -1,5 +1,5 @@
 import jwt from 'jsonwebtoken';
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import { prisma } from './prisma';
 import type { UserRole } from './roles';
 
@@ -30,7 +30,16 @@ export function verifyToken(token: string): SessionUser | null {
 
 export async function getSession(): Promise<SessionUser | null> {
   const cookieStore = await cookies();
-  const token = cookieStore.get(COOKIE)?.value;
+  let token = cookieStore.get(COOKIE)?.value;
+
+  if (!token) {
+    const headerStore = await headers();
+    const authHeader = headerStore.get('authorization');
+    if (authHeader?.startsWith('Bearer ')) {
+      token = authHeader.slice('Bearer '.length).trim();
+    }
+  }
+
   if (!token) return null;
   return verifyToken(token);
 }

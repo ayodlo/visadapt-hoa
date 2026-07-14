@@ -1,0 +1,46 @@
+name: Mobile CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'mobile/**'
+      - 'package.json'
+      - '.github/workflows/mobile-ci.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'mobile/**'
+      - 'package.json'
+      - '.github/workflows/mobile-ci.yml'
+
+jobs:
+  typecheck:
+    name: Typecheck & lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      # Installs from the repo root: npm workspaces hoists shared deps
+      # (e.g. typescript) into the root node_modules, so mobile/ itself often
+      # has no local node_modules/.bin at all.
+      - name: Install dependencies
+        run: npm ci
+
+      # `npm exec -w mobile` (not a bare `npx <tool>` from inside mobile/) is
+      # what correctly resolves workspace-hoisted binaries here — a bare npx
+      # run from a workspace subdir can silently pick up the wrong hoisted
+      # version of a same-named tool from a sibling workspace, or fall
+      # through to an unrelated same-named package on the npm registry.
+      - name: Type check
+        run: npm exec -w mobile -- tsc --noEmit
+
+      - name: Lint
+        run: npm exec -w mobile -- expo lint

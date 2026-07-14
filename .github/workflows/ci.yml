@@ -3,8 +3,14 @@ name: CI
 on:
   push:
     branches: [main]
+    paths:
+      - 'nextjs/**'
+      - '.github/workflows/ci.yml'
   pull_request:
     branches: [main]
+    paths:
+      - 'nextjs/**'
+      - '.github/workflows/ci.yml'
 
 jobs:
   unit:
@@ -38,4 +44,7 @@ jobs:
         run: npm run lint
 
       - name: Type check
-        run: npx tsc --noEmit
+        # Note: not `npx tsc` — since the repo root became an npm workspace,
+        # npx's local-bin resolution for this subdir breaks and falls through
+        # to an unrelated registry package literally named "tsc".
+        run: node_modules/.bin/tsc --noEmit
