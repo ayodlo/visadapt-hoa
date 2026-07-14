@@ -2,6 +2,24 @@
 
 ---
 
+## 2026-07-14 (Fix, part 2: CI still failing after the lockfile fix)
+
+**Files changed:**
+- `.github/workflows/ci.yml` — removed `cache: npm`/`cache-dependency-path` from the `actions/setup-node@v4` step.
+
+**Decisions made:**
+- The lockfile regeneration below (part 1) fixed the `npm ci` integrity failure, but pushing it (`16c8455`) surfaced a **second, different** failure on the real GitHub Actions runner: `npm test` crashed with `Cannot find native binding` / `Cannot find module '@rolldown/binding-linux-x64-gnu'`, even though the lockfile entry for that exact package is present and correctly formed (`os: ["linux"], cpu: ["x64"]` — verified directly). This is npm's own documented bug (npm/cli#4828, quoted verbatim in the error message rolldown's native loader prints): a restored `~/.npm` cache — via `actions/setup-node@v4`'s built-in caching, which was carrying over stale cache state from all the previously-failing runs since July 5 — causes `npm ci` to silently skip installing a valid optional platform dependency. This reproduces the "works in a fresh environment (my Docker container had an empty cache), fails on the real cached CI runner" pattern exactly.
+- Fix is to stop caching npm's download cache for this job entirely, rather than trying to bust/version the cache key — simplest and most robust against this specific bug recurring. User chose to scope the fix to `ci.yml` only (the workflow that's actually broken) rather than also touching `e2e.yml`/`mobile-ci.yml`, which have the same caching setup but haven't demonstrated the bug.
+
+**Next steps:**
+- Watch the next CI run to confirm both fixes together (lockfile regen + no npm cache) actually go green — still not yet confirmed via a real passing run as of this entry.
+- If `e2e.yml` or `mobile-ci.yml` ever hit this same "Cannot find native binding" class of error, apply the identical fix (drop `cache: npm` from their `actions/setup-node@v4` steps).
+
+**Gotchas:**
+- The generic GitHub check-run annotation API only ever reports "Process completed with exit code 1" — no actual error text. Full step output requires the job-logs endpoint, which 403s ("Must have admin rights to Repository") even for a public repo without an authenticated token with repo access. Real diagnosis for this second failure only became possible once the user pasted the actual `npm test` output copied from the Actions UI. Installing `gh` CLI + `gh auth login` would remove this blind spot going forward.
+
+**Verification:** Not yet — this fix is unverified against a real CI run at the time of this entry (see Next steps). Diagnosis (lockfile entry correctness, cache-restore theory) was verified by direct inspection of `package-lock.json`, not just inference.
+
 ## 2026-07-14 (Fix: CI "Unit tests & lint" failing since ~July 5)
 
 **Files changed:**

@@ -26,8 +26,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-          cache: npm
-          cache-dependency-path: nextjs/package-lock.json
+
+      # No `cache: npm` here: actions/setup-node's npm cache restore can
+      # resurrect a stale ~/.npm from an earlier run and trip npm's known
+      # optional-dependency bug (npm/cli#4828) -- `npm ci` silently skips
+      # installing a valid platform-specific optional package (e.g.
+      # @rolldown/binding-linux-x64-gnu), even though the lockfile entry is
+      # correct. Confirmed happening on this exact workflow; a from-scratch
+      # npm cache avoids it. See DEVLOG 2026-07-14.
 
       # npm implementations disagree on optional wasm deps in the lockfile;
       # pin to the version that generates it locally so `npm ci` validates.
