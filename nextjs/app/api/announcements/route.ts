@@ -1,12 +1,16 @@
 import { NextRequest } from 'next/server';
 import { getSession } from '@/lib/auth';
+import { getActiveCommunityId } from '@/lib/community';
 import { isAdmin } from '@/lib/roles';
 import { prisma } from '@/lib/prisma';
-import { ok, unauthorized } from '@/lib/api';
+import { ok, err, unauthorized } from '@/lib/api';
 
 export async function GET(req: NextRequest) {
   const session = await getSession();
   if (!session) return unauthorized();
+
+  const communityId = await getActiveCommunityId(session);
+  if (!communityId) return err('No community selected', 400);
 
   const { searchParams } = req.nextUrl;
   const priority = searchParams.get('priority') ?? '';
@@ -22,6 +26,7 @@ export async function GET(req: NextRequest) {
       : { audience: { in: ['ALL_RESIDENTS', 'SPECIFIC_LOCATION'] as never[] } };
 
   const where = {
+    communityId,
     ...audienceFilter,
     publishAt: { lte: now },
     OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],

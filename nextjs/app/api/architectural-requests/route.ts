@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { getSession } from '@/lib/auth';
+import { getActiveCommunityId } from '@/lib/community';
 import { prisma } from '@/lib/prisma';
 import { ok, err, unauthorized, forbidden } from '@/lib/api';
 import { createAuditLog } from '@/lib/audit';
@@ -18,6 +19,9 @@ export async function POST(req: NextRequest) {
   if (!session) return unauthorized();
   if (session.role !== 'RESIDENT') return forbidden();
 
+  const communityId = await getActiveCommunityId(session);
+  if (!communityId) return err('No community selected', 400);
+
   const body = await req.json().catch(() => null);
   const parsed = schema.safeParse(body);
   if (!parsed.success) return err(parsed.error.issues[0].message, 400);
@@ -28,6 +32,7 @@ export async function POST(req: NextRequest) {
   const request = await prisma.architecturalRequest.create({
     data: {
       residentId: session.id,
+      communityId,
       status,
       desiredStartDate: desiredStartDate ? new Date(desiredStartDate) : null,
       propertyId: propertyId ?? null,

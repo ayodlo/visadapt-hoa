@@ -20,7 +20,7 @@ export async function PUT(req: NextRequest) {
   const updated = await prisma.user.update({
     where: { id: session.id },
     data: parsed.data,
-    select: { id: true, email: true, firstName: true, lastName: true, role: true },
+    select: { id: true, email: true, firstName: true, lastName: true, role: true, communityId: true },
   });
 
   const token = signToken(updated);

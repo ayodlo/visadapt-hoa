@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
+import { getActiveCommunityId } from '@/lib/community';
 import { isAdmin } from '@/lib/roles';
 import { ok, err, unauthorized, forbidden, notFound } from '@/lib/api';
 import { createAuditLog } from '@/lib/audit';
@@ -24,9 +25,12 @@ export async function GET(_req: NextRequest, { params }: Params) {
   const session = await getSession();
   if (!session) return unauthorized();
 
+  const communityId = await getActiveCommunityId(session);
+  if (!communityId) return err('No community selected', 400);
+
   const { id } = await params;
   const doc = await prisma.document.findUnique({ where: { id }, include: INCLUDE });
-  if (!doc) return notFound('Document');
+  if (!doc || doc.communityId !== communityId) return notFound('Document');
 
   return ok(doc);
 }
@@ -36,9 +40,12 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   if (!session) return unauthorized();
   if (!isAdmin(session.role)) return forbidden();
 
+  const communityId = await getActiveCommunityId(session);
+  if (!communityId) return err('No community selected', 400);
+
   const { id } = await params;
   const existing = await prisma.document.findUnique({ where: { id } });
-  if (!existing) return notFound('Document');
+  if (!existing || existing.communityId !== communityId) return notFound('Document');
 
   const body = await req.json().catch(() => null);
   const parsed = updateSchema.safeParse(body);
@@ -60,9 +67,12 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
   if (!session) return unauthorized();
   if (!isAdmin(session.role)) return forbidden();
 
+  const communityId = await getActiveCommunityId(session);
+  if (!communityId) return err('No community selected', 400);
+
   const { id } = await params;
   const existing = await prisma.document.findUnique({ where: { id } });
-  if (!existing) return notFound('Document');
+  if (!existing || existing.communityId !== communityId) return notFound('Document');
 
   await prisma.document.delete({ where: { id } });
   await createAuditLog({ userId: session.id, action: 'document.delete', entityType: 'Document', entityId: id });

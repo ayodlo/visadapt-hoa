@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { getSession } from '@/lib/auth';
+import { getActiveCommunityId } from '@/lib/community';
 import { isAdmin } from '@/lib/roles';
 import { prisma } from '@/lib/prisma';
 import { ok, err, unauthorized, forbidden } from '@/lib/api';
@@ -11,7 +12,11 @@ export async function GET() {
   if (!session) return unauthorized();
   if (session.role === 'RESIDENT') return forbidden();
 
+  const communityId = await getActiveCommunityId(session);
+  if (!communityId) return err('No community selected', 400);
+
   const vendors = await prisma.vendor.findMany({
+    where: { communityId },
     orderBy: { name: 'asc' },
     select: { id: true, name: true, contactName: true, category: true },
   });
@@ -33,11 +38,14 @@ export async function POST(req: NextRequest) {
   if (!session) return unauthorized();
   if (!isAdmin(session.role)) return forbidden();
 
+  const communityId = await getActiveCommunityId(session);
+  if (!communityId) return err('No community selected', 400);
+
   const body = await req.json().catch(() => null);
   const parsed = createSchema.safeParse(body);
   if (!parsed.success) return err(parsed.error.issues[0].message, 400);
 
-  const vendor = await prisma.vendor.create({ data: parsed.data });
+  const vendor = await prisma.vendor.create({ data: { ...parsed.data, communityId } });
 
   await createAuditLog({ userId: session.id, action: 'vendor.create', entityType: 'Vendor', entityId: vendor.id });
 

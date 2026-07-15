@@ -8,6 +8,7 @@ const payload = {
   firstName: 'Test',
   lastName: 'User',
   role: 'RESIDENT' as const,
+  communityId: 'community-abc-123',
 };
 
 describe('signToken', () => {

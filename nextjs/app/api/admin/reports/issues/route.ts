@@ -1,11 +1,15 @@
 import { getSession } from '@/lib/auth';
-import { ok, unauthorized, forbidden } from '@/lib/api';
+import { getActiveCommunityId } from '@/lib/community';
+import { ok, err, unauthorized, forbidden } from '@/lib/api';
 import { prisma } from '@/lib/prisma';
 
 export async function GET() {
   const session = await getSession();
   if (!session) return unauthorized();
   if (session.role === 'RESIDENT') return forbidden();
+
+  const communityId = await getActiveCommunityId(session);
+  if (!communityId) return err('No community selected', 400);
 
   const now = new Date();
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 86_400_000);
@@ -20,25 +24,27 @@ export async function GET() {
     avgResolutionSample,
     unassignedCount,
   ] = await Promise.all([
-    prisma.issue.groupBy({ by: ['status'], _count: { _all: true } }),
-    prisma.issue.groupBy({ by: ['category'], _count: { _all: true } }),
-    prisma.issue.groupBy({ by: ['priority'], _count: { _all: true } }),
+    prisma.issue.groupBy({ by: ['status'], where: { communityId }, _count: { _all: true } }),
+    prisma.issue.groupBy({ by: ['category'], where: { communityId }, _count: { _all: true } }),
+    prisma.issue.groupBy({ by: ['priority'], where: { communityId }, _count: { _all: true } }),
     prisma.issue.count({
       where: {
+        communityId,
         status: { in: ['SUBMITTED', 'UNDER_REVIEW', 'ASSIGNED', 'IN_PROGRESS', 'WAITING_ON_VENDOR'] },
         dueDate: { lt: now, not: null },
       },
     }),
-    prisma.issue.count({ where: { createdAt: { gte: thirtyDaysAgo } } }),
-    prisma.issue.count({ where: { status: { in: ['RESOLVED', 'CLOSED'] }, updatedAt: { gte: thirtyDaysAgo } } }),
+    prisma.issue.count({ where: { communityId, createdAt: { gte: thirtyDaysAgo } } }),
+    prisma.issue.count({ where: { communityId, status: { in: ['RESOLVED', 'CLOSED'] }, updatedAt: { gte: thirtyDaysAgo } } }),
     prisma.issue.findMany({
-      where: { status: { in: ['RESOLVED', 'CLOSED'] } },
+      where: { communityId, status: { in: ['RESOLVED', 'CLOSED'] } },
       select: { createdAt: true, updatedAt: true },
       orderBy: { updatedAt: 'desc' },
       take: 500,
     }),
     prisma.issue.count({
       where: {
+        communityId,
         assignedToId: null,
         status: { in: ['SUBMITTED', 'UNDER_REVIEW'] },
       },

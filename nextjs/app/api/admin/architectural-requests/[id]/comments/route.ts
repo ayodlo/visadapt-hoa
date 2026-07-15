@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { getSession } from '@/lib/auth';
+import { getActiveCommunityId } from '@/lib/community';
 import { isAdmin } from '@/lib/roles';
 import { prisma } from '@/lib/prisma';
 import { ok, err, unauthorized, forbidden, notFound } from '@/lib/api';
@@ -15,9 +16,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (!session) return unauthorized();
   if (!isAdmin(session.role)) return forbidden();
 
+  const communityId = await getActiveCommunityId(session);
+  if (!communityId) return err('No community selected', 400);
+
   const { id } = await params;
   const request = await prisma.architecturalRequest.findUnique({ where: { id } });
-  if (!request) return notFound('Architectural request');
+  if (!request || request.communityId !== communityId) return notFound('Architectural request');
 
   const body = await req.json().catch(() => null);
   const parsed = schema.safeParse(body);

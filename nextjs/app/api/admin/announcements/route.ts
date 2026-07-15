@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { getSession } from '@/lib/auth';
+import { getActiveCommunityId } from '@/lib/community';
 import { prisma } from '@/lib/prisma';
 import { ok, err, unauthorized, forbidden } from '@/lib/api';
 import { createAuditLog } from '@/lib/audit';
@@ -22,6 +23,9 @@ export async function GET(req: NextRequest) {
   if (!session) return unauthorized();
   if (session.role === 'RESIDENT') return forbidden();
 
+  const communityId = await getActiveCommunityId(session);
+  if (!communityId) return err('No community selected', 400);
+
   const { searchParams } = req.nextUrl;
   const search = searchParams.get('search')?.trim() ?? '';
   const priority = searchParams.get('priority') ?? '';
@@ -32,6 +36,7 @@ export async function GET(req: NextRequest) {
   const now = new Date();
 
   const where = {
+    communityId,
     ...(search
       ? {
           OR: [
@@ -75,6 +80,9 @@ export async function POST(req: NextRequest) {
   if (!session) return unauthorized();
   if (session.role === 'RESIDENT') return forbidden();
 
+  const communityId = await getActiveCommunityId(session);
+  if (!communityId) return err('No community selected', 400);
+
   const body = await req.json().catch(() => null);
   const parsed = schema.safeParse(body);
   if (!parsed.success) return err(parsed.error.issues[0].message, 400);
@@ -85,6 +93,7 @@ export async function POST(req: NextRequest) {
     data: {
       ...rest,
       createdById: session.id,
+      communityId,
       publishAt: publishAt ? new Date(publishAt) : new Date(),
       expiresAt: expiresAt ? new Date(expiresAt) : null,
     },
@@ -100,10 +109,13 @@ export async function POST(req: NextRequest) {
   });
 
   const recipientRole = announcement.audience === 'BOARD_MEMBERS' ? 'BOARD_MEMBER' : 'RESIDENT';
-  const recipients = await prisma.user.findMany({
-    where: { role: recipientRole, id: { not: session.id } },
-    select: { id: true },
-  });
+  const recipients =
+    recipientRole === 'RESIDENT'
+      ? await prisma.user.findMany({ where: { role: 'RESIDENT', communityId, id: { not: session.id } }, select: { id: true } })
+      : await prisma.user.findMany({
+          where: { role: 'BOARD_MEMBER', id: { not: session.id }, communityAssignments: { some: { communityId } } },
+          select: { id: true },
+        });
   await sendPushToUsers(recipients.map((r) => r.id), {
     title: 'New Announcement',
     body: announcement.title,

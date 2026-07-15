@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { getSession } from '@/lib/auth';
+import { getActiveCommunityId } from '@/lib/community';
 import { StatCard } from '@/components/ui/StatCard';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -19,7 +20,8 @@ export default async function ResidentDashboardPage() {
   let data: Awaited<ReturnType<typeof getResidentDashboard>> | null = null;
   try {
     if (session?.id) {
-      data = await getResidentDashboard(session.id);
+      const communityId = await getActiveCommunityId(session);
+      if (communityId) data = await getResidentDashboard(session.id, communityId);
     }
   } catch {
     // show partial UI

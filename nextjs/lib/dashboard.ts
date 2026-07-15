@@ -5,7 +5,7 @@ function monthStart() {
   return new Date(d.getFullYear(), d.getMonth(), 1);
 }
 
-export async function getAdminDashboard() {
+export async function getAdminDashboard(communityId: string) {
   const now = new Date();
   const ms = monthStart();
 
@@ -24,14 +24,15 @@ export async function getAdminDashboard() {
     recentAnnouncements,
     recentActivity,
   ] = await Promise.all([
-    prisma.user.count({ where: { role: 'RESIDENT' } }),
+    prisma.user.count({ where: { role: 'RESIDENT', communityId } }),
 
     prisma.issue.count({
-      where: { status: { in: ['SUBMITTED', 'UNDER_REVIEW', 'ASSIGNED', 'IN_PROGRESS', 'WAITING_ON_VENDOR'] } },
+      where: { communityId, status: { in: ['SUBMITTED', 'UNDER_REVIEW', 'ASSIGNED', 'IN_PROGRESS', 'WAITING_ON_VENDOR'] } },
     }),
 
     prisma.issue.count({
       where: {
+        communityId,
         status: { in: ['SUBMITTED', 'UNDER_REVIEW', 'ASSIGNED', 'IN_PROGRESS', 'WAITING_ON_VENDOR'] },
         dueDate: { lt: now, not: null },
       },
@@ -40,50 +41,53 @@ export async function getAdminDashboard() {
     prisma.issue.groupBy({
       by: ['category'],
       _count: { _all: true },
-      where: { status: { in: ['SUBMITTED', 'UNDER_REVIEW', 'ASSIGNED', 'IN_PROGRESS', 'WAITING_ON_VENDOR'] } },
+      where: { communityId, status: { in: ['SUBMITTED', 'UNDER_REVIEW', 'ASSIGNED', 'IN_PROGRESS', 'WAITING_ON_VENDOR'] } },
       orderBy: { _count: { category: 'desc' } },
     }),
 
     prisma.issue.groupBy({
       by: ['status'],
       _count: { _all: true },
+      where: { communityId },
       orderBy: { _count: { status: 'desc' } },
     }),
 
     prisma.issue.findMany({
-      where: { status: { in: ['RESOLVED', 'CLOSED'] }, updatedAt: { gte: ms } },
+      where: { communityId, status: { in: ['RESOLVED', 'CLOSED'] }, updatedAt: { gte: ms } },
       select: { createdAt: true, updatedAt: true },
       take: 200,
     }),
 
     prisma.architecturalRequest.count({
-      where: { status: { in: ['SUBMITTED', 'UNDER_REVIEW', 'NEEDS_MORE_INFORMATION'] } },
+      where: { communityId, status: { in: ['SUBMITTED', 'UNDER_REVIEW', 'NEEDS_MORE_INFORMATION'] } },
     }),
 
     prisma.violation.count({
-      where: { status: { in: ['NOTICE_SENT', 'RESIDENT_RESPONDED', 'UNDER_REVIEW', 'ESCALATED'] } },
+      where: { communityId, status: { in: ['NOTICE_SENT', 'RESIDENT_RESPONDED', 'UNDER_REVIEW', 'ESCALATED'] } },
     }),
 
     prisma.violationAppeal.count({
-      where: { status: { in: ['SUBMITTED', 'UNDER_REVIEW'] } },
+      where: { status: { in: ['SUBMITTED', 'UNDER_REVIEW'] }, violation: { communityId } },
     }),
 
     prisma.charge.aggregate({
       _sum: { amount: true },
-      where: { status: { in: ['PENDING', 'OVERDUE'] } },
+      where: { communityId, status: { in: ['PENDING', 'OVERDUE'] } },
     }),
 
     prisma.charge
-      .groupBy({ by: ['residentId'], where: { status: 'OVERDUE' } })
+      .groupBy({ by: ['residentId'], where: { communityId, status: 'OVERDUE' } })
       .then((rows) => rows.length),
 
     prisma.announcement.findMany({
+      where: { communityId },
       orderBy: { createdAt: 'desc' },
       take: 5,
       select: { id: true, title: true, createdAt: true },
     }),
 
     prisma.issueActivity.findMany({
+      where: { issue: { communityId } },
       orderBy: { createdAt: 'desc' },
       take: 10,
       select: {
@@ -137,7 +141,7 @@ export async function getAdminDashboard() {
 
 export type AdminDashboard = Awaited<ReturnType<typeof getAdminDashboard>>;
 
-export async function getBoardDashboard() {
+export async function getBoardDashboard(communityId: string) {
   const ms = monthStart();
 
   const [
@@ -152,35 +156,36 @@ export async function getBoardDashboard() {
     recentAnnouncements,
   ] = await Promise.all([
     prisma.architecturalRequest.count({
-      where: { status: { in: ['SUBMITTED', 'UNDER_REVIEW'] } },
+      where: { communityId, status: { in: ['SUBMITTED', 'UNDER_REVIEW'] } },
     }),
 
-    prisma.violation.count({ where: { status: 'ESCALATED' } }),
+    prisma.violation.count({ where: { communityId, status: 'ESCALATED' } }),
 
     prisma.violationAppeal.count({
-      where: { status: { in: ['SUBMITTED', 'UNDER_REVIEW'] } },
+      where: { status: { in: ['SUBMITTED', 'UNDER_REVIEW'] }, violation: { communityId } },
     }),
 
     prisma.issue.count({
-      where: { status: { in: ['SUBMITTED', 'UNDER_REVIEW', 'ASSIGNED', 'IN_PROGRESS', 'WAITING_ON_VENDOR'] } },
+      where: { communityId, status: { in: ['SUBMITTED', 'UNDER_REVIEW', 'ASSIGNED', 'IN_PROGRESS', 'WAITING_ON_VENDOR'] } },
     }),
 
     prisma.issue.count({
-      where: { status: { in: ['RESOLVED', 'CLOSED'] }, updatedAt: { gte: ms } },
+      where: { communityId, status: { in: ['RESOLVED', 'CLOSED'] }, updatedAt: { gte: ms } },
     }),
 
-    prisma.charge.aggregate({ _sum: { amount: true } }),
+    prisma.charge.aggregate({ _sum: { amount: true }, where: { communityId } }),
 
     prisma.payment.aggregate({
       _sum: { amount: true },
-      where: { status: 'PAID' },
+      where: { communityId, status: 'PAID' },
     }),
 
     prisma.charge
-      .groupBy({ by: ['residentId'], where: { status: 'OVERDUE' } })
+      .groupBy({ by: ['residentId'], where: { communityId, status: 'OVERDUE' } })
       .then((rows) => rows.length),
 
     prisma.announcement.findMany({
+      where: { communityId },
       orderBy: { createdAt: 'desc' },
       take: 5,
       select: { id: true, title: true, createdAt: true },
@@ -210,7 +215,7 @@ export async function getBoardDashboard() {
 
 export type BoardDashboard = Awaited<ReturnType<typeof getBoardDashboard>>;
 
-export async function getResidentDashboard(userId: string) {
+export async function getResidentDashboard(userId: string, communityId: string) {
   const now = new Date();
 
   const [
@@ -257,6 +262,7 @@ export async function getResidentDashboard(userId: string) {
     }),
 
     prisma.announcement.findMany({
+      where: { communityId },
       orderBy: { createdAt: 'desc' },
       take: 3,
       select: { id: true, title: true, createdAt: true },

@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
+import { getActiveCommunityId } from '@/lib/community';
 import { redirect } from 'next/navigation';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { categoryLabel } from '@/lib/documents';
@@ -14,13 +15,16 @@ export default async function ResidentDocumentDetailPage({
   const session = await getSession();
   if (!session) redirect('/login');
 
+  const communityId = await getActiveCommunityId(session);
+  if (!communityId) notFound();
+
   const { id } = await params;
   const doc = await prisma.document.findUnique({
     where: { id },
     include: { uploadedBy: { select: { firstName: true, lastName: true } } },
   });
 
-  if (!doc) notFound();
+  if (!doc || doc.communityId !== communityId) notFound();
 
   return (
     <div className="max-w-2xl mx-auto">

@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { getSession } from '@/lib/auth';
+import { getActiveCommunityId } from '@/lib/community';
 import { redirect } from 'next/navigation';
 import { StatCard } from '@/components/ui/StatCard';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -34,7 +35,8 @@ export default async function AdminDashboardPage() {
 
   let data: Awaited<ReturnType<typeof getAdminDashboard>> | null = null;
   try {
-    data = await getAdminDashboard();
+    const communityId = await getActiveCommunityId(session);
+    if (communityId) data = await getAdminDashboard(communityId);
   } catch {
     // show partial UI with error banner
   }

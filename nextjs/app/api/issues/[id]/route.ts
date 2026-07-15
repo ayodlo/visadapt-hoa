@@ -1,11 +1,15 @@
 import { NextRequest } from 'next/server';
 import { getSession } from '@/lib/auth';
+import { getActiveCommunityId } from '@/lib/community';
 import { prisma } from '@/lib/prisma';
-import { ok, unauthorized, forbidden, notFound } from '@/lib/api';
+import { ok, err, unauthorized, forbidden, notFound } from '@/lib/api';
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
   if (!session) return unauthorized();
+
+  const communityId = await getActiveCommunityId(session);
+  if (!communityId) return err('No community selected', 400);
 
   const { id } = await params;
   const issue = await prisma.issue.findUnique({
@@ -26,7 +30,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     },
   });
 
-  if (!issue) return notFound('Issue');
+  if (!issue || issue.communityId !== communityId) return notFound('Issue');
   if (session.role === 'RESIDENT' && issue.residentId !== session.id) return forbidden();
 
   return ok({ issue });

@@ -1,5 +1,6 @@
 import { getSession } from '@/lib/auth';
-import { ok, unauthorized, forbidden } from '@/lib/api';
+import { getActiveCommunityId } from '@/lib/community';
+import { ok, err, unauthorized, forbidden } from '@/lib/api';
 import { prisma } from '@/lib/prisma';
 
 export async function GET() {
@@ -7,19 +8,22 @@ export async function GET() {
   if (!session) return unauthorized();
   if (session.role === 'RESIDENT') return forbidden();
 
+  const communityId = await getActiveCommunityId(session);
+  if (!communityId) return err('No community selected', 400);
+
   const thirtyDaysAgo = new Date(Date.now() - 30 * 86_400_000);
 
   const [byStatus, byType, submittedLast30, decidedLast30, avgDecisionSample] = await Promise.all([
-    prisma.architecturalRequest.groupBy({ by: ['status'], _count: { _all: true } }),
-    prisma.architecturalRequest.groupBy({ by: ['requestType'], _count: { _all: true } }),
+    prisma.architecturalRequest.groupBy({ by: ['status'], where: { communityId }, _count: { _all: true } }),
+    prisma.architecturalRequest.groupBy({ by: ['requestType'], where: { communityId }, _count: { _all: true } }),
     prisma.architecturalRequest.count({
-      where: { createdAt: { gte: thirtyDaysAgo }, status: { not: 'DRAFT' } },
+      where: { communityId, createdAt: { gte: thirtyDaysAgo }, status: { not: 'DRAFT' } },
     }),
     prisma.architecturalRequest.count({
-      where: { status: { in: ['APPROVED', 'DENIED'] }, updatedAt: { gte: thirtyDaysAgo } },
+      where: { communityId, status: { in: ['APPROVED', 'DENIED'] }, updatedAt: { gte: thirtyDaysAgo } },
     }),
     prisma.architecturalRequest.findMany({
-      where: { status: { in: ['APPROVED', 'DENIED'] } },
+      where: { communityId, status: { in: ['APPROVED', 'DENIED'] } },
       select: { createdAt: true, updatedAt: true },
       orderBy: { updatedAt: 'desc' },
       take: 200,

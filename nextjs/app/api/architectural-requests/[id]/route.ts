@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { getSession } from '@/lib/auth';
+import { getActiveCommunityId } from '@/lib/community';
 import { prisma } from '@/lib/prisma';
 import { ok, err, unauthorized, forbidden, notFound } from '@/lib/api';
 import { createAuditLog } from '@/lib/audit';
@@ -41,7 +42,13 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   });
 
   if (!request) return notFound('Architectural request');
-  if (session.role === 'RESIDENT' && request.residentId !== session.id) return forbidden();
+  if (session.role === 'RESIDENT') {
+    if (request.residentId !== session.id) return forbidden();
+  } else {
+    const communityId = await getActiveCommunityId(session);
+    if (!communityId) return err('No community selected', 400);
+    if (request.communityId !== communityId) return notFound('Architectural request');
+  }
 
   return ok({ request });
 }

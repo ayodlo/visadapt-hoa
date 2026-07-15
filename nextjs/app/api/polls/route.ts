@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
+import { getActiveCommunityId } from '@/lib/community';
 import { ok, err, unauthorized, forbidden } from '@/lib/api';
 
 const schema = z.object({
@@ -15,7 +16,11 @@ export async function GET() {
   const session = await getSession();
   if (!session) return unauthorized();
 
+  const communityId = await getActiveCommunityId(session);
+  if (!communityId) return err('No community selected', 400);
+
   const polls = await prisma.poll.findMany({
+    where: { communityId },
     orderBy: { createdAt: 'desc' },
     include: {
       createdBy: { select: { id: true, firstName: true, lastName: true } },
@@ -31,6 +36,9 @@ export async function POST(req: NextRequest) {
   if (!session) return unauthorized();
   if (session.role === 'RESIDENT') return forbidden();
 
+  const communityId = await getActiveCommunityId(session);
+  if (!communityId) return err('No community selected', 400);
+
   const body = await req.json().catch(() => null);
   const parsed = schema.safeParse(body);
   if (!parsed.success) return err(parsed.error.issues[0].message, 400);
@@ -40,6 +48,7 @@ export async function POST(req: NextRequest) {
     data: {
       ...rest,
       createdById: session.id,
+      communityId,
       options: { create: options.map((text) => ({ text })) },
     },
     include: {

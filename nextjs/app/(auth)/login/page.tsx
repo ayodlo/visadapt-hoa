@@ -101,8 +101,7 @@ export default function LoginPage() {
         </form>
 
         <p className="mt-4 text-sm text-center text-gray-600">
-          Don&apos;t have an account?{' '}
-          <Link href="/register" className="text-blue-600 font-medium hover:underline">Create one</Link>
+          Don&apos;t have an account? Contact your HOA administrator to be added.
         </p>
       </div>
     </div>

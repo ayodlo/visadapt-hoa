@@ -32,10 +32,11 @@ export async function POST(req: NextRequest) {
     firstName: user.firstName,
     lastName: user.lastName,
     role: user.role,
+    communityId: user.communityId,
   });
 
   const res = NextResponse.json({
-    user: { id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName, role: user.role },
+    user: { id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName, role: user.role, communityId: user.communityId },
     token,
   });
   const cookieHeader = setTokenCookie(token);

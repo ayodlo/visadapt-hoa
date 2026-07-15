@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { getSession } from '@/lib/auth';
+import { getActiveCommunityId } from '@/lib/community';
 import { prisma } from '@/lib/prisma';
 import { ok, err, unauthorized, forbidden, notFound } from '@/lib/api';
 import { sendPushToUsers } from '@/lib/push';
@@ -15,9 +16,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (!session) return unauthorized();
   if (session.role === 'RESIDENT') return forbidden();
 
+  const communityId = await getActiveCommunityId(session);
+  if (!communityId) return err('No community selected', 400);
+
   const { id } = await params;
-  const issue = await prisma.issue.findUnique({ where: { id }, select: { id: true, residentId: true, title: true } });
-  if (!issue) return notFound('Issue');
+  const issue = await prisma.issue.findUnique({ where: { id }, select: { id: true, residentId: true, title: true, communityId: true } });
+  if (!issue || issue.communityId !== communityId) return notFound('Issue');
 
   const body = await req.json().catch(() => null);
   const parsed = schema.safeParse(body);

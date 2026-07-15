@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
+import { getActiveCommunityId } from '@/lib/community';
 import { ok, err, unauthorized, forbidden, notFound } from '@/lib/api';
 import { sendMaintenanceStatusEmail } from '@/lib/email';
 
@@ -16,9 +17,12 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   const session = await getSession();
   if (!session) return unauthorized();
 
+  const communityId = await getActiveCommunityId(session);
+  if (!communityId) return err('No community selected', 400);
+
   const { id } = await params;
   const existing = await prisma.maintenanceRequest.findUnique({ where: { id } });
-  if (!existing) return notFound('Maintenance request');
+  if (!existing || existing.communityId !== communityId) return notFound('Maintenance request');
 
   if (session.role === 'RESIDENT' && existing.submittedById !== session.id) return forbidden();
 
@@ -49,9 +53,12 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
   if (!session) return unauthorized();
   if (session.role === 'RESIDENT') return forbidden();
 
+  const communityId = await getActiveCommunityId(session);
+  if (!communityId) return err('No community selected', 400);
+
   const { id } = await params;
   const existing = await prisma.maintenanceRequest.findUnique({ where: { id } });
-  if (!existing) return notFound('Maintenance request');
+  if (!existing || existing.communityId !== communityId) return notFound('Maintenance request');
 
   await prisma.maintenanceRequest.delete({ where: { id } });
   return ok({ deleted: true });

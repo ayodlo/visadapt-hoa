@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
+import { getActiveCommunityId } from '@/lib/community';
 import { ok, err, unauthorized, notFound } from '@/lib/api';
 
 const schema = z.object({ optionId: z.string().min(1) });
@@ -10,9 +11,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const session = await getSession();
   if (!session) return unauthorized();
 
+  const communityId = await getActiveCommunityId(session);
+  if (!communityId) return err('No community selected', 400);
+
   const { id: pollId } = await params;
   const poll = await prisma.poll.findUnique({ where: { id: pollId } });
-  if (!poll) return notFound('Poll');
+  if (!poll || poll.communityId !== communityId) return notFound('Poll');
   if (poll.closesAt && poll.closesAt < new Date()) return err('Poll is closed', 400);
 
   const body = await req.json().catch(() => null);

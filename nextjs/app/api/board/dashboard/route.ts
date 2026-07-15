@@ -1,5 +1,6 @@
 import { getSession } from '@/lib/auth';
-import { ok, unauthorized, forbidden } from '@/lib/api';
+import { getActiveCommunityId } from '@/lib/community';
+import { ok, err, unauthorized, forbidden } from '@/lib/api';
 import { getBoardDashboard } from '@/lib/dashboard';
 
 export async function GET() {
@@ -7,8 +8,11 @@ export async function GET() {
   if (!session) return unauthorized();
   if (session.role === 'RESIDENT') return forbidden();
 
+  const communityId = await getActiveCommunityId(session);
+  if (!communityId) return err('No community selected', 400);
+
   try {
-    const data = await getBoardDashboard();
+    const data = await getBoardDashboard(communityId);
     return ok(data);
   } catch {
     return ok({ error: 'Failed to load dashboard data' }, 500);

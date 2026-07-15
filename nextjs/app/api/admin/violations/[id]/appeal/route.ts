@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { getSession } from '@/lib/auth';
+import { getActiveCommunityId } from '@/lib/community';
 import { prisma } from '@/lib/prisma';
 import { ok, err, unauthorized, forbidden, notFound } from '@/lib/api';
 import { createAuditLog } from '@/lib/audit';
@@ -16,12 +17,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (!session) return unauthorized();
   if (session.role === 'RESIDENT') return forbidden();
 
+  const communityId = await getActiveCommunityId(session);
+  if (!communityId) return err('No community selected', 400);
+
   const { id } = await params;
   const violation = await prisma.violation.findUnique({
     where: { id },
     include: { appeal: true },
   });
-  if (!violation) return notFound('Violation');
+  if (!violation || violation.communityId !== communityId) return notFound('Violation');
   if (!violation.appeal) return notFound('Appeal');
 
   const body = await req.json().catch(() => null);

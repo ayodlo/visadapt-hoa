@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
+import { getActiveCommunityId } from '@/lib/community';
 import { ok, err, unauthorized, forbidden } from '@/lib/api';
 
 const schema = z.object({
@@ -16,7 +17,11 @@ export async function GET() {
   const session = await getSession();
   if (!session) return unauthorized();
 
+  const communityId = await getActiveCommunityId(session);
+  if (!communityId) return err('No community selected', 400);
+
   const events = await prisma.event.findMany({
+    where: { communityId },
     orderBy: { startAt: 'asc' },
     include: { createdBy: { select: { id: true, firstName: true, lastName: true } } },
   });
@@ -28,12 +33,15 @@ export async function POST(req: NextRequest) {
   if (!session) return unauthorized();
   if (session.role === 'RESIDENT') return forbidden();
 
+  const communityId = await getActiveCommunityId(session);
+  if (!communityId) return err('No community selected', 400);
+
   const body = await req.json().catch(() => null);
   const parsed = schema.safeParse(body);
   if (!parsed.success) return err(parsed.error.issues[0].message, 400);
 
   const event = await prisma.event.create({
-    data: { ...parsed.data, createdById: session.id },
+    data: { ...parsed.data, createdById: session.id, communityId },
     include: { createdBy: { select: { id: true, firstName: true, lastName: true } } },
   });
   return ok(event, 201);

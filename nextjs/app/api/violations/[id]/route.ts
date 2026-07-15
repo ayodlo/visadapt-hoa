@@ -1,8 +1,9 @@
 import { NextRequest } from 'next/server';
 import { getSession } from '@/lib/auth';
+import { getActiveCommunityId } from '@/lib/community';
 import { isStaff } from '@/lib/roles';
 import { prisma } from '@/lib/prisma';
-import { ok, unauthorized, forbidden, notFound } from '@/lib/api';
+import { ok, err, unauthorized, forbidden, notFound } from '@/lib/api';
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
@@ -39,6 +40,10 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   if (session.role === 'RESIDENT') {
     if (violation.residentId !== session.id) return forbidden();
     if (violation.status === 'DRAFT') return notFound('Violation');
+  } else {
+    const communityId = await getActiveCommunityId(session);
+    if (!communityId) return err('No community selected', 400);
+    if (violation.communityId !== communityId) return notFound('Violation');
   }
 
   return ok({ violation });

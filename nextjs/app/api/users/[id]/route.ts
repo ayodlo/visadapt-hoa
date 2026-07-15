@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
+import { getActiveCommunityId } from '@/lib/community';
 import { isAdmin } from '@/lib/roles';
 import { ok, err, unauthorized, forbidden, notFound } from '@/lib/api';
 
@@ -11,16 +12,31 @@ const schema = z.object({
   lastName: z.string().min(1).optional(),
 });
 
+async function assertAccessible(id: string, session: NonNullable<Awaited<ReturnType<typeof getSession>>>, communityId: string) {
+  const existing = await prisma.user.findUnique({
+    where: { id },
+    include: { communityAssignments: { select: { communityId: true } } },
+  });
+  if (!existing) return null;
+  if (existing.role === 'SUPER_ADMIN' && session.role !== 'SUPER_ADMIN') return null;
+  const accessible =
+    existing.communityId === communityId ||
+    existing.communityAssignments.some((a) => a.communityId === communityId);
+  if (!accessible) return null;
+  return existing;
+}
+
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
   if (!session) return unauthorized();
   if (!isAdmin(session.role)) return forbidden();
 
+  const communityId = await getActiveCommunityId(session);
+  if (!communityId) return err('No community selected', 400);
+
   const { id } = await params;
-  const existing = await prisma.user.findUnique({ where: { id } });
+  const existing = await assertAccessible(id, session, communityId);
   if (!existing) return notFound('User');
-  // SUPER_ADMIN accounts are engineer-managed only; regular ADMINs cannot touch them.
-  if (existing.role === 'SUPER_ADMIN' && session.role !== 'SUPER_ADMIN') return forbidden();
 
   const body = await req.json().catch(() => null);
   const parsed = schema.safeParse(body);
@@ -39,12 +55,14 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
   if (!session) return unauthorized();
   if (!isAdmin(session.role)) return forbidden();
 
+  const communityId = await getActiveCommunityId(session);
+  if (!communityId) return err('No community selected', 400);
+
   const { id } = await params;
   if (id === session.id) return err('Cannot delete your own account', 400);
 
-  const existing = await prisma.user.findUnique({ where: { id } });
+  const existing = await assertAccessible(id, session, communityId);
   if (!existing) return notFound('User');
-  if (existing.role === 'SUPER_ADMIN' && session.role !== 'SUPER_ADMIN') return forbidden();
 
   await prisma.user.delete({ where: { id } });
   return ok({ deleted: true });

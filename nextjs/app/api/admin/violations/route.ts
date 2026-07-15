@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { getSession } from '@/lib/auth';
+import { getActiveCommunityId } from '@/lib/community';
 import { isAdmin } from '@/lib/roles';
 import { prisma } from '@/lib/prisma';
 import { ok, err, unauthorized, forbidden } from '@/lib/api';
@@ -23,6 +24,9 @@ export async function GET(req: NextRequest) {
   if (!session) return unauthorized();
   if (session.role === 'RESIDENT') return forbidden();
 
+  const communityId = await getActiveCommunityId(session);
+  if (!communityId) return err('No community selected', 400);
+
   const { searchParams } = req.nextUrl;
   const search = searchParams.get('search')?.trim() ?? '';
   const status = searchParams.get('status') ?? '';
@@ -32,6 +36,7 @@ export async function GET(req: NextRequest) {
   const limit = 20;
 
   const where = {
+    communityId,
     ...(search ? {
       OR: [
         { description: { contains: search, mode: 'insensitive' as const } },
@@ -73,6 +78,9 @@ export async function POST(req: NextRequest) {
   if (!session) return unauthorized();
   if (!isAdmin(session.role)) return forbidden();
 
+  const communityId = await getActiveCommunityId(session);
+  if (!communityId) return err('No community selected', 400);
+
   const body = await req.json().catch(() => null);
   const parsed = createSchema.safeParse(body);
   if (!parsed.success) return err(parsed.error.issues[0].message, 400);
@@ -86,6 +94,7 @@ export async function POST(req: NextRequest) {
       observedAt: new Date(observedAt),
       deadline: deadline ? new Date(deadline) : null,
       createdById: session.id,
+      communityId,
       status,
     },
   });

@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { getSession } from '@/lib/auth';
+import { getActiveCommunityId } from '@/lib/community';
 import { redirect } from 'next/navigation';
 import { StatCard } from '@/components/ui/StatCard';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -11,7 +12,8 @@ export default async function BoardDashboardPage() {
 
   let data: Awaited<ReturnType<typeof getBoardDashboard>> | null = null;
   try {
-    data = await getBoardDashboard();
+    const communityId = await getActiveCommunityId(session);
+    if (communityId) data = await getBoardDashboard(communityId);
   } catch {
     // partial UI with error banner
   }

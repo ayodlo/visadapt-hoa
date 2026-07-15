@@ -1,12 +1,16 @@
 import { NextRequest } from 'next/server';
 import { getSession } from '@/lib/auth';
+import { getActiveCommunityId } from '@/lib/community';
 import { prisma } from '@/lib/prisma';
-import { ok, unauthorized, forbidden } from '@/lib/api';
+import { ok, err, unauthorized, forbidden } from '@/lib/api';
 
 export async function GET(req: NextRequest) {
   const session = await getSession();
   if (!session) return unauthorized();
   if (session.role === 'RESIDENT') return forbidden();
+
+  const communityId = await getActiveCommunityId(session);
+  if (!communityId) return err('No community selected', 400);
 
   const { searchParams } = req.nextUrl;
   const search = searchParams.get('search')?.trim() ?? '';
@@ -33,6 +37,7 @@ export async function GET(req: NextRequest) {
     { createdAt: sortDir };
 
   const where = {
+    communityId,
     ...(search ? {
       OR: [
         { title: { contains: search, mode: 'insensitive' as const } },

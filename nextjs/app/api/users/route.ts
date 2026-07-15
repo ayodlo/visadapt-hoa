@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { getSession } from '@/lib/auth';
+import { getActiveCommunityId } from '@/lib/community';
 import { isAdmin } from '@/lib/roles';
 import { prisma } from '@/lib/prisma';
 import { ok, err, unauthorized, forbidden } from '@/lib/api';
@@ -13,7 +14,13 @@ export async function GET() {
   // Roster includes every member's email — staff only.
   if (session.role === 'RESIDENT') return forbidden();
 
+  const communityId = await getActiveCommunityId(session);
+  if (!communityId) return err('No community selected', 400);
+
   const users = await prisma.user.findMany({
+    where: {
+      OR: [{ communityId }, { communityAssignments: { some: { communityId } } }],
+    },
     orderBy: { lastName: 'asc' },
     select: { id: true, firstName: true, lastName: true, email: true, role: true, createdAt: true },
   });
@@ -34,6 +41,9 @@ export async function POST(req: NextRequest) {
   if (!session) return unauthorized();
   if (!isAdmin(session.role)) return forbidden();
 
+  const communityId = await getActiveCommunityId(session);
+  if (!communityId) return err('No community selected', 400);
+
   const body = await req.json().catch(() => null);
   const parsed = createSchema.safeParse(body);
   if (!parsed.success) return err(parsed.error.issues[0].message, 400);
@@ -45,11 +55,20 @@ export async function POST(req: NextRequest) {
 
   const passwordHash = await bcrypt.hash(password, 12);
   const user = await prisma.user.create({
-    data: { firstName, lastName, email, passwordHash, role },
+    data: {
+      firstName,
+      lastName,
+      email,
+      passwordHash,
+      role,
+      ...(role === 'RESIDENT'
+        ? { communityId }
+        : { communityAssignments: { create: [{ communityId, assignedById: session.id }] } }),
+    },
     select: { id: true, firstName: true, lastName: true, email: true, role: true, createdAt: true },
   });
 
-  await createAuditLog({ userId: session.id, action: 'user.create', entityType: 'User', entityId: user.id, metadata: { role } });
+  await createAuditLog({ userId: session.id, action: 'user.create', entityType: 'User', entityId: user.id, metadata: { role, communityId } });
 
   return ok(user, 201);
 }

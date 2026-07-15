@@ -123,19 +123,19 @@ describe('canWithdrawArchRequest', () => {
 // Token-based role verification
 describe('JWT role in token', () => {
   it('preserves role in signed token', () => {
-    const token = signToken({ id: 'u1', email: 'a@b.com', firstName: 'A', lastName: 'B', role: 'ADMIN' });
+    const token = signToken({ id: 'u1', email: 'a@b.com', firstName: 'A', lastName: 'B', role: 'ADMIN', communityId: null });
     const decoded = verifyToken(token);
     expect(decoded?.role).toBe('ADMIN');
   });
 
   it('resident role is preserved', () => {
-    const token = signToken({ id: 'u2', email: 'r@b.com', firstName: 'R', lastName: 'B', role: 'RESIDENT' });
+    const token = signToken({ id: 'u2', email: 'r@b.com', firstName: 'R', lastName: 'B', role: 'RESIDENT', communityId: 'c1' });
     const decoded = verifyToken(token);
     expect(decoded?.role).toBe('RESIDENT');
   });
 
   it('board member role is preserved', () => {
-    const token = signToken({ id: 'u3', email: 'b@b.com', firstName: 'B', lastName: 'M', role: 'BOARD_MEMBER' });
+    const token = signToken({ id: 'u3', email: 'b@b.com', firstName: 'B', lastName: 'M', role: 'BOARD_MEMBER', communityId: null });
     const decoded = verifyToken(token);
     expect(decoded?.role).toBe('BOARD_MEMBER');
   });

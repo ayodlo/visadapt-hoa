@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { getSession } from '@/lib/auth';
+import { getActiveCommunityId } from '@/lib/community';
 import { prisma } from '@/lib/prisma';
 import { ok, err, unauthorized } from '@/lib/api';
 import { createAuditLog } from '@/lib/audit';
@@ -19,6 +20,9 @@ function generateConfirmationNumber(): string {
 export async function POST(req: NextRequest) {
   const session = await getSession();
   if (!session) return unauthorized();
+
+  const communityId = await getActiveCommunityId(session);
+  if (!communityId) return err('No community selected', 400);
 
   const body = await req.json().catch(() => null);
   const parsed = schema.safeParse(body);
@@ -43,6 +47,7 @@ export async function POST(req: NextRequest) {
   const payment = await prisma.payment.create({
     data: {
       residentId: session.id,
+      communityId,
       amount,
       paymentMethod,
       status: 'PAID',

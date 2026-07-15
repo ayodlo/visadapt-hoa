@@ -12,6 +12,10 @@ export interface SessionUser {
   firstName: string;
   lastName: string;
   role: UserRole;
+  // RESIDENT's fixed home community. Null for ADMIN/BOARD_MEMBER (who use
+  // CommunityAssignment + the active_community cookie instead) and for
+  // SUPER_ADMIN (unrestricted). See lib/community.ts.
+  communityId: string | null;
 }
 
 export function signToken(payload: SessionUser): string {
