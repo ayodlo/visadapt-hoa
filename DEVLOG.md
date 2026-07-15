@@ -2,6 +2,32 @@
 
 ---
 
+## 2026-07-15 (Multi-tenancy Phase 4 — Mobile UI parity: switcher, assignments, properties)
+
+**Files changed:**
+- `nextjs/lib/community.ts` — `getActiveCommunityId` now also accepts the active community via an `X-Active-Community` request header (cookie still wins if both are present). Required plumbing: the mobile app authenticates with a Bearer token and never sends cookies, so the web switcher's cookie-based design had no way to work over Bearer auth at all until this.
+- `mobile/src/types/auth.ts` — `SessionUser.communityId` added (hand-mirrored from `nextjs/lib/auth.ts`, per the file's existing convention).
+- `mobile/src/api/client.ts` — `setActiveCommunityId()` + `X-Active-Community` header injection, mirroring the existing `setAuthToken`/Bearer-header pattern.
+- `mobile/src/auth/AuthContext.tsx` — bootstraps and persists the active community (secure storage key `communityhq_active_community`, mirroring the token key) on login and cold-start restore; exposes `activeCommunityId`, `communities`, `switchCommunity()`.
+- `mobile/app/_layout.tsx` — root `<Stack>` now keyed by `activeCommunityId`, forcing a full remount of every screen on a community switch.
+- `mobile/src/screens/shared/CommunitiesScreen.tsx` (new) — list + switch, SUPER_ADMIN-only creation; thin route wrappers at `app/(admin)/more/communities/` and `app/(board)/more/communities/`, added to both "more" menus.
+- `mobile/src/components/CommunityMultiSelect.tsx` (new) — checkable list reused by the user create/edit screens.
+- `mobile/app/(admin)/more/users/new.tsx` — SUPER_ADMIN creating an ADMIN/BOARD_MEMBER now sees the multi-select.
+- `mobile/app/(admin)/more/users/[id].tsx` — rewritten to fetch via a new `getUser(id)` detail endpoint instead of `listUsers().find()`; shows community info for residents, editable (SUPER_ADMIN) or read-only (everyone else) assignments for staff, and a Properties list/add/remove section for residents.
+- `mobile/src/api/community.ts`, `mobile/src/api/properties.ts` (new) — thin wrappers over the Phase 3 web API routes, reused as-is.
+
+**Decisions made:**
+- Applied the Phase 3 lesson proactively rather than rediscovering it: most mobile screens fetch their own data once via `useApi` on mount, so switching communities needs a full remount (keying the root `<Stack>` by `activeCommunityId`), not just a local state update — the RN equivalent of the web fix's full page reload.
+- Kept the mobile Properties/community-assignment UI on the existing admin `users/[id]` screen only, matching the original plan's exact scope — board members have no user-management screen on mobile at all (a pre-existing web/mobile parity gap, out of scope for this retrofit).
+
+**Gotchas:**
+- Found a real bug via `expo lint` before it shipped: the `useEffect` loading properties on the user detail screen called `setState` after an `await` inside the effect body — same legitimate pattern as `useApi.ts`'s `load()`, needing the same `eslint-disable-next-line react-hooks/set-state-in-effect` treatment (the codebase's own established precedent, not a new exception).
+- Rewriting `[id].tsx` to use a new `getUser()` endpoint instead of `listUsers().find()` broke the existing `EditUser.test.tsx`/`NewUser.test.tsx` mocks (they mocked `listUsers`, and `NewUser` gained a `useAuth()` call the test never mocked, so it threw with no `AuthProvider`) — updated both test files accordingly rather than skipping them.
+
+**Verification:** `tsc --noEmit` clean on both `nextjs/` and `mobile/`; full mobile jest suite (54 suites, 243 tests, up from 236) passing; `expo lint` clean except one pre-existing `useMemo` dependency warning in `AuthContext.tsx` that predates this session (confirmed via `git show HEAD:...` against the prior commit). This completes all 4 phases of the multi-tenancy retrofit (schema → route scoping → web UI → mobile UI).
+
+---
+
 ## 2026-07-15 (Multi-tenancy Phase 3 — Web UI: switcher, communities, assignments, properties)
 
 **Files changed:**
