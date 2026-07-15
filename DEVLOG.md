@@ -2,6 +2,25 @@
 
 ---
 
+## 2026-07-15 (Session handoff — multi-tenancy shipped, next steps)
+
+**State at close:** All 4 multi-tenancy phases (schema → route scoping → web UI → mobile UI) committed, pushed, and deployed. Vercel deploy confirmed green after the optionalDependencies fix (see the two fix entries below). nextjs: tsc clean, 113 vitest tests green. mobile: tsc clean, 243 jest tests green, expo lint clean (one pre-existing useMemo warning).
+
+**Next steps (user):**
+1. Verify the deployed app runs against a migrated database — the multi-tenancy migration was only applied to the Neon dev DB. If Vercel's DATABASE_URL points elsewhere, run `npx prisma migrate deploy` against that DB first. Quick check: log into the deployed site; if the dashboard loads, the schema is there.
+2. Smoke-test deployed web flows as superadmin@communityhq.local: switcher in sidebar, /dashboard/communities, switching isolates data, resident login still works. Note: the dev DB contains leftover "Playwright Test HOA*" communities + a test resident from automated verification — harmless, delete manually if unwanted (no community-delete UI exists; use Prisma Studio).
+3. Confirm GitHub Actions (ci.yml + mobile-ci.yml) is green post-push — Vercel green only covers the deploy build, and the lockfile changed this session.
+4. Mobile smoke test on iPhone via Expo Go: `npx expo start` in mobile/, scan QR. Check More → Communities (switching), More → Users → New (multi-community picker as SUPER_ADMIN), More → Users → [resident] → Properties add/remove. No simulator/device verification has happened yet — only jest/tsc/lint.
+5. `eas init` against a real Expo account so push notifications work on physical devices (known gap, fails silently until then).
+
+**Next steps (next Claude session):**
+- If mobile smoke test (step 4) surfaces issues, that's the likely first task.
+- Backlog, roughly in order of prior discussion: board-role user-management screens on mobile (pre-existing parity gap, now more visible since community assignment/properties live there); Resend email wiring; real S3 document upload; Stripe payments; store submission per mobile/STORE_SUBMISSION.md.
+- Remember: @tailwindcss/oxide-linux-x64-gnu is pinned exact (4.3.1) in nextjs/package.json optionalDependencies — bump it in lockstep with any Tailwind upgrade or Vercel builds break. Same pattern (direct optionalDependency, NOT a build-time npm install) for any future missing-native-binding failure on Vercel.
+- No uncommitted work, no pending decisions, no half-finished code.
+
+---
+
 ## 2026-07-15 (fix v2: Vercel deploy — the build-time npm install approach backfired)
 
 **Files changed:**
