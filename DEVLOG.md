@@ -2,6 +2,25 @@
 
 ---
 
+## 2026-07-15 (fix v2: Vercel deploy — the build-time npm install approach backfired)
+
+**Files changed:**
+- `nextjs/scripts/fix-native-deps.js` — DELETED (the fix from the previous entry, reverted after one failed deploy).
+- `nextjs/package.json` — `build` script reverted to plain `prisma generate && next build`; added `optionalDependencies: { "@tailwindcss/oxide-linux-x64-gnu": "4.3.1" }`.
+- `package-lock.json` — regenerated with npm 11.6.1 (the version CI pins). Diff verified: only the new binding entry plus `dev` → `devOptional` flag flips on packages now reachable through both trees; zero packages removed.
+
+**What happened:** The build-time `npm install <binding> --no-save` from the previous fix ran fine but logged `added 1 package, and removed 349 packages` — Vercel's build environment puts npm in production mode, so any mid-build `npm install` prunes every devDependency, which deleted `@tailwindcss/postcss` and failed the build one step later. The same trick survives in GitHub Actions only because Actions doesn't set production mode.
+
+**Decision:** Switched to the standard npm/cli#4828 workaround — declare the platform binding as a *direct* `optionalDependency` (npm only drops *transitive* optional deps inside workspaces, never direct ones), so Vercel's own install step brings it in and no npm invocation happens at build time. os/cpu gating in the binding's own package.json means Windows/macOS installs skip it automatically. Lockfile change approved by the user before making it.
+
+**Gotchas:**
+- The binding version is pinned exact (`4.3.1`, no caret) because it must identically match `@tailwindcss/oxide`'s version to load — **when Tailwind is upgraded, this pin must be bumped in the same change** or the Vercel build regresses.
+- The CI rolldown workaround in `.github/workflows/ci.yml` still uses the mid-build `npm install` approach. It works there (no production mode) and was left untouched, but if it ever breaks the same optionalDependencies pattern is the fix.
+
+**Verification:** `tsc` + vitest (113) green on nextjs; full mobile jest suite (243) green after the root reinstall. Real confirmation still requires the next Vercel deploy on Linux.
+
+---
+
 ## 2026-07-15 (fix: Vercel deploy failure — @tailwindcss/oxide native binding)
 
 **Files changed:**
