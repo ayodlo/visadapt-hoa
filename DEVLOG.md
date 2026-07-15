@@ -2,6 +2,54 @@
 
 ---
 
+## 2026-07-15 (Multi-tenancy Phase 3 — Web UI: switcher, communities, assignments, properties)
+
+**Files changed:**
+- `nextjs/components/CommunitySwitcher.tsx` (new) — client dropdown for staff roles, fetches `/api/community/mine`, posts to `/api/community/select` on change, then does a full `window.location.reload()`. Wired into `Sidebar.tsx` and `MobileNav.tsx`.
+- `nextjs/app/api/admin/communities/route.ts` (new) — GET (list all + `_count` of users/assignments/properties) and POST (create), SUPER_ADMIN only.
+- `nextjs/app/dashboard/communities/{layout,page}.tsx` (new) — SUPER_ADMIN-only list + create page, mirroring the existing `/dashboard/users` structure. Added to `lib/nav.ts` for SUPER_ADMIN.
+- `nextjs/app/api/users/[id]/communities/route.ts` (new) — PUT, SUPER_ADMIN only, replaces the full `CommunityAssignment` set for an ADMIN/BOARD_MEMBER user (transaction: delete all + recreate).
+- `nextjs/app/api/users/route.ts` — POST now accepts optional `communityIds[]`, honored only for SUPER_ADMIN assigning a new ADMIN/BOARD_MEMBER to more than one community (defaults to the creator's active community otherwise). GET now scopes the roster to the active community and includes each user's `communityAssignments`.
+- `nextjs/app/api/users/[id]/route.ts` — added GET (single-user detail, reused by the new detail page).
+- `nextjs/app/dashboard/users/[id]/page.tsx` (new) — user detail view: community assignment (multi-select checkboxes for SUPER_ADMIN, read-only list otherwise) for staff users; a Properties section (list/add/remove) for residents.
+- `nextjs/app/api/properties/route.ts` + `[id]/route.ts` (new) — admin/board-managed property CRUD, scoped to the active community and verifying the target resident belongs to it.
+- `nextjs/app/dashboard/users/page.tsx` — added a "Manage" link per row to the new detail page; SUPER_ADMIN creating an ADMIN/BOARD_MEMBER now sees a multi-select for initial community assignment.
+
+**Decisions made:**
+- Kept community *creation* to list+create only (no rename/delete) per the approved plan — smallest UI that satisfies "SUPER_ADMIN gets a page to create/manage communities."
+- Multi-community assignment editing is SUPER_ADMIN-only, matching the user's original requirement ("As SUPER_ADMINs, engineers will be able to assign more than one community to an admin"); a regular ADMIN creating staff always assigns to their own active community, no picker shown.
+
+**Gotchas:**
+- **Real bug found via browser verification:** `CommunitySwitcher` originally called `router.refresh()` after switching. That only re-renders Server Components — most dashboard pages (`/dashboard/users`, `/dashboard/communities`, etc.) are client components that fetch their own data once via `useEffect` on mount, so switching communities left them showing the *previous* community's data (confirmed live: 26 stale rows shown after switching to a brand-new, empty community) until a manual reload. Fixed by using `window.location.reload()` instead — the standard pattern for a tenant/org switch in client-heavy dashboards.
+- This session's sandbox had a pre-existing, unrelated environment issue blocking `next dev`: Turbopack's `turbopack.root` is deliberately pinned to `nextjs/` (see the comment in `next.config.ts`, committed separately, to fix an earlier `Cannot find module 'zod'` bug), which means it refuses to resolve packages that only exist in the monorepo root `node_modules` (e.g. `scheduler`, `source-map-js`, `picocolors` — transitive deps of `react-dom`/`postcss` that npm hoisted to the root instead of `nextjs/node_modules`). Confirmed this is a genuine Turbopack-on-Windows rough edge (`resolveAlias` with absolute Windows paths errors with "windows imports are not implemented yet"). Worked around it locally (not committed — gitignored `node_modules` only) by merge-copying the root `node_modules` into `nextjs/node_modules`. If `next dev` throws `Module not found` for a package you can `ls` at the repo root, this is why — no next.config.ts change needed, just re-sync `nextjs/node_modules`.
+
+**Verification:** `tsc --noEmit` clean, full vitest suite (113 tests) passing. Live end-to-end browser verification via an ad-hoc Playwright script (not committed): logged in as SUPER_ADMIN, created a new community, switched into it, confirmed the (fixed) reload correctly shows 0 users for the new community, created a resident, confirmed the user detail page shows the right community, added a property and confirmed it appears. Zero cross-tenant data leakage observed between the demo community and the newly created one.
+
+**Next steps:** Phase 4 — mobile UI parity (community switcher for admin/board tab navigators, community multi-select on user create/edit screens, properties section on resident detail), deferred as its own pass per the original plan.
+
+---
+
+## 2026-07-15 (Multi-tenancy Phase 2 — Authorization layer + full route/page scoping)
+
+**Files changed:**
+- `nextjs/lib/community.ts` (new) — `getActiveCommunityId`, `listAccessibleCommunities`, `canAccessCommunity`, `setActiveCommunityCookie`. Residents resolve via their fixed `session.communityId`; ADMIN/BOARD_MEMBER/SUPER_ADMIN via an `active_community` httpOnly cookie, re-validated per request and falling back to their first accessible community.
+- `nextjs/app/api/community/{mine,select}/route.ts` (new) — list-accessible-communities + set-active-community endpoints backing the (Phase 3) switcher.
+- `nextjs/lib/auth.ts` — `SessionUser.communityId` added; login route includes it in the JWT.
+- Public self-registration disabled (`/api/auth/register` now a static 403; `/register` page replaced with a "contact your admin" message) — new accounts must be assigned to a community by an admin, so open signup no longer makes sense under multi-tenancy.
+- The full mechanical scoping pass: every tenant-scoped route (announcements, events, issues, documents, dues, maintenance, violations, architectural-requests, polls, payments, vendors, users — ~55 route files) now resolves the active community and either filters list/create queries by it or 404s on a cross-community id. `lib/dashboard.ts`'s three dashboard functions and their three page.tsx callers (which call the lib functions directly as server components, bypassing the API routes) got the same fix.
+
+**Decisions made:**
+- Users create/update kept minimal in this phase (assign the creator's active community only) — the multi-select assignment UI and its backing logic were deliberately deferred to Phase 3, since this phase's job was isolation, not new features.
+- Routes already scoped via `residentId: session.id` (issues/me, violations/me, violations/[id]/respond, etc.) were deliberately left alone — a resident only ever belongs to one community, so that scoping is already fully isolated; adding `communityId` there would be redundant.
+
+**Gotchas:**
+- Found and fixed **two real pre-existing cross-tenant leaks** that predated this session entirely, unrelated to any of this work: the admin/board dashboard's "recent announcements" queries had zero community scoping, and `app/resident/documents/[id]/page.tsx` (a server-rendered page that queries Prisma directly rather than through an API route) fetched a document by id with no scoping check at all — any resident could view another community's document via URL. Found via a dedicated read-only audit sub-agent sweep after the manual pass, specifically to catch exactly this class of miss.
+- Also found and fixed narrower leaks introduced by the retrofit itself before commit: several `admin/reports/*` aggregate endpoints (violations, architectural-requests, payments, issues) and a few staff-facing detail routes (`architectural-requests/[id]`, `board/architectural-requests/[id]`) had no `communityId` filter/check at all.
+
+**Verification:** `tsc --noEmit` clean, full vitest suite (113 tests) passing after the entire pass. A dedicated read-only Explore-agent audit re-swept the whole `app/api` tree plus `lib/dashboard.ts` and server-rendered pages afterward specifically looking for anything still unscoped — found the one page.tsx leak noted above, nothing else.
+
+---
+
 ## 2026-07-15 (Multi-tenancy Phase 1 — Community schema + migration)
 
 **Files changed:**
