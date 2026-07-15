@@ -2,6 +2,22 @@
 
 ---
 
+## 2026-07-15 (fix: Vercel deploy failure — @tailwindcss/oxide native binding)
+
+**Files changed:**
+- `nextjs/scripts/fix-native-deps.js` (new) — no-ops on any platform other than Linux x64; otherwise checks whether `@tailwindcss/oxide-linux-x64-gnu` actually resolves and, if not, explicitly `npm install`s it at the exact version declared by `@tailwindcss/oxide`.
+- `nextjs/package.json` — `build` script now runs this before `prisma generate && next build`.
+
+**Decisions made:**
+- Same root cause already documented for rolldown in `.github/workflows/ci.yml` (npm/cli#4828 — npm workspaces on Linux silently drop a valid, correctly platform-gated optional dependency), just a different native binding. It only surfaced now because CI never runs a real `next build` (only tests/lint/tsc), so the Tailwind v4 native binding gap was invisible until an actual Vercel deploy hit it. Applied the same fix pattern (explicit reinstall of the missing platform binary) rather than something novel.
+
+**Gotchas:**
+- The build log also showed a warning: `Both outputFileTracingRoot and turbopack.root are set, but they must have the same value` — Vercel auto-injects `outputFileTracingRoot` for monorepo builds, which conflicts with the `turbopack.root` pinned in `next.config.ts` (that pin exists to fix a *different*, dev-server-only module resolution bug — see Phase 3's DEVLOG entry). Left untouched: it's a warning, not the failure, and touching it risks reintroducing the dev-only bug it was added to fix. Worth watching if a real resolution error shows up on Vercel later.
+
+**Verification:** Script confirmed to no-op cleanly on Windows (dev machine). Full effect can only be confirmed by the next real Vercel build on Linux — not yet observed, since this session doesn't push to remote on its own.
+
+---
+
 ## 2026-07-15 (Multi-tenancy Phase 4 — Mobile UI parity: switcher, assignments, properties)
 
 **Files changed:**
