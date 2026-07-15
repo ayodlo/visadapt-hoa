@@ -2,6 +2,32 @@
 
 ---
 
+## 2026-07-14 (Mobile unit tests — full screen coverage, all remaining screens)
+
+**Files changed:**
+- `mobile/__tests__/screens/*.test.tsx` (9 new) — the remaining shared screens: `AnnouncementDetailScreen`, `EventsListScreen`, `EventDetailScreen`, `DocumentsListScreen`, `DocumentDetailScreen`, `PollsListScreen`, `PollDetailScreen` (including the vote → percentage-reveal flow and the 409-conflict "already voted" path), `ProfileScreen`, `ViolationManageScreen` (shared by board+admin violation detail).
+- `mobile/__tests__/screens/resident/*.test.tsx` (11 new) — Dashboard, IssuesList, IssueDetail, NewIssue, Payments, Pay (form → processing → receipt), ArchRequestsList, ArchRequestDetail (including the `Alert.alert` withdraw-confirmation flow), NewArchRequest, ViolationsList, ViolationDetail (response + appeal forms).
+- `mobile/__tests__/screens/board/*.test.tsx` (4 new) — Dashboard, RequestsList (status filter re-fetching), RequestDetail (decision form), ViolationsList (escalated/appeals filter toggle). Board's violation *detail* screen is a 2-line wrapper around the already-tested shared `ViolationManageScreen`, so it didn't get its own file.
+- `mobile/__tests__/screens/admin/*.test.tsx` + `admin/reports/*.test.tsx` (15 new) — Dashboard, IssuesList, IssueDetail (including its odd "PATCH with an empty body to read current state" pattern, and that saving triggers a second read via `reload()`), ViolationsList, NewViolation (resident search/picker), VendorsList, NewVendor, UsersList, EditUser (SUPER_ADMIN lockout, self-delete prevention, delete confirmation), NewUser, ReportsMenu, and all 4 report screens (Issues/Payments/ArchRequests/Violations).
+- Total: **39 new screen test files, 192 new tests** (84 → 236 mobile tests overall).
+
+**Decisions made:**
+- This was a "test everything" pass per explicit user request, not a scoped batch — every screen in `mobile/app/` and `mobile/src/screens/shared/` now has at least one test file, except pure 1-2 line re-export wrappers (e.g. `(admin)/more/announcements/index.tsx` just re-exports `AnnouncementsListScreen`) and role-specific violation-detail wrappers that just parameterize the shared `ViolationManageScreen` with a different `statusChoices` list — testing the underlying shared component once covers those.
+- Kept each screen's test depth roughly proportional to its actual logic: simple list screens got loading/error/empty/navigate coverage; screens with real business logic (form validation, multi-step flows, confirmation dialogs, role-based lockouts) got dedicated tests for each branch.
+- `Alert.alert` (used for withdraw/delete confirmations) is tested by spying on it and synchronously invoking the matching button's `onPress` from the mock implementation, rather than trying to render a real native alert.
+
+**Next steps:**
+- Coverage is now broad; deepening any individual screen's edge cases is optional, not a gap.
+- No E2E tooling (Maestro) for mobile still — the standing gap, unrelated to this pass.
+- `eas init` remains the standalone blocker for real push delivery/builds.
+
+**Gotchas:**
+- **Real, recurring bug across ~6 different files this session, root-caused once and reused:** batching multiple `fireEvent.changeText`/`fireEvent.press` calls inside a *single* `act(async () => {...})` block reliably produces `"You seem to have overlapping act() calls"` and silently drops state updates — e.g. a second `fireEvent.changeText` call's value never lands, so a later assertion reads stale state, or a validation branch that should fire never does (observed exactly this in `NewIssue`, `Pay`, `NewViolation` during this batch). Fix: **one `fireEvent` call per `act()` block**, always. Sequential separate `await act(...)` calls work reliably; a single one wrapping multiple `fireEvent` calls does not.
+- **Self-inflicted, real, and already documented in the previous entry, but it recurred mid-session** (from re-running `cd nextjs && npm ci` on the real checkout while spot-checking something unrelated) — same fix: `npm ci` from the repo root, then `node_modules/.bin/prisma generate` in `nextjs/`.
+- `FormField` has no `testID` or `placeholder` for several fields (e.g. name fields, password fields on `ProfileScreen`/`NewUser`) — when two same-valued inputs exist simultaneously (two empty strings, for instance), locate them via `getAllByDisplayValue('')` (or `getAllByPlaceholderText`) and index by render order, documented inline in each test file, rather than guessing a query that happens to be unique.
+
+**Verification:** `npm exec -w mobile -- jest` — 53 suites, 236 tests, all passing. `tsc --noEmit` and `expo lint` both clean on `mobile/`. Re-confirmed `nextjs/` unaffected: 113/113 vitest tests still passing.
+
 ## 2026-07-14 (Mobile unit tests — component + screen rendering batch)
 
 **Files changed:**
