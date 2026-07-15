@@ -22,7 +22,15 @@ export async function GET() {
       OR: [{ communityId }, { communityAssignments: { some: { communityId } } }],
     },
     orderBy: { lastName: 'asc' },
-    select: { id: true, firstName: true, lastName: true, email: true, role: true, createdAt: true },
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      email: true,
+      role: true,
+      createdAt: true,
+      communityAssignments: { select: { communityId: true, community: { select: { name: true } } } },
+    },
   });
   return ok(users);
 }
@@ -34,6 +42,8 @@ const createSchema = z.object({
   password: z.string().min(8),
   // SUPER_ADMIN is engineer-only and is never assignable here — see prisma/create-super-admin.ts.
   role: z.enum(['ADMIN', 'BOARD_MEMBER', 'RESIDENT']).default('RESIDENT'),
+  // Only honored for SUPER_ADMIN callers assigning ADMIN/BOARD_MEMBER to more than one community.
+  communityIds: z.array(z.string().min(1)).min(1).optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -41,17 +51,24 @@ export async function POST(req: NextRequest) {
   if (!session) return unauthorized();
   if (!isAdmin(session.role)) return forbidden();
 
-  const communityId = await getActiveCommunityId(session);
-  if (!communityId) return err('No community selected', 400);
+  const activeCommunityId = await getActiveCommunityId(session);
+  if (!activeCommunityId) return err('No community selected', 400);
 
   const body = await req.json().catch(() => null);
   const parsed = createSchema.safeParse(body);
   if (!parsed.success) return err(parsed.error.issues[0].message, 400);
 
-  const { firstName, lastName, email, password, role } = parsed.data;
+  const { firstName, lastName, email, password, role, communityIds } = parsed.data;
 
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) return err('Email already in use', 409);
+
+  let targetCommunityIds = [activeCommunityId];
+  if (session.role === 'SUPER_ADMIN' && role !== 'RESIDENT' && communityIds?.length) {
+    const found = await prisma.community.findMany({ where: { id: { in: communityIds } }, select: { id: true } });
+    if (found.length !== communityIds.length) return err('One or more communities not found', 400);
+    targetCommunityIds = communityIds;
+  }
 
   const passwordHash = await bcrypt.hash(password, 12);
   const user = await prisma.user.create({
@@ -62,13 +79,13 @@ export async function POST(req: NextRequest) {
       passwordHash,
       role,
       ...(role === 'RESIDENT'
-        ? { communityId }
-        : { communityAssignments: { create: [{ communityId, assignedById: session.id }] } }),
+        ? { communityId: targetCommunityIds[0] }
+        : { communityAssignments: { create: targetCommunityIds.map((id) => ({ communityId: id, assignedById: session.id })) } }),
     },
     select: { id: true, firstName: true, lastName: true, email: true, role: true, createdAt: true },
   });
 
-  await createAuditLog({ userId: session.id, action: 'user.create', entityType: 'User', entityId: user.id, metadata: { role, communityId } });
+  await createAuditLog({ userId: session.id, action: 'user.create', entityType: 'User', entityId: user.id, metadata: { role, communityIds: targetCommunityIds } });
 
   return ok(user, 201);
 }

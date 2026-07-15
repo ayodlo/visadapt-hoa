@@ -6,6 +6,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import type { SessionUser } from '@/lib/auth';
 import { buildNav, isNavItemActive } from '@/lib/nav';
 import ThemeToggle from '@/components/ThemeToggle';
+import CommunitySwitcher from '@/components/CommunitySwitcher';
 
 export default function MobileNav({ user }: { user: SessionUser }) {
   const [open, setOpen] = useState(false);
@@ -62,6 +63,8 @@ export default function MobileNav({ user }: { user: SessionUser }) {
                 </svg>
               </button>
             </div>
+
+            <CommunitySwitcher className="px-4 py-3 border-b border-gray-200" />
 
             <nav className="flex-1 px-2 py-4 space-y-0.5 overflow-y-auto">
               {nav.map((item) => {

@@ -13,6 +13,7 @@ import {
   Wallet,
   FileText,
   Users,
+  Building2,
 } from 'lucide-react';
 
 type Role = SessionUser['role'];
@@ -79,6 +80,7 @@ export function buildNav(role: Role): NavItem[] {
     { href: documentsHref(role), label: 'Documents', icon: FileText },
   ];
   if (staff) items.push({ href: '/dashboard/users', label: 'Users', icon: Users });
+  if (role === 'SUPER_ADMIN') items.push({ href: '/dashboard/communities', label: 'Communities', icon: Building2 });
   return items;
 }
 

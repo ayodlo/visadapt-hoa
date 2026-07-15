@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useSession } from '@/context/session';
 import { isAdmin as isAdminRole } from '@/lib/roles';
 
@@ -8,6 +9,7 @@ type Role = 'SUPER_ADMIN' | 'ADMIN' | 'BOARD_MEMBER' | 'RESIDENT';
 // Roles assignable through this UI. SUPER_ADMIN is engineer-only — see prisma/create-super-admin.ts.
 const ASSIGNABLE_ROLES: Role[] = ['ADMIN', 'BOARD_MEMBER', 'RESIDENT'];
 interface User { id: string; firstName: string; lastName: string; email: string; role: Role; createdAt: string; }
+interface Community { id: string; name: string }
 
 const ROLE_COLORS: Record<Role, string> = {
   SUPER_ADMIN: 'bg-fuchsia-100 text-fuchsia-800',
@@ -27,6 +29,8 @@ export default function UsersPage() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
+  const [allCommunities, setAllCommunities] = useState<Community[]>([]);
+  const [createCommunityIds, setCreateCommunityIds] = useState<string[]>([]);
 
   async function load() {
     const res = await fetch('/api/users');
@@ -35,6 +39,14 @@ export default function UsersPage() {
   }
 
   useEffect(() => { load(); }, []);
+
+  useEffect(() => {
+    if (session.role === 'SUPER_ADMIN') {
+      fetch('/api/admin/communities')
+        .then((res) => (res.ok ? res.json() : []))
+        .then((data: Community[]) => setAllCommunities(data));
+    }
+  }, [session.role]);
 
   async function updateRole(id: string, role: Role) {
     await fetch(`/api/users/${id}`, {
@@ -51,17 +63,26 @@ export default function UsersPage() {
     load();
   }
 
+  function toggleCreateCommunity(id: string) {
+    setCreateCommunityIds((prev) => (prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id]));
+  }
+
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     setSubmitting(true);
     setFormError('');
+    const showsMultiSelect = session.role === 'SUPER_ADMIN' && form.role !== 'RESIDENT';
     const res = await fetch('/api/users', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form),
+      body: JSON.stringify({
+        ...form,
+        ...(showsMultiSelect && createCommunityIds.length ? { communityIds: createCommunityIds } : {}),
+      }),
     });
     if (res.ok) {
       setForm(EMPTY_FORM);
+      setCreateCommunityIds([]);
       setShowForm(false);
       load();
     } else {
@@ -95,6 +116,26 @@ export default function UsersPage() {
           <select value={form.role} onChange={(e) => setForm((f) => ({ ...f, role: e.target.value as Role }))} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
             {ASSIGNABLE_ROLES.map((r) => <option key={r} value={r}>{r.replace('_', ' ')}</option>)}
           </select>
+          {session.role === 'SUPER_ADMIN' && form.role !== 'RESIDENT' && allCommunities.length > 0 && (
+            <div className="border border-gray-200 rounded-lg p-3">
+              <p className="text-xs font-medium text-gray-500 mb-2">
+                Communities (defaults to your active community if none selected)
+              </p>
+              <div className="space-y-1.5">
+                {allCommunities.map((c) => (
+                  <label key={c.id} className="flex items-center gap-2 text-sm text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={createCommunityIds.includes(c.id)}
+                      onChange={() => toggleCreateCommunity(c.id)}
+                      className="rounded border-gray-300 focus:ring-2 focus:ring-blue-500"
+                    />
+                    {c.name}
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="flex gap-2">
             <button type="submit" disabled={submitting} className="bg-blue-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50">{submitting ? 'Creating…' : 'Create User'}</button>
             <button type="button" onClick={() => { setShowForm(false); setFormError(''); }} className="text-sm px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-50">Cancel</button>
@@ -128,7 +169,10 @@ export default function UsersPage() {
                       )}
                     </td>
                     <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{new Date(user.createdAt).toLocaleDateString()}</td>
-                    <td className="px-4 py-3 text-right whitespace-nowrap">
+                    <td className="px-4 py-3 text-right whitespace-nowrap space-x-3">
+                      {!locked && (
+                        <Link href={`/dashboard/users/${user.id}`} className="text-xs text-blue-600 hover:underline focus:outline-none focus:ring-2 focus:ring-blue-500 rounded">Manage</Link>
+                      )}
                       {isAdmin && !locked && (
                         <button onClick={() => handleDelete(user.id, `${user.firstName} ${user.lastName}`)} className="text-xs text-gray-400 hover:text-red-500">Delete</button>
                       )}

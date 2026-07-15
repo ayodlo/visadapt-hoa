@@ -15,7 +15,10 @@ const schema = z.object({
 async function assertAccessible(id: string, session: NonNullable<Awaited<ReturnType<typeof getSession>>>, communityId: string) {
   const existing = await prisma.user.findUnique({
     where: { id },
-    include: { communityAssignments: { select: { communityId: true } } },
+    include: {
+      community: { select: { name: true } },
+      communityAssignments: { select: { communityId: true, community: { select: { name: true } } } },
+    },
   });
   if (!existing) return null;
   if (existing.role === 'SUPER_ADMIN' && session.role !== 'SUPER_ADMIN') return null;
@@ -24,6 +27,22 @@ async function assertAccessible(id: string, session: NonNullable<Awaited<ReturnT
     existing.communityAssignments.some((a) => a.communityId === communityId);
   if (!accessible) return null;
   return existing;
+}
+
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const session = await getSession();
+  if (!session) return unauthorized();
+  if (session.role === 'RESIDENT') return forbidden();
+
+  const communityId = await getActiveCommunityId(session);
+  if (!communityId) return err('No community selected', 400);
+
+  const { id } = await params;
+  const existing = await assertAccessible(id, session, communityId);
+  if (!existing) return notFound('User');
+
+  const { passwordHash: _passwordHash, ...user } = existing;
+  return ok(user);
 }
 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
