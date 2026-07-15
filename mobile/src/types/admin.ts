@@ -134,6 +134,12 @@ export interface AdminUserListItem {
   email: string;
   role: UserRole;
   createdAt: string;
+  communityAssignments?: { communityId: string; community: { name: string } }[];
+}
+
+export interface AdminUserDetail extends AdminUserListItem {
+  communityId: string | null;
+  community: { name: string } | null;
 }
 
 export interface CreateUserInput {
@@ -142,6 +148,8 @@ export interface CreateUserInput {
   email: string;
   password: string;
   role: 'ADMIN' | 'BOARD_MEMBER' | 'RESIDENT';
+  // Only honored for SUPER_ADMIN callers assigning ADMIN/BOARD_MEMBER to more than one community.
+  communityIds?: string[];
 }
 
 export interface UpdateUserInput {

@@ -1,10 +1,13 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { getItem, setItem, deleteItem } from './secureStorage';
-import { apiFetch, setAuthToken, setUnauthorizedHandler, ApiError } from '@/api/client';
+import { apiFetch, setAuthToken, setActiveCommunityId as setActiveCommunityHeader, setUnauthorizedHandler, ApiError } from '@/api/client';
+import { getMyCommunities } from '@/api/community';
 import { registerPushToken } from '@/notifications/registerPushToken';
 import type { SessionUser } from '@/types/auth';
+import type { Community } from '@/types/community';
 
 const TOKEN_KEY = 'communityhq_token';
+const COMMUNITY_KEY = 'communityhq_active_community';
 
 interface LoginResponse {
   user: SessionUser;
@@ -17,6 +20,10 @@ interface AuthContextValue {
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   updateUser: (user: SessionUser) => void;
+  // Staff-only (ADMIN/BOARD_MEMBER/SUPER_ADMIN). Null for RESIDENT, who has one fixed community.
+  activeCommunityId: string | null;
+  communities: Community[];
+  switchCommunity: (communityId: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -24,11 +31,17 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<SessionUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [activeCommunityId, setActiveCommunityId] = useState<string | null>(null);
+  const [communities, setCommunities] = useState<Community[]>([]);
 
   async function logout() {
     setAuthToken(null);
+    setActiveCommunityHeader(null);
     setUser(null);
+    setActiveCommunityId(null);
+    setCommunities([]);
     await deleteItem(TOKEN_KEY);
+    await deleteItem(COMMUNITY_KEY);
   }
 
   useEffect(() => {
@@ -37,6 +50,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     return () => setUnauthorizedHandler(null);
   }, []);
+
+  async function bootstrapCommunities(sessionUser: SessionUser) {
+    if (sessionUser.role === 'RESIDENT') return;
+    try {
+      const stored = await getItem(COMMUNITY_KEY);
+      if (stored) setActiveCommunityHeader(stored);
+      const res = await getMyCommunities();
+      setCommunities(res.communities);
+      const resolved =
+        stored && res.communities.some((c) => c.id === stored) ? stored : res.activeCommunityId;
+      if (resolved) {
+        setActiveCommunityHeader(resolved);
+        setActiveCommunityId(resolved);
+        await setItem(COMMUNITY_KEY, resolved);
+      }
+    } catch {
+      // Non-fatal — dashboard screens will surface a "no community selected" error if this never resolves.
+    }
+  }
 
   useEffect(() => {
     (async () => {
@@ -49,6 +81,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const me = await apiFetch<{ user: SessionUser }>('/api/auth/me');
         setUser(me.user);
+        await bootstrapCommunities(me.user);
         void registerPushToken();
       } catch (e) {
         if (!(e instanceof ApiError && e.status === 401)) {
@@ -68,6 +101,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await setItem(TOKEN_KEY, res.token);
     setAuthToken(res.token);
     setUser(res.user);
+    await bootstrapCommunities(res.user);
     void registerPushToken();
   }
 
@@ -75,7 +109,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(nextUser);
   }
 
-  const value = useMemo(() => ({ user, isLoading, login, logout, updateUser }), [user, isLoading]);
+  async function switchCommunity(communityId: string) {
+    setActiveCommunityHeader(communityId);
+    setActiveCommunityId(communityId);
+    await setItem(COMMUNITY_KEY, communityId);
+  }
+
+  const value = useMemo(
+    () => ({ user, isLoading, login, logout, updateUser, activeCommunityId, communities, switchCommunity }),
+    [user, isLoading, activeCommunityId, communities]
+  );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

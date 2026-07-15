@@ -9,6 +9,7 @@ const MANAGE_MENU: { icon: string; label: string; href: string }[] = [
   { icon: '👥', label: 'Users', href: '/more/users' },
   { icon: '🧰', label: 'Vendors', href: '/more/vendors' },
   { icon: '📊', label: 'Reports', href: '/more/reports' },
+  { icon: '🏘️', label: 'Communities', href: '/more/communities' },
 ];
 
 const COMMUNITY_MENU: { icon: string; label: string; href: string }[] = [

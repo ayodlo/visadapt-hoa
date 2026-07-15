@@ -10,6 +10,7 @@ const MENU: { icon: string; label: string; href: string }[] = [
   { icon: '📅', label: 'Events', href: '/more/events' },
   { icon: '📄', label: 'Documents', href: '/more/documents' },
   { icon: '🗳️', label: 'Polls', href: '/more/polls' },
+  { icon: '🏘️', label: 'Communities', href: '/more/communities' },
 ];
 
 export default function BoardMoreMenu() {

@@ -1,8 +1,9 @@
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import { prisma } from './prisma';
 import type { SessionUser } from './auth';
 
 const ACTIVE_COMMUNITY_COOKIE = 'active_community';
+const ACTIVE_COMMUNITY_HEADER = 'x-active-community';
 
 // RESIDENT belongs to exactly one community (SessionUser.communityId, fixed
 // at login). ADMIN and BOARD_MEMBER can be assigned to several
@@ -39,14 +40,18 @@ export async function canAccessCommunity(session: SessionUser, communityId: stri
 
 // Resolves which community the current request operates within. RESIDENT
 // always gets their fixed community with no extra query. ADMIN/BOARD_MEMBER/
-// SUPER_ADMIN read the `active_community` cookie (set by the switcher),
+// SUPER_ADMIN read the `active_community` cookie (set by the web switcher),
 // re-validating it on every call since assignments can change between
-// requests, and fall back to the first accessible community otherwise.
+// requests, and fall back to the first accessible community otherwise. The
+// mobile app authenticates with a Bearer token and never sends cookies, so
+// it sends its selection via the `X-Active-Community` header instead — the
+// cookie takes precedence when both are present (it never should be).
 export async function getActiveCommunityId(session: SessionUser): Promise<string | null> {
   if (session.role === 'RESIDENT') return session.communityId;
 
-  const cookieStore = await cookies();
-  const selected = cookieStore.get(ACTIVE_COMMUNITY_COOKIE)?.value ?? null;
+  const [cookieStore, headerStore] = await Promise.all([cookies(), headers()]);
+  const selected =
+    cookieStore.get(ACTIVE_COMMUNITY_COOKIE)?.value ?? headerStore.get(ACTIVE_COMMUNITY_HEADER) ?? null;
   if (selected && (await canAccessCommunity(session, selected))) return selected;
 
   const accessible = await listAccessibleCommunities(session);

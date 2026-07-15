@@ -2,12 +2,15 @@ import { render, fireEvent, act } from '@testing-library/react-native';
 import NewUser from '../../../app/(admin)/more/users/new';
 import { createUser } from '@/api/admin';
 import { ApiError } from '@/api/client';
+import { useAuth } from '@/auth/AuthContext';
 import { router } from 'expo-router';
 
 jest.mock('@/api/admin');
+jest.mock('@/auth/AuthContext', () => ({ useAuth: jest.fn() }));
 jest.mock('expo-router', () => ({ router: { replace: jest.fn() } }));
 
 const mockedCreateUser = createUser as jest.Mock;
+const mockedUseAuth = useAuth as jest.Mock;
 
 // FormField has no placeholder for name/email fields, so locate the inputs
 // by render order instead: [firstName, lastName, email, password].
@@ -25,7 +28,31 @@ async function fillForm(getAllByDisplayValue: (v: string) => unknown[]) {
 }
 
 describe('NewUser (admin)', () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockedUseAuth.mockReturnValue({ user: { role: 'ADMIN' }, communities: [] });
+  });
+
+  it('does not show a community picker for a regular ADMIN', async () => {
+    const { queryByText } = await render(<NewUser />);
+    expect(queryByText(/Communities \(defaults/)).toBeNull();
+  });
+
+  it('shows a community picker for SUPER_ADMIN creating a non-resident', async () => {
+    mockedUseAuth.mockReturnValue({
+      user: { role: 'SUPER_ADMIN' },
+      communities: [{ id: 'c1', name: 'Maple Ridge' }, { id: 'c2', name: 'Oak Hollow' }],
+    });
+    const { getByText, queryByText } = await render(<NewUser />);
+    expect(queryByText(/Communities \(defaults/)).toBeNull();
+
+    await act(async () => {
+      fireEvent.press(getByText('Board Member'));
+    });
+    expect(getByText(/Communities \(defaults/)).toBeTruthy();
+    expect(getByText('Maple Ridge')).toBeTruthy();
+    expect(getByText('Oak Hollow')).toBeTruthy();
+  });
 
   it('disables submit until the form is valid', async () => {
     const { getByText } = await render(<NewUser />);

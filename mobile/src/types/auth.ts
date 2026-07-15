@@ -9,6 +9,10 @@ export interface SessionUser {
   firstName: string;
   lastName: string;
   role: UserRole;
+  // RESIDENT's fixed home community. Null for ADMIN/BOARD_MEMBER (who use
+  // CommunityAssignment + an active-community selection instead) and for
+  // SUPER_ADMIN (unrestricted). See src/api/community.ts.
+  communityId: string | null;
 }
 
 export function isAdmin(role: UserRole): boolean {

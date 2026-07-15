@@ -37,7 +37,7 @@ export default function RootLayout() {
 }
 
 function RootNavigator() {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, activeCommunityId } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
@@ -56,7 +56,12 @@ function RootNavigator() {
   if (isLoading) return null;
 
   return (
-    <Stack screenOptions={{ headerShown: false }}>
+    // Keyed by the active community so switching forces a full remount of
+    // every screen — most screens fetch their own data once via useApi on
+    // mount, so without this they'd keep showing the previous community's
+    // data after a switch (the same class of bug fixed on web by using a
+    // full page reload instead of router.refresh()).
+    <Stack key={activeCommunityId ?? 'no-community'} screenOptions={{ headerShown: false }}>
       <Stack.Protected guard={!user}>
         <Stack.Screen name="(auth)" />
       </Stack.Protected>

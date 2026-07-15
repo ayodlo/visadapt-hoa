@@ -9,6 +9,7 @@ export class ApiError extends Error {
 }
 
 let currentToken: string | null = null;
+let currentActiveCommunityId: string | null = null;
 let onUnauthorized: (() => void) | null = null;
 
 // Wired up once by AuthContext on mount, so the client can react to a 401
@@ -16,6 +17,13 @@ let onUnauthorized: (() => void) | null = null;
 // circular dependency.
 export function setAuthToken(token: string | null) {
   currentToken = token;
+}
+
+// The web app tracks the active community via an httpOnly cookie; the
+// mobile app authenticates with a Bearer token and never sends cookies, so
+// it sends its selection via this header instead (see nextjs/lib/community.ts).
+export function setActiveCommunityId(communityId: string | null) {
+  currentActiveCommunityId = communityId;
 }
 
 export function setUnauthorizedHandler(handler: (() => void) | null) {
@@ -27,6 +35,9 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
   headers.set('Content-Type', 'application/json');
   if (currentToken) {
     headers.set('Authorization', `Bearer ${currentToken}`);
+  }
+  if (currentActiveCommunityId) {
+    headers.set('X-Active-Community', currentActiveCommunityId);
   }
 
   const res = await fetch(`${API_URL}${path}`, { ...init, headers });

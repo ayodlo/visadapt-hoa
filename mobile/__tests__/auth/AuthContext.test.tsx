@@ -25,7 +25,7 @@ const mockedGetItem = secureStorage.getItem as jest.Mock;
 const mockedSetItem = secureStorage.setItem as jest.Mock;
 const mockedDeleteItem = secureStorage.deleteItem as jest.Mock;
 
-const user: SessionUser = { id: 'u1', email: 'r@communityhq.local', firstName: 'Demo', lastName: 'Resident', role: 'RESIDENT' };
+const user: SessionUser = { id: 'u1', email: 'r@communityhq.local', firstName: 'Demo', lastName: 'Resident', role: 'RESIDENT', communityId: 'c1' };
 
 function wrapper({ children }: { children: ReactNode }) {
   return <AuthProvider>{children}</AuthProvider>;

@@ -12,7 +12,7 @@ const mockedUseAuth = useAuth as jest.Mock;
 const mockedUpdateProfile = updateProfile as jest.Mock;
 const mockedChangePassword = changePassword as jest.Mock;
 
-const user: SessionUser = { id: 'u1', email: 'r@communityhq.local', firstName: 'Demo', lastName: 'Resident', role: 'RESIDENT' };
+const user: SessionUser = { id: 'u1', email: 'r@communityhq.local', firstName: 'Demo', lastName: 'Resident', role: 'RESIDENT', communityId: 'c1' };
 
 describe('ProfileScreen', () => {
   const updateUser = jest.fn();

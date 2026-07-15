@@ -8,6 +8,7 @@ import type {
   CreateVendorInput,
   CreateViolationInput,
   AdminUserListItem,
+  AdminUserDetail,
   CreateUserInput,
   UpdateUserInput,
   IssuesReport,
@@ -65,6 +66,10 @@ export function createViolation(input: CreateViolationInput) {
 
 export function listUsers() {
   return apiFetch<AdminUserListItem[]>('/api/users');
+}
+
+export function getUser(id: string) {
+  return apiFetch<AdminUserDetail>(`/api/users/${id}`);
 }
 
 export function createUser(input: CreateUserInput) {
