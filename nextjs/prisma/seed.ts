@@ -93,13 +93,21 @@ const properties = [
 async function main() {
   const passwordHash = await bcrypt.hash(DEMO_PASSWORD, 12);
 
+  console.log('Seeding community…');
+  const community = await prisma.community.upsert({
+    where: { id: 'community_default_seed' },
+    update: {},
+    create: { id: 'community_default_seed', name: 'CommunityHQ Demo' },
+  });
+  const communityId = community.id;
+
   console.log('Seeding residents…');
   const createdResidents = await Promise.all(
     residents.map((r) =>
       prisma.user.upsert({
         where: { email: r.email },
         update: {},
-        create: { ...r, passwordHash, role: 'RESIDENT' },
+        create: { ...r, passwordHash, role: 'RESIDENT', communityId },
       })
     )
   );
@@ -116,12 +124,25 @@ async function main() {
   );
 
   console.log('Seeding board members…');
-  await Promise.all(
+  const createdBoardMembers = await Promise.all(
     boardMembers.map((b) =>
       prisma.user.upsert({
         where: { email: b.email },
         update: {},
         create: { ...b, passwordHash, role: 'BOARD_MEMBER' },
+      })
+    )
+  );
+
+  console.log('Assigning admins and board members to the community…');
+  // ADMIN/BOARD_MEMBER get multi-community access via CommunityAssignment,
+  // not the fixed User.communityId (that's RESIDENT-only) — see prisma/schema.prisma.
+  await Promise.all(
+    [...createdAdmins, ...createdBoardMembers].map((u) =>
+      prisma.communityAssignment.upsert({
+        where: { userId_communityId: { userId: u.id, communityId } },
+        update: {},
+        create: { userId: u.id, communityId },
       })
     )
   );
@@ -132,9 +153,9 @@ async function main() {
       prisma.vendor.upsert({
         where: { id: v.email },
         update: {},
-        create: v,
+        create: { ...v, communityId },
       }).catch(() =>
-        prisma.vendor.create({ data: v })
+        prisma.vendor.create({ data: { ...v, communityId } })
       )
     )
   );
@@ -146,7 +167,7 @@ async function main() {
   await Promise.all(
     properties.map((p, i) =>
       prisma.property.create({
-        data: { ...p, ownerId: propertyOwners[i % propertyOwners.length].id },
+        data: { ...p, ownerId: propertyOwners[i % propertyOwners.length].id, communityId },
       })
     )
   );
@@ -170,8 +191,17 @@ async function main() {
   function daysFromNow(d: number) { return new Date(now2.getTime() + d * 86400000); }
   function daysAgoFn(d: number) { return new Date(now2.getTime() - d * 86400000); }
 
-  await prisma.announcement.createMany({
-    data: [
+  const announcementDefs: {
+    title: string;
+    body: string;
+    priority: 'NORMAL' | 'IMPORTANT' | 'EMERGENCY';
+    audience: 'ALL_RESIDENTS' | 'BOARD_MEMBERS' | 'SPECIFIC_LOCATION';
+    targetLocation?: string;
+    isPinned: boolean;
+    publishAt: Date;
+    expiresAt?: Date;
+    createdById: string;
+  }[] = [
       {
         title: 'Welcome to CommunityHQ!',
         body: 'We are thrilled to launch CommunityHQ — your new all-in-one community management platform. Use it to stay informed about announcements, submit maintenance issues, track your HOA payments, and connect with your neighbors. If you have feedback or questions, please reach out to the management office.',
@@ -291,7 +321,10 @@ async function main() {
         expiresAt: daysFromNow(9),
         createdById: firstAdmin.id,
       },
-    ],
+  ];
+
+  await prisma.announcement.createMany({
+    data: announcementDefs.map((a) => ({ ...a, communityId })),
   });
 
   console.log('Seeding charges and payments…');
@@ -334,6 +367,7 @@ async function main() {
         amount: HOA_DUES,
         dueDate: new Date('2026-06-01'),
         status: juneStatus,
+        communityId,
       },
     });
 
@@ -346,6 +380,7 @@ async function main() {
           amount: HOA_DUES,
           dueDate: month.due,
           status: month.status,
+          communityId,
         },
       });
     }
@@ -360,6 +395,7 @@ async function main() {
           amount: special.amount,
           dueDate: special.dueDate,
           status: special.status,
+          communityId,
         },
       });
     }
@@ -377,6 +413,7 @@ async function main() {
           status: 'PAID',
           paidAt: new Date(month.due.getTime() - 2 * 24 * 60 * 60 * 1000), // 2 days before due
           confirmationNumber: nextConf(),
+          communityId,
         },
       });
     }
@@ -391,6 +428,7 @@ async function main() {
           status: 'PAID',
           paidAt: new Date(special.dueDate.getTime() - 3 * 24 * 60 * 60 * 1000),
           confirmationNumber: nextConf(),
+          communityId,
         },
       });
     }
@@ -400,9 +438,14 @@ async function main() {
 
   console.log('Seeding sample documents…');
   const PLACEHOLDER_BASE = 'https://cdn.example.com/hoa-docs';
-  await prisma.document.createMany({
-    skipDuplicates: false,
-    data: [
+  const documentDefs: {
+    title: string;
+    description: string;
+    category: 'CC_AND_RS' | 'RULES_AND_REGS' | 'MEETING_MINUTES' | 'FINANCIALS' | 'INSURANCE' | 'COMMUNITY_FORMS' | 'MAINTENANCE' | 'OTHER';
+    fileUrl: string;
+    fileName: string;
+    uploadedById: string;
+  }[] = [
       {
         title: 'Declaration of CC&Rs (2024 Restatement)',
         description: 'The governing document establishing the covenants, conditions, and restrictions for the community. All residents are required to comply with these rules.',
@@ -499,7 +542,11 @@ async function main() {
         fileName: 'Emergency-Contact-Directory.pdf',
         uploadedById: firstAdmin.id,
       },
-    ],
+  ];
+
+  await prisma.document.createMany({
+    skipDuplicates: false,
+    data: documentDefs.map((d) => ({ ...d, communityId })),
   });
 
   console.log('Seeding issues…');
@@ -747,6 +794,7 @@ async function main() {
         status: def.status,
         preferredContactMethod: def.preferredContactMethod,
         dueDate: def.dueDate ?? null,
+        communityId,
         createdAt,
         updatedAt: createdAt,
       },
@@ -927,6 +975,7 @@ async function main() {
         status: def.status,
         governingRuleReference: def.governingRuleReference ?? null,
         decisionReason: def.decisionReason ?? null,
+        communityId,
         createdAt,
         updatedAt: createdAt,
       },
@@ -1110,6 +1159,7 @@ async function main() {
         resolutionSteps: def.resolutionSteps ?? null,
         deadline: def.deadline ?? null,
         status: def.status,
+        communityId,
         observedAt,
         createdAt: observedAt,
         updatedAt: observedAt,

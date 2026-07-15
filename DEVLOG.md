@@ -2,6 +2,28 @@
 
 ---
 
+## 2026-07-15 (Multi-tenancy Phase 1 — Community schema + migration)
+
+**Files changed:**
+- `nextjs/prisma/schema.prisma` — new `Community` and `CommunityAssignment` models; `communityId` added to `User` (nullable — RESIDENT's fixed home community only), and required + indexed on `Property`, `Vendor`, `Announcement`, `Event`, `Issue`, `Document`, `Poll`, `ArchitecturalRequest`, `Violation`, `Charge`, `Payment`, `DuesRecord`, `MaintenanceRequest`; nullable on `AuditLog`.
+- `nextjs/prisma/migrations/20260715023900_add_communities/migration.sql` — generated via `--create-only` then hand-edited: columns added nullable first, backfilled into a new "CommunityHQ Demo" community (including `CommunityAssignment` rows for every existing ADMIN/BOARD_MEMBER), *then* `NOT NULL` enforced — the standard safe pattern for a required-column backfill.
+- `nextjs/prisma/seed.ts` — creates the community first; residents get `communityId` directly; admins/board members get `CommunityAssignment` rows instead; every tenant-scoped `create`/`createMany` call across the file (announcements, vendors, properties, charges, payments, documents, issues, architectural requests, violations) now includes `communityId`.
+
+**Decisions made (from the approved plan, `idempotent-hugging-plum.md`):**
+- BOARD_MEMBER uses the same multi-community `CommunityAssignment` mechanism as ADMIN, not the RESIDENT's fixed `User.communityId` — confirmed with the user before planning.
+- Comment/activity/child tables (`IssueComment`, `ViolationAppeal`, `PollVote`, etc.) deliberately did **not** get their own `communityId` — they're scoped transitively through their parent row, avoiding redundant denormalization on ~10 more tables.
+- This is Phase 1 of 4 (schema → auth/route scoping → web UI → mobile UI), each with its own checkpoint before proceeding, matching how the mobile app itself was built phase by phase.
+
+**Next steps:**
+- Phase 2: `lib/community.ts` (`getActiveCommunityId`, `requireCommunityContext`, `listAccessibleCommunities`), `SessionUser.communityId` + JWT changes, and the mechanical pass scoping every tenant-touching route. `tsc --noEmit` already identifies the exact 11 route files with a `create` call now missing `communityId` (`admin/announcements`, `admin/vendors`, `admin/violations`, `architectural-requests`, `documents`, `dues`, `events`, `issues`, `maintenance`, `payments/me/pay`, `polls`) — a precise, compiler-verified checklist for that phase, though the full pass (list/detail/update routes too) is larger than just these 11 creates.
+- Phase 3: web UI (switcher, `/dashboard/communities`, user-community assignment, admin-managed property CRUD).
+- Phase 4: mobile UI, mirroring Phase 3.
+
+**Gotchas:**
+- None new. Migration workflow (export `DATABASE_URL`, `--create-only`, hand-edit the SQL, `migrate dev` to apply) matches the pattern already used for the `push_tokens` migration earlier this project.
+
+**Verification:** Migration applied cleanly against the Neon dev DB. Verified directly via Prisma queries (not just "it didn't error"): all 19 pre-existing RESIDENT users got `communityId` set, all 2 ADMIN + 5 BOARD_MEMBER users got a `CommunityAssignment` row (7 total, matching exactly), SUPER_ADMIN untouched as designed. The `ALTER COLUMN ... SET NOT NULL` statements succeeding is itself proof zero rows were missed by the backfill (they would have hard-failed otherwise). `seed.ts` typechecks clean on its own. Full existing vitest suite (113 tests) still passes — schema-only change, no route logic touched yet in this phase.
+
 ## 2026-07-14 (Mobile unit tests — full screen coverage, all remaining screens)
 
 **Files changed:**

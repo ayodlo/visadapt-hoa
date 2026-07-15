@@ -15,6 +15,49 @@ enum UserRole {
   RESIDENT
 }
 
+model Community {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users                 User[]
+  communityAssignments  CommunityAssignment[]
+  properties            Property[]
+  vendors               Vendor[]
+  announcements         Announcement[]
+  events                Event[]
+  issues                Issue[]
+  documents             Document[]
+  polls                 Poll[]
+  architecturalRequests ArchitecturalRequest[]
+  violations            Violation[]
+  charges               Charge[]
+  payments              Payment[]
+  duesRecords           DuesRecord[]
+  maintenanceRequests   MaintenanceRequest[]
+  auditLogs             AuditLog[]
+
+  @@map("communities")
+}
+
+// Multi-community access for ADMIN and BOARD_MEMBER (assigned by SUPER_ADMIN).
+// SUPER_ADMIN needs no rows here — it can select any community, unrestricted.
+// RESIDENT doesn't use this either — see User.communityId, its one fixed community.
+model CommunityAssignment {
+  id           String    @id @default(cuid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  communityId  String
+  community    Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  assignedById String?
+  assignedBy   User?     @relation("CommunityAssignmentsMade", fields: [assignedById], references: [id])
+  createdAt    DateTime  @default(now())
+
+  @@unique([userId, communityId])
+  @@map("community_assignments")
+}
+
 model User {
   id                   String                @id @default(cuid())
   firstName            String
@@ -22,8 +65,14 @@ model User {
   email                String                @unique
   passwordHash         String
   role                 UserRole              @default(RESIDENT)
+  // Fixed home community for RESIDENT; null for ADMIN/BOARD_MEMBER/SUPER_ADMIN,
+  // who use CommunityAssignment (multi-community) instead.
+  communityId          String?
+  community            Community?            @relation(fields: [communityId], references: [id])
   createdAt            DateTime              @default(now())
   updatedAt            DateTime              @updatedAt
+  communityAssignments     CommunityAssignment[]
+  communityAssignmentsMade CommunityAssignment[] @relation("CommunityAssignmentsMade")
   properties              Property[]
   residentProfile         ResidentProfile?
   createdAnnouncements    Announcement[]
@@ -77,6 +126,8 @@ model Property {
   zipCode       String
   ownerId       String
   owner         User     @relation(fields: [ownerId], references: [id])
+  communityId   String
+  community     Community @relation(fields: [communityId], references: [id])
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   charges                Charge[]
@@ -85,6 +136,7 @@ model Property {
   architecturalRequests  ArchitecturalRequest[]
   violations             Violation[]
 
+  @@index([communityId])
   @@map("properties")
 }
 
@@ -109,10 +161,13 @@ model Vendor {
   phone       String?
   category    String?
   notes       String?
+  communityId String
+  community   Community @relation(fields: [communityId], references: [id])
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   issues      Issue[]
 
+  @@index([communityId])
   @@map("vendors")
 }
 
@@ -156,6 +211,8 @@ model Issue {
   vendor               Vendor?         @relation(fields: [vendorId], references: [id])
   assignedToId         String?
   assignedTo           User?           @relation("AssignedIssues", fields: [assignedToId], references: [id])
+  communityId          String
+  community            Community       @relation(fields: [communityId], references: [id])
   category             IssueCategory   @default(OTHER)
   title                String
   description          String
@@ -169,6 +226,7 @@ model Issue {
   comments             IssueComment[]
   activities           IssueActivity[]
 
+  @@index([communityId])
   @@map("issues")
 }
 
@@ -199,15 +257,18 @@ model IssueActivity {
 }
 
 model AuditLog {
-  id         String   @id @default(cuid())
-  userId     String?
-  user       User?    @relation(fields: [userId], references: [id])
-  action     String
-  entityType String?
-  entityId   String?
-  metadata   Json?
-  createdAt  DateTime @default(now())
+  id          String     @id @default(cuid())
+  userId      String?
+  user        User?      @relation(fields: [userId], references: [id])
+  communityId String?
+  community   Community? @relation(fields: [communityId], references: [id])
+  action      String
+  entityType  String?
+  entityId    String?
+  metadata    Json?
+  createdAt   DateTime   @default(now())
 
+  @@index([communityId])
   @@map("audit_logs")
 }
 
@@ -248,10 +309,13 @@ model Announcement {
   expiresAt      DateTime?
   createdById    String
   createdBy      User                 @relation(fields: [createdById], references: [id])
+  communityId    String
+  community      Community            @relation(fields: [communityId], references: [id])
   reads          AnnouncementRead[]
   createdAt      DateTime             @default(now())
   updatedAt      DateTime             @updatedAt
 
+  @@index([communityId])
   @@map("announcements")
 }
 
@@ -276,9 +340,12 @@ model Event {
   endAt       DateTime?
   createdById String
   createdBy   User      @relation(fields: [createdById], references: [id])
+  communityId String
+  community   Community @relation(fields: [communityId], references: [id])
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
+  @@index([communityId])
   @@map("events")
 }
 
@@ -290,9 +357,12 @@ model MaintenanceRequest {
   priority      RequestPriority @default(MEDIUM)
   submittedById String
   submittedBy   User            @relation(fields: [submittedById], references: [id])
+  communityId   String
+  community     Community       @relation(fields: [communityId], references: [id])
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
 
+  @@index([communityId])
   @@map("maintenance_requests")
 }
 
@@ -319,9 +389,12 @@ model Document {
   fileName     String
   uploadedById String
   uploadedBy   User             @relation(fields: [uploadedById], references: [id])
+  communityId  String
+  community    Community        @relation(fields: [communityId], references: [id])
   createdAt    DateTime         @default(now())
   updatedAt    DateTime         @updatedAt
 
+  @@index([communityId])
   @@map("documents")
 }
 
@@ -340,6 +413,8 @@ model DuesRecord {
   id           String     @id @default(cuid())
   userId       String
   user         User       @relation(fields: [userId], references: [id])
+  communityId  String
+  community    Community  @relation(fields: [communityId], references: [id])
   label        String
   amountCents  Int
   dueDate      DateTime
@@ -349,6 +424,7 @@ model DuesRecord {
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 
+  @@index([communityId])
   @@map("dues_records")
 }
 
@@ -365,12 +441,15 @@ model Charge {
   resident    User         @relation(fields: [residentId], references: [id])
   propertyId  String?
   property    Property?    @relation(fields: [propertyId], references: [id])
+  communityId String
+  community   Community    @relation(fields: [communityId], references: [id])
   description String
   amount      Int
   dueDate     DateTime
   status      ChargeStatus @default(PENDING)
   createdAt   DateTime     @default(now())
 
+  @@index([communityId])
   @@map("charges")
 }
 
@@ -386,6 +465,8 @@ model Payment {
   resident           User          @relation(fields: [residentId], references: [id])
   propertyId         String?
   property           Property?     @relation(fields: [propertyId], references: [id])
+  communityId        String
+  community          Community     @relation(fields: [communityId], references: [id])
   amount             Int
   paymentMethod      String
   status             PaymentStatus @default(PAID)
@@ -393,6 +474,7 @@ model Payment {
   confirmationNumber String        @unique
   createdAt          DateTime      @default(now())
 
+  @@index([communityId])
   @@map("payments")
 }
 
@@ -409,11 +491,14 @@ model Poll {
   closesAt    DateTime?
   createdById String
   createdBy   User         @relation(fields: [createdById], references: [id])
+  communityId String
+  community   Community    @relation(fields: [communityId], references: [id])
   options     PollOption[]
   votes       PollVote[]
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 
+  @@index([communityId])
   @@map("polls")
 }
 
@@ -469,6 +554,8 @@ model ArchitecturalRequest {
   resident               User                           @relation("ResidentArchRequests", fields: [residentId], references: [id])
   propertyId             String?
   property               Property?                      @relation(fields: [propertyId], references: [id])
+  communityId            String
+  community              Community                      @relation(fields: [communityId], references: [id])
   requestType            ArchitecturalRequestType
   description            String
   desiredStartDate       DateTime?
@@ -481,6 +568,7 @@ model ArchitecturalRequest {
   activities             ArchitecturalRequestActivity[]
   attachments            ArchitecturalRequestAttachment[]
 
+  @@index([communityId])
   @@map("architectural_requests")
 }
 
@@ -560,6 +648,8 @@ model Violation {
   property        Property?       @relation(fields: [propertyId], references: [id])
   createdById     String
   createdBy       User            @relation("CreatedViolations", fields: [createdById], references: [id])
+  communityId     String
+  community       Community       @relation(fields: [communityId], references: [id])
   violationType   ViolationType
   ruleCitation    String
   description     String
@@ -574,6 +664,7 @@ model Violation {
   activities      ViolationActivity[]
   appeal          ViolationAppeal?
 
+  @@index([communityId])
   @@map("violations")
 }
 
