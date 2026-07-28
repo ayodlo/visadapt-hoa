@@ -107,8 +107,7 @@ export default function PrivacyPolicyPage() {
             <h2 className="text-lg font-semibold text-gray-900 mb-2">Contact Us</h2>
             <p>
               Questions about this policy or your data can be directed to your HOA&rsquo;s administrator, or
-              to <span className="font-mono">privacy@communityhq.example.com</span> (placeholder — replace with
-              a real contact address before publishing).
+              to <span className="font-mono">privacy@portalhoa.com</span>.
             </p>
           </section>
         </div>
