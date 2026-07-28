@@ -14,13 +14,13 @@
     "preview": {
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://www.portalhoa.com"
+        "EXPO_PUBLIC_API_URL": "https://account.portalhoa.com"
       }
     },
     "production": {
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://www.portalhoa.com"
+        "EXPO_PUBLIC_API_URL": "https://account.portalhoa.com"
       }
     }
   },
