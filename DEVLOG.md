@@ -2,6 +2,31 @@
 
 ---
 
+## 2026-07-28 (Production database provisioned; Resend domain still unverified)
+
+**Files changed:** none — this session was operational only (running scripts against remote databases), no code edits.
+
+**Decisions made:**
+- Created a **new, separate Neon project** for production rather than reusing the existing dev project's branch labeled "production" — that label was misleading, it's just Neon's default branch name, and its endpoint (`ep-fancy-dew-aff252a0`) matched dev's `.env.local` exactly, confirming it was the same database (full of demo/seed/Playwright test data). The genuinely new prod project has endpoint `ep-weathered-leaf-afn90pdb`.
+- Declined Neon Auth (a dashboard upsell prompt) — app already has a complete custom JWT/bcrypt auth system deeply wired through ~55 routes and the mobile Bearer-auth flow; adopting it would mean re-architecting user identity for no gain.
+- Ran all 4 existing migrations (`0_init` → `add_communities`) against the new prod DB via `prisma migrate deploy` — schema only, zero seed data.
+- Created SUPER_ADMIN `devonlewis808@gmail.com` on both dev and the new prod DB (same password both places, user's choice).
+- Created a second SUPER_ADMIN `justin@justhodges.com` on both dev and prod, via `npm run create-super-admin`.
+- User then set the new `DATABASE_URL` (and presumably other prod env vars) in Vercel directly and redeployed — confirmed working by logging into the live site as SUPER_ADMIN.
+
+**Next steps:**
+1. **Unresolved this session:** password-reset emails are failing with a Resend 403 (`from: noreply@notifications.portalhoa.com`). Almost certainly the `notifications.portalhoa.com` sending domain isn't verified in Resend yet (needs SPF/DKIM DNS records added at wherever `portalhoa.com` DNS lives). Was waiting on the user to check Resend's Domains tab when the session ended — pick this up first next time.
+2. Confirm all prod Vercel env vars are actually set, not just `DATABASE_URL` — `JWT_SECRET` (should be unique, not reused from dev), `RESEND_API_KEY`, `EMAIL_FROM`, `AWS_*`, `NEXT_PUBLIC_APP_URL`. Login/dashboard working confirms DB+JWT are fine; Resend is confirmed broken; AWS/S3 unconfirmed either way.
+3. Consider rotating the new prod Neon DB password (`npg_n7jt4ElsUqAw`) — it was pasted in plaintext into this chat session while wiring it into Vercel.
+4. Still-open from the 07-15 handoff, untouched this session: clean up "Playwright Test HOA*" demo data on the **dev** DB, confirm CI green, mobile device smoke test, `eas init` for push notifications, Stripe payments, mobile board-role user-management screens.
+
+**Gotchas:**
+- **A Neon branch named "production" is not proof of a separate database** — Neon auto-names a new project's default branch "production" regardless of what it's actually used for. Always diff the actual connection-string host/endpoint ID, not the branch label, before trusting "this is prod."
+- `create-super-admin` (and any other `tsx`/prisma script run directly, not through `next dev`) does **not** read `.env.local` automatically — `DATABASE_URL` must be exported/prefixed explicitly on every invocation, or it silently targets whatever's already in the shell env.
+- `app/api/auth/forgot-password/route.ts` intentionally swallows email-send errors (`.catch(() => {})`) so the API response never reveals whether an account exists (security-by-design) — this also means the UI shows "success" even when Resend fails outright. Resend's own dashboard **Logs** tab is the actual source of truth for delivery failures, not the app's response.
+
+---
+
 ## 2026-07-15 (Session handoff — multi-tenancy shipped, next steps)
 
 **State at close:** All 4 multi-tenancy phases (schema → route scoping → web UI → mobile UI) committed, pushed, and deployed. Vercel deploy confirmed green after the optionalDependencies fix (see the two fix entries below). nextjs: tsc clean, 113 vitest tests green. mobile: tsc clean, 243 jest tests green, expo lint clean (one pre-existing useMemo warning).
