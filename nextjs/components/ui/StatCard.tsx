@@ -5,7 +5,7 @@ type Color = 'default' | 'green' | 'red' | 'yellow' | 'blue';
 interface Props {
   label: string;
   value: string | number;
-  icon?: string;
+  icon?: React.ReactNode;
   href?: string;
   color?: Color;
   subtext?: string;

@@ -1,18 +1,32 @@
 import Link from 'next/link';
+import type { LucideIcon } from 'lucide-react';
+import {
+  Users,
+  Wallet,
+  Hammer,
+  Clock,
+  PencilRuler,
+  TriangleAlert,
+  ClipboardList,
+  Megaphone,
+  Calendar,
+  FileText,
+} from 'lucide-react';
 import { getSession } from '@/lib/auth';
 import { getActiveCommunityId } from '@/lib/community';
 import { redirect } from 'next/navigation';
 import { StatCard } from '@/components/ui/StatCard';
+import { EmptyCard } from '@/components/ui/EmptyCard';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { getAdminDashboard, formatDollars } from '@/lib/dashboard';
 
-const QUICK_ACTIONS = [
-  { href: '/admin/announcements', label: 'Post Announcement', icon: '📢', description: 'Share news with residents' },
-  { href: '/dashboard/events', label: 'Create Event', icon: '📅', description: 'Schedule a community event' },
-  { href: '/admin/issues', label: 'Review Issues', icon: '🔨', description: 'Manage open maintenance requests' },
-  { href: '/dashboard/users', label: 'Manage Users', icon: '👥', description: 'View and manage resident accounts' },
-  { href: '/admin/payments', label: 'Dues Overview', icon: '💰', description: 'Track payments and balances' },
-  { href: '/admin/documents', label: 'Documents', icon: '📄', description: 'Share files with the community' },
+const QUICK_ACTIONS: { href: string; label: string; icon: LucideIcon; description: string }[] = [
+  { href: '/admin/announcements', label: 'Post Announcement', icon: Megaphone, description: 'Share news with residents' },
+  { href: '/dashboard/events', label: 'Create Event', icon: Calendar, description: 'Schedule a community event' },
+  { href: '/admin/issues', label: 'Review Issues', icon: Hammer, description: 'Manage open maintenance requests' },
+  { href: '/dashboard/users', label: 'Manage Users', icon: Users, description: 'View and manage resident accounts' },
+  { href: '/admin/payments', label: 'Dues Overview', icon: Wallet, description: 'Track payments and balances' },
+  { href: '/admin/documents', label: 'Documents', icon: FileText, description: 'Share files with the community' },
 ];
 
 function activityLabel(action: string): string {
@@ -59,40 +73,40 @@ export default async function AdminDashboardPage() {
         <StatCard
           label="Total Residents"
           value={data?.totalResidents ?? '—'}
-          icon="👥"
+          icon={<Users className="w-6 h-6 text-gray-400" />}
           href="/dashboard/users"
           color="blue"
         />
         <StatCard
           label="Unpaid Balance"
           value={data ? formatDollars(data.unpaidBalanceCents) : '—'}
-          icon="💰"
+          icon={<Wallet className="w-6 h-6 text-gray-400" />}
           href="/admin/payments"
           color={(data?.unpaidBalanceCents ?? 0) > 0 ? 'red' : 'default'}
         />
         <StatCard
           label="Open Issues"
           value={data?.openIssues ?? '—'}
-          icon="🔨"
+          icon={<Hammer className="w-6 h-6 text-gray-400" />}
           href="/admin/issues"
         />
         <StatCard
           label="Overdue Issues"
           value={data?.overdueIssues ?? '—'}
-          icon="⏰"
+          icon={<Clock className="w-6 h-6 text-gray-400" />}
           href="/admin/issues"
           color={(data?.overdueIssues ?? 0) > 0 ? 'red' : 'default'}
         />
         <StatCard
           label="Arch Requests"
           value={data?.openArchRequests ?? '—'}
-          icon="🏗️"
+          icon={<PencilRuler className="w-6 h-6 text-gray-400" />}
           href="/admin/architectural-requests"
         />
         <StatCard
           label="Open Violations"
           value={data?.openViolations ?? '—'}
-          icon="⚠️"
+          icon={<TriangleAlert className="w-6 h-6 text-gray-400" />}
           href="/admin/violations"
           color={(data?.openViolations ?? 0) > 0 ? 'yellow' : 'default'}
         />
@@ -110,7 +124,7 @@ export default async function AdminDashboardPage() {
                 href="/admin/issues"
                 className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-xl px-4 py-3 hover:bg-red-100 transition-colors focus:outline-none focus:ring-2 focus:ring-red-500"
               >
-                <span className="text-xl" aria-hidden="true">⏰</span>
+                <Clock className="w-5 h-5 text-red-500 shrink-0" aria-hidden="true" />
                 <div>
                   <p className="text-sm font-medium text-red-800">
                     {data.overdueIssues} overdue maintenance {data.overdueIssues === 1 ? 'issue' : 'issues'}
@@ -124,7 +138,7 @@ export default async function AdminDashboardPage() {
                 href="/admin/violations"
                 className="flex items-center gap-3 bg-yellow-50 border border-yellow-200 rounded-xl px-4 py-3 hover:bg-yellow-100 transition-colors focus:outline-none focus:ring-2 focus:ring-yellow-500"
               >
-                <span className="text-xl" aria-hidden="true">⚠️</span>
+                <TriangleAlert className="w-5 h-5 text-yellow-500 shrink-0" aria-hidden="true" />
                 <div>
                   <p className="text-sm font-medium text-yellow-800">
                     {data.openViolations} open {data.openViolations === 1 ? 'violation' : 'violations'}
@@ -138,7 +152,7 @@ export default async function AdminDashboardPage() {
                 href="/admin/violations"
                 className="flex items-center gap-3 bg-indigo-50 border border-indigo-200 rounded-xl px-4 py-3 hover:bg-indigo-100 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500"
               >
-                <span className="text-xl" aria-hidden="true">📋</span>
+                <ClipboardList className="w-5 h-5 text-indigo-500 shrink-0" aria-hidden="true" />
                 <div>
                   <p className="text-sm font-medium text-indigo-800">
                     {data.pendingAppeals} {data.pendingAppeals === 1 ? 'appeal' : 'appeals'} pending review
@@ -152,7 +166,7 @@ export default async function AdminDashboardPage() {
                 href="/admin/architectural-requests"
                 className="flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 hover:bg-blue-100 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                <span className="text-xl" aria-hidden="true">🏗️</span>
+                <PencilRuler className="w-5 h-5 text-blue-500 shrink-0" aria-hidden="true" />
                 <div>
                   <p className="text-sm font-medium text-blue-800">
                     {data.openArchRequests} architectural {data.openArchRequests === 1 ? 'request' : 'requests'} pending
@@ -161,11 +175,8 @@ export default async function AdminDashboardPage() {
                 </div>
               </Link>
             )}
-            {data && data.overdueIssues === 0 && data.openViolations === 0 && data.pendingAppeals === 0 && data.openArchRequests === 0 && (
-              <div className="flex items-center gap-3 bg-green-50 border border-green-200 rounded-xl px-4 py-3">
-                <span className="text-xl" aria-hidden="true">✅</span>
-                <p className="text-sm font-medium text-green-800">All queues are clear</p>
-              </div>
+            {(!data || (data.overdueIssues === 0 && data.openViolations === 0 && data.pendingAppeals === 0 && data.openArchRequests === 0)) && (
+              <EmptyCard message="Nothing currently needs attention." />
             )}
           </div>
         </section>
@@ -180,26 +191,28 @@ export default async function AdminDashboardPage() {
               View all
             </Link>
           </div>
-          <div className="bg-white border border-gray-200 rounded-xl divide-y divide-gray-100">
-            {!data || data.recentAnnouncements.length === 0 ? (
-              <p className="px-4 py-6 text-sm text-gray-400 text-center">No announcements yet.</p>
-            ) : (
-              data.recentAnnouncements.map((a) => (
+          {!data || data.recentAnnouncements.length === 0 ? (
+            <EmptyCard message="No announcements yet." />
+          ) : (
+            <div className="bg-white border border-gray-200 rounded-xl divide-y divide-gray-100">
+              {data.recentAnnouncements.map((a) => (
                 <div key={a.id} className="px-4 py-3">
                   <p className="text-sm font-medium text-gray-900">{a.title}</p>
                   <p className="text-xs text-gray-500 mt-0.5">{a.date}</p>
                 </div>
-              ))
-            )}
-          </div>
+              ))}
+            </div>
+          )}
         </section>
 
         {/* Issue metrics */}
-        {data && (
-          <section aria-labelledby="admin-issue-metrics-heading">
-            <h2 id="admin-issue-metrics-heading" className="text-base font-semibold text-gray-900 mb-3">
-              Issue Breakdown
-            </h2>
+        <section aria-labelledby="admin-issue-metrics-heading">
+          <h2 id="admin-issue-metrics-heading" className="text-base font-semibold text-gray-900 mb-3">
+            Issue Breakdown
+          </h2>
+          {!data || data.issuesByStatus.length === 0 ? (
+            <EmptyCard message="No issues yet." />
+          ) : (
             <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-3">
               {data.avgResolutionDays !== null && (
                 <div className="flex items-center justify-between text-sm border-b border-gray-100 pb-3 mb-1">
@@ -214,15 +227,17 @@ export default async function AdminDashboardPage() {
                 </div>
               ))}
             </div>
-          </section>
-        )}
+          )}
+        </section>
 
         {/* Financial summary */}
-        {data && (
-          <section aria-labelledby="admin-financial-heading">
-            <h2 id="admin-financial-heading" className="text-base font-semibold text-gray-900 mb-3">
-              Financial Summary
-            </h2>
+        <section aria-labelledby="admin-financial-heading">
+          <h2 id="admin-financial-heading" className="text-base font-semibold text-gray-900 mb-3">
+            Financial Summary
+          </h2>
+          {!data ? (
+            <EmptyCard message="No payment activity yet." />
+          ) : (
             <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-3">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-gray-600">Total outstanding</span>
@@ -240,16 +255,18 @@ export default async function AdminDashboardPage() {
                 View full payment report →
               </Link>
             </div>
-          </section>
-        )}
+          )}
+        </section>
       </div>
 
       {/* Recent activity */}
-      {data && data.recentActivity.length > 0 && (
-        <section aria-labelledby="admin-activity-heading">
-          <h2 id="admin-activity-heading" className="text-base font-semibold text-gray-900 mb-3">
-            Recent Issue Activity
-          </h2>
+      <section aria-labelledby="admin-activity-heading">
+        <h2 id="admin-activity-heading" className="text-base font-semibold text-gray-900 mb-3">
+          Recent Issue Activity
+        </h2>
+        {!data || data.recentActivity.length === 0 ? (
+          <EmptyCard message="No recent activity." />
+        ) : (
           <div className="bg-white border border-gray-200 rounded-xl divide-y divide-gray-100">
             {data.recentActivity.map((a) => (
               <div key={a.id} className="flex items-start gap-3 px-4 py-3">
@@ -268,8 +285,8 @@ export default async function AdminDashboardPage() {
               </div>
             ))}
           </div>
-        </section>
-      )}
+        )}
+      </section>
 
       {/* Quick Actions */}
       <section aria-labelledby="admin-actions-heading">
@@ -283,7 +300,7 @@ export default async function AdminDashboardPage() {
               href={action.href}
               className="bg-white border border-gray-200 rounded-xl p-4 hover:border-blue-300 hover:shadow-sm transition-all text-left group focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <span className="text-2xl mb-2 block" aria-hidden="true">{action.icon}</span>
+              <action.icon className="w-6 h-6 mb-2 text-blue-600" aria-hidden="true" />
               <p className="text-sm font-medium text-gray-900 group-hover:text-blue-700 transition-colors">
                 {action.label}
               </p>

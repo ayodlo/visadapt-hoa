@@ -5,12 +5,6 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { isAdmin } from '@/lib/roles';
 
-const DEMO_ACCOUNTS = [
-  { label: 'Resident', email: 'resident@communityhq.local' },
-  { label: 'Admin', email: 'admin@communityhq.local' },
-  { label: 'Board Member', email: 'board@communityhq.local' },
-];
-
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState('');
@@ -23,15 +17,23 @@ export default function LoginPage() {
     setError('');
     setLoading(true);
     try {
+
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
       });
+
       const data = await res.json();
-      if (!res.ok) { setError(data.error ?? 'Login failed'); return; }
+      if (!res.ok) { 
+        setError(data.error ?? 'Login failed');
+        return 
+      }
+
       const role = data.user?.role;
+
       const dest = isAdmin(role) ? '/admin/dashboard' : role === 'BOARD_MEMBER' ? '/board/dashboard' : '/resident/dashboard';
+      
       router.push(dest);
       router.refresh();
     } catch {
@@ -46,22 +48,6 @@ export default function LoginPage() {
       <div className="w-full max-w-md bg-white text-gray-900 rounded-2xl shadow-sm border border-gray-200 p-8">
         <h1 className="text-2xl font-bold text-blue-600 mb-1">CommunityHQ</h1>
         <h2 className="text-xl font-semibold mb-6">Sign in to your account</h2>
-
-        <div className="mb-4">
-          <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Demo Accounts</p>
-          <div className="flex gap-2">
-            {DEMO_ACCOUNTS.map((a) => (
-              <button
-                key={a.label}
-                type="button"
-                onClick={() => { setEmail(a.email); setPassword('password123'); }}
-                className="flex-1 text-sm border border-gray-300 rounded-lg py-1.5 hover:bg-gray-50 transition-colors"
-              >
-                {a.label}
-              </button>
-            ))}
-          </div>
-        </div>
 
         {error && <div className="mb-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</div>}
 

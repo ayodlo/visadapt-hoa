@@ -160,3 +160,17 @@
 body {
   font-family: var(--font-sans, ui-sans-serif, system-ui, sans-serif);
 }
+
+/*
+ * iOS Safari (and some Android browsers) zoom the viewport on focus when a
+ * text input's font-size is under 16px. Several pages use text-sm/text-xs
+ * (14px/12px) on inputs, selects, and textareas. Unlayered, so — like the
+ * dark-theme corrections above — it takes precedence over Tailwind's
+ * utilities layer without needing !important. Checkboxes/radios are excluded
+ * since they have no text to zoom on and shouldn't change size.
+ */
+input:not([type="checkbox"]):not([type="radio"]),
+select,
+textarea {
+  font-size: 1rem;
+}

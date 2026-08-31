@@ -9,9 +9,6 @@ test('login page renders the sign-in form', async ({ page }) => {
   await page.goto('/login');
   await expect(page.getByRole('heading', { name: 'CommunityHQ' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Sign in' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Admin' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Resident' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Board Member' })).toBeVisible();
 });
 
 test('shows error for invalid credentials', async ({ page }) => {
@@ -22,9 +19,10 @@ test('shows error for invalid credentials', async ({ page }) => {
   await expect(page.getByText('Invalid email or password')).toBeVisible();
 });
 
-test('demo admin button fills credentials and logs in', async ({ page }) => {
+test('admin can sign in with valid credentials', async ({ page }) => {
   await page.goto('/login');
-  await page.getByRole('button', { name: 'Admin' }).click();
+  await page.getByLabel('Email address').fill('admin@communityhq.local');
+  await page.getByLabel('Password').fill('password123');
   await page.getByRole('button', { name: 'Sign in' }).click();
   await page.waitForURL('**/dashboard');
   await expect(page).toHaveURL(/\/dashboard/);
@@ -32,7 +30,8 @@ test('demo admin button fills credentials and logs in', async ({ page }) => {
 
 test('logout clears session and redirects to /login', async ({ page }) => {
   await page.goto('/login');
-  await page.getByRole('button', { name: 'Admin' }).click();
+  await page.getByLabel('Email address').fill('admin@communityhq.local');
+  await page.getByLabel('Password').fill('password123');
   await page.getByRole('button', { name: 'Sign in' }).click();
   await page.waitForURL('**/dashboard');
 

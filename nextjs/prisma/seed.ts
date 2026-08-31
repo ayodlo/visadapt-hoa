@@ -212,7 +212,7 @@ async function main() {
         createdById: firstAdmin.id,
       },
       {
-        title: '⚠️ Emergency Water Shutoff — Wednesday 8 AM to 2 PM',
+        title: 'Emergency Water Shutoff — Wednesday 8 AM to 2 PM',
         body: 'The city water department has notified us of a mandatory water shutoff affecting the entire property this Wednesday from 8:00 AM to 2:00 PM for emergency main line repair. Please store water in advance. We apologize for the inconvenience and will update you when service is restored.',
         priority: 'EMERGENCY',
         audience: 'ALL_RESIDENTS',
