@@ -3,6 +3,10 @@
 import { useEffect, useState } from 'react';
 import { useSession } from '@/context/session';
 import { isStaff } from '@/lib/roles';
+import { useListControls } from '@/hooks/useListControls';
+import { ListToolbar } from '@/components/ui/ListToolbar';
+import { SortableTh, PlainTh } from '@/components/ui/SortableTh';
+import type { ListField } from '@/lib/list-controls';
 
 type DuesStatus = 'PENDING' | 'PAID' | 'OVERDUE' | 'WAIVED';
 interface User { id: string; firstName: string; lastName: string; email: string; }
@@ -19,6 +23,14 @@ function fmt(cents: number) {
   return `$${(cents / 100).toFixed(2)}`;
 }
 
+const FIELDS: ListField<DuesRecord>[] = [
+  { key: 'resident', label: 'Resident', value: (r) => `${r.user.firstName} ${r.user.lastName}`, filterable: true },
+  { key: 'label', label: 'Label', value: (r) => r.label, filterable: true },
+  { key: 'amount', label: 'Amount', type: 'number', value: (r) => r.amountCents, text: (r) => fmt(r.amountCents) },
+  { key: 'dueDate', label: 'Due Date', type: 'date', value: (r) => r.dueDate, text: (r) => new Date(r.dueDate).toLocaleDateString() },
+  { key: 'status', label: 'Status', value: (r) => r.status, filterable: true },
+];
+
 export default function DuesPage() {
   const { role } = useSession();
   const isAdmin = isStaff(role);
@@ -29,6 +41,7 @@ export default function DuesPage() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ userId: '', label: '', amountCents: '', dueDate: '' });
   const [submitting, setSubmitting] = useState(false);
+  const controls = useListControls(records, FIELDS);
 
   async function load() {
     const [duesRes, usersRes] = await Promise.all([fetch('/api/dues'), fetch('/api/users')]);
@@ -99,14 +112,22 @@ export default function DuesPage() {
       )}
 
       {loading ? <p className="text-gray-500 text-sm">Loading…</p> : records.length === 0 ? <p className="text-gray-500 text-sm">No dues records yet.</p> : (
+        <>
+        <ListToolbar controls={controls} searchPlaceholder="Search resident, label, amount…" noun="record" />
+        {controls.visible.length === 0 ? (
+          <p className="text-gray-500 text-sm">No dues records match your search.</p>
+        ) : (
         <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>{['Resident', 'Label', 'Amount', 'Due Date', 'Status', ''].map((h) => <th key={h} className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">{h}</th>)}</tr>
+                <tr>
+                  {FIELDS.map((f) => <SortableTh key={f.key} field={f} controls={controls} />)}
+                  <PlainTh label="" />
+                </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {records.map((r) => (
+                {controls.visible.map((r) => (
                   <tr key={r.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3 font-medium text-gray-900 whitespace-nowrap">{r.user.firstName} {r.user.lastName}</td>
                     <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{r.label}</td>
@@ -132,6 +153,8 @@ export default function DuesPage() {
             </table>
           </div>
         </div>
+        )}
+        </>
       )}
     </div>
   );

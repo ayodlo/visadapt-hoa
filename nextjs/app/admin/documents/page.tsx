@@ -207,6 +207,7 @@ export default function AdminDocumentsPage() {
         detailBase="/resident/documents"
         headerAction={headerAction}
         extraActions={extraActions}
+        showSort
       />
 
       {formOpen && (

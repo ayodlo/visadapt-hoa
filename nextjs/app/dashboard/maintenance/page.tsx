@@ -3,11 +3,23 @@
 import { useEffect, useState } from 'react';
 import { useSession } from '@/context/session';
 import { isStaff } from '@/lib/roles';
+import { useListControls } from '@/hooks/useListControls';
+import { ListToolbar } from '@/components/ui/ListToolbar';
+import type { ListField } from '@/lib/list-controls';
 
 type Status = 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED';
 type Priority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
 interface Submitter { id: string; firstName: string; lastName: string; }
 interface Request { id: string; title: string; description: string; status: Status; priority: Priority; submittedBy: Submitter; createdAt: string; }
+
+const FIELDS: ListField<Request>[] = [
+  { key: 'title', label: 'Title', value: (r) => r.title },
+  { key: 'description', label: 'Description', value: (r) => r.description, sortable: false },
+  { key: 'status', label: 'Status', value: (r) => r.status, text: (r) => r.status.replace('_', ' '), filterable: true },
+  { key: 'priority', label: 'Priority', value: (r) => r.priority, filterable: true },
+  { key: 'submittedBy', label: 'Submitted by', value: (r) => `${r.submittedBy.firstName} ${r.submittedBy.lastName}`, filterable: true },
+  { key: 'createdAt', label: 'Created', type: 'date', value: (r) => r.createdAt, text: (r) => new Date(r.createdAt).toLocaleDateString() },
+];
 
 const STATUS_COLORS: Record<Status, string> = {
   OPEN: 'bg-yellow-100 text-yellow-800',
@@ -32,6 +44,7 @@ export default function MaintenancePage() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ title: '', description: '', priority: 'MEDIUM' });
   const [submitting, setSubmitting] = useState(false);
+  const controls = useListControls(items, FIELDS);
 
   async function load() {
     const res = await fetch('/api/maintenance');
@@ -90,8 +103,13 @@ export default function MaintenancePage() {
       )}
 
       {loading ? <p className="text-gray-500 text-sm">Loading…</p> : items.length === 0 ? <p className="text-gray-500 text-sm">No requests yet.</p> : (
+        <>
+        <ListToolbar controls={controls} searchPlaceholder="Search title, description, submitter…" showSort noun="request" />
+        {controls.visible.length === 0 ? (
+          <p className="text-gray-500 text-sm">No requests match your search.</p>
+        ) : (
         <div className="space-y-4">
-          {items.map((item) => (
+          {controls.visible.map((item) => (
             <div key={item.id} className="bg-white border border-gray-200 rounded-xl p-5">
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1">
@@ -115,6 +133,8 @@ export default function MaintenancePage() {
             </div>
           ))}
         </div>
+        )}
+        </>
       )}
     </div>
   );

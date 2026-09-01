@@ -19,6 +19,10 @@ const createSchema = z.object({
 
 const INCLUDE = { uploadedBy: { select: { id: true, firstName: true, lastName: true } } };
 
+// Whitelisted sort columns — the `sort` param is never used as a column name directly.
+const SORT_FIELDS = ['title', 'category', 'fileName', 'createdAt'] as const;
+type SortField = (typeof SORT_FIELDS)[number];
+
 export async function GET(req: NextRequest) {
   const session = await getSession();
   if (!session) return unauthorized();
@@ -32,6 +36,13 @@ export async function GET(req: NextRequest) {
   const page = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10));
   const limit = Math.min(50, Math.max(1, parseInt(searchParams.get('limit') ?? '12', 10)));
 
+  // Defaults preserve the previous behaviour: newest first.
+  const sortParam = searchParams.get('sort') ?? '';
+  const sort: SortField = (SORT_FIELDS as readonly string[]).includes(sortParam)
+    ? (sortParam as SortField)
+    : 'createdAt';
+  const dir = searchParams.get('dir') === 'asc' ? 'asc' : 'desc';
+
   const where = {
     communityId,
     ...(search
@@ -39,6 +50,7 @@ export async function GET(req: NextRequest) {
           OR: [
             { title: { contains: search, mode: 'insensitive' as const } },
             { description: { contains: search, mode: 'insensitive' as const } },
+            { fileName: { contains: search, mode: 'insensitive' as const } },
           ],
         }
       : {}),
@@ -48,7 +60,7 @@ export async function GET(req: NextRequest) {
   const [documents, total] = await Promise.all([
     prisma.document.findMany({
       where,
-      orderBy: { createdAt: 'desc' },
+      orderBy: { [sort]: dir },
       skip: (page - 1) * limit,
       take: limit,
       include: INCLUDE,

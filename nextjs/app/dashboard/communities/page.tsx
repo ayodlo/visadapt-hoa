@@ -2,6 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { useToast } from '@/context/toast';
+import { useListControls } from '@/hooks/useListControls';
+import { ListToolbar } from '@/components/ui/ListToolbar';
+import { SortableTh } from '@/components/ui/SortableTh';
+import type { ListField } from '@/lib/list-controls';
 
 interface Community {
   id: string;
@@ -9,6 +13,14 @@ interface Community {
   createdAt: string;
   _count: { users: number; communityAssignments: number; properties: number };
 }
+
+const FIELDS: ListField<Community>[] = [
+  { key: 'name', label: 'Name', value: (c) => c.name },
+  { key: 'users', label: 'Users', type: 'number', value: (c) => c._count.users },
+  { key: 'assignments', label: 'Staff Assignments', type: 'number', value: (c) => c._count.communityAssignments },
+  { key: 'properties', label: 'Properties', type: 'number', value: (c) => c._count.properties },
+  { key: 'createdAt', label: 'Created', type: 'date', value: (c) => c.createdAt, text: (c) => new Date(c.createdAt).toLocaleDateString() },
+];
 
 export default function CommunitiesPage() {
   const { toast } = useToast();
@@ -18,6 +30,7 @@ export default function CommunitiesPage() {
   const [name, setName] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
+  const controls = useListControls(communities, FIELDS);
 
   async function load() {
     const res = await fetch('/api/admin/communities');
@@ -82,18 +95,21 @@ export default function CommunitiesPage() {
       )}
 
       {loading ? <p className="text-gray-500 text-sm">Loading…</p> : (
+        <>
+        <ListToolbar controls={controls} searchPlaceholder="Search communities…" noun="community" nounPlural="communities" />
+        {controls.visible.length === 0 ? (
+          <p className="text-gray-500 text-sm">No communities match your search.</p>
+        ) : (
         <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  {['Name', 'Users', 'Staff Assignments', 'Properties', 'Created'].map((h) => (
-                    <th key={h} className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">{h}</th>
-                  ))}
+                  {FIELDS.map((f) => <SortableTh key={f.key} field={f} controls={controls} />)}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {communities.map((c) => (
+                {controls.visible.map((c) => (
                   <tr key={c.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3 font-medium text-gray-900 whitespace-nowrap">{c.name}</td>
                     <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{c._count.users}</td>
@@ -106,6 +122,8 @@ export default function CommunitiesPage() {
             </table>
           </div>
         </div>
+        )}
+        </>
       )}
     </div>
   );

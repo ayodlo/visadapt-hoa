@@ -3,9 +3,21 @@
 import { useEffect, useState } from 'react';
 import { useSession } from '@/context/session';
 import { isStaff } from '@/lib/roles';
+import { useListControls } from '@/hooks/useListControls';
+import { ListToolbar } from '@/components/ui/ListToolbar';
+import type { ListField } from '@/lib/list-controls';
 
 interface Creator { id: string; firstName: string; lastName: string; }
 interface Event { id: string; title: string; description?: string; location?: string; startAt: string; endAt?: string; createdBy: Creator; }
+
+const FIELDS: ListField<Event>[] = [
+  { key: 'title', label: 'Title', value: (e) => e.title },
+  { key: 'location', label: 'Location', value: (e) => e.location ?? '', filterable: true },
+  { key: 'description', label: 'Description', value: (e) => e.description ?? '', sortable: false },
+  { key: 'startAt', label: 'Start', type: 'date', value: (e) => e.startAt, text: (e) => new Date(e.startAt).toLocaleString() },
+  { key: 'endAt', label: 'End', type: 'date', value: (e) => e.endAt ?? null, text: (e) => (e.endAt ? new Date(e.endAt).toLocaleString() : '') },
+  { key: 'createdBy', label: 'Created by', value: (e) => `${e.createdBy.firstName} ${e.createdBy.lastName}`, filterable: true },
+];
 
 export default function EventsPage() {
   const { role } = useSession();
@@ -16,6 +28,7 @@ export default function EventsPage() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ title: '', description: '', location: '', startAt: '', endAt: '' });
   const [submitting, setSubmitting] = useState(false);
+  const controls = useListControls(items, FIELDS);
 
   async function load() {
     const res = await fetch('/api/events');
@@ -74,8 +87,13 @@ export default function EventsPage() {
       )}
 
       {loading ? <p className="text-gray-500 text-sm">Loading…</p> : items.length === 0 ? <p className="text-gray-500 text-sm">No events yet.</p> : (
+        <>
+        <ListToolbar controls={controls} searchPlaceholder="Search title, location, description…" showSort noun="event" />
+        {controls.visible.length === 0 ? (
+          <p className="text-gray-500 text-sm">No events match your search.</p>
+        ) : (
         <div className="space-y-4">
-          {items.map((item) => (
+          {controls.visible.map((item) => (
             <div key={item.id} className="bg-white border border-gray-200 rounded-xl p-5">
               <div className="flex items-start justify-between gap-4">
                 <div>
@@ -93,6 +111,8 @@ export default function EventsPage() {
             </div>
           ))}
         </div>
+        )}
+        </>
       )}
     </div>
   );

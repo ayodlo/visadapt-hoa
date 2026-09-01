@@ -31,13 +31,26 @@ interface ApiResponse {
   totalPages: number;
 }
 
+/** Server-side sort options — keys must match the API's whitelist. */
+const SORT_OPTIONS = [
+  { value: 'createdAt', label: 'Upload date' },
+  { value: 'title', label: 'Title' },
+  { value: 'category', label: 'Category' },
+  { value: 'fileName', label: 'File name' },
+];
+
 interface Props {
   detailBase: string;
   headerAction?: React.ReactNode;
   extraActions?: (doc: Doc) => React.ReactNode;
+  /**
+   * Opt-in sort controls. Off by default so the resident and board views that
+   * share this component are unchanged.
+   */
+  showSort?: boolean;
 }
 
-export default function DocumentList({ detailBase, headerAction, extraActions }: Props) {
+export default function DocumentList({ detailBase, headerAction, extraActions, showSort = false }: Props) {
   const [docs, setDocs] = useState<Doc[]>([]);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
@@ -45,6 +58,8 @@ export default function DocumentList({ detailBase, headerAction, extraActions }:
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [category, setCategory] = useState('');
+  const [sort, setSort] = useState('createdAt');
+  const [dir, setDir] = useState<'asc' | 'desc'>('desc');
   const [status, setStatus] = useState<'idle' | 'loading' | 'error'>('idle');
 
   useEffect(() => {
@@ -52,12 +67,14 @@ export default function DocumentList({ detailBase, headerAction, extraActions }:
     return () => clearTimeout(t);
   }, [search]);
 
-  useEffect(() => { setPage(1); }, [debouncedSearch, category]);
+  // Any change to what's being shown returns to the first page, or the user
+  // can land on a page number that no longer exists.
+  useEffect(() => { setPage(1); }, [debouncedSearch, category, sort, dir]);
 
   const load = useCallback(async () => {
     setStatus('loading');
     try {
-      const params = new URLSearchParams({ page: String(page), limit: '12' });
+      const params = new URLSearchParams({ page: String(page), limit: '12', sort, dir });
       if (debouncedSearch) params.set('search', debouncedSearch);
       if (category) params.set('category', category);
       const res = await fetch(`/api/documents?${params}`);
@@ -70,7 +87,7 @@ export default function DocumentList({ detailBase, headerAction, extraActions }:
     } catch {
       setStatus('error');
     }
-  }, [page, debouncedSearch, category]);
+  }, [page, debouncedSearch, category, sort, dir]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -78,12 +95,12 @@ export default function DocumentList({ detailBase, headerAction, extraActions }:
     <div className="max-w-5xl mx-auto">
       <PageHeader title="Documents" subtitle={`${total} document${total !== 1 ? 's' : ''} in the library`} action={headerAction} />
 
-      <div className="flex flex-col sm:flex-row gap-3 mb-6">
+      <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3 mb-6">
         <SearchInput
           value={search}
           onChange={setSearch}
-          placeholder="Search by title or description…"
-          className="flex-1"
+          placeholder={showSort ? 'Search title, description, file name…' : 'Search by title or description…'}
+          className="flex-1 sm:min-w-[16rem]"
         />
         <FilterSelect
           options={CATEGORY_FILTER_OPTIONS as unknown as { label: string; value: string }[]}
@@ -91,6 +108,25 @@ export default function DocumentList({ detailBase, headerAction, extraActions }:
           onChange={setCategory}
           id="category-filter"
         />
+        {showSort && (
+          <div className="flex items-center gap-2">
+            <FilterSelect
+              label="Sort"
+              id="document-sort"
+              options={SORT_OPTIONS}
+              value={sort}
+              onChange={setSort}
+            />
+            <button
+              type="button"
+              onClick={() => setDir((d) => (d === 'asc' ? 'desc' : 'asc'))}
+              aria-label={`Sort ${dir === 'asc' ? 'descending' : 'ascending'}`}
+              className="text-sm border border-gray-300 rounded-lg px-3 py-2 bg-white text-gray-600 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 whitespace-nowrap"
+            >
+              {dir === 'asc' ? '↑ Asc' : '↓ Desc'}
+            </button>
+          </div>
+        )}
       </div>
 
       {status === 'loading' && <LoadingState rows={5} />}

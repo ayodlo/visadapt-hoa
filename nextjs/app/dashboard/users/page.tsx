@@ -4,12 +4,23 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useSession } from '@/context/session';
 import { isAdmin as isAdminRole } from '@/lib/roles';
+import { useListControls } from '@/hooks/useListControls';
+import { ListToolbar } from '@/components/ui/ListToolbar';
+import { SortableTh, PlainTh } from '@/components/ui/SortableTh';
+import type { ListField } from '@/lib/list-controls';
 
 type Role = 'SUPER_ADMIN' | 'ADMIN' | 'BOARD_MEMBER' | 'RESIDENT';
 // Roles assignable through this UI. SUPER_ADMIN is engineer-only — see prisma/create-super-admin.ts.
 const ASSIGNABLE_ROLES: Role[] = ['ADMIN', 'BOARD_MEMBER', 'RESIDENT'];
 interface User { id: string; firstName: string; lastName: string; email: string; role: Role; createdAt: string; }
 interface Community { id: string; name: string }
+
+const FIELDS: ListField<User>[] = [
+  { key: 'name', label: 'Name', value: (u) => `${u.firstName} ${u.lastName}` },
+  { key: 'email', label: 'Email', value: (u) => u.email },
+  { key: 'role', label: 'Role', value: (u) => u.role, text: (u) => u.role.replace('_', ' '), filterable: true },
+  { key: 'createdAt', label: 'Joined', type: 'date', value: (u) => u.createdAt, text: (u) => new Date(u.createdAt).toLocaleDateString() },
+];
 
 const ROLE_COLORS: Record<Role, string> = {
   SUPER_ADMIN: 'bg-fuchsia-100 text-fuchsia-800',
@@ -31,6 +42,7 @@ export default function UsersPage() {
   const [formError, setFormError] = useState('');
   const [allCommunities, setAllCommunities] = useState<Community[]>([]);
   const [createCommunityIds, setCreateCommunityIds] = useState<string[]>([]);
+  const controls = useListControls(users, FIELDS);
 
   async function load() {
     const res = await fetch('/api/users');
@@ -144,14 +156,22 @@ export default function UsersPage() {
       )}
 
       {loading ? <p className="text-gray-500 text-sm">Loading…</p> : (
+        <>
+        <ListToolbar controls={controls} searchPlaceholder="Search name, email, role…" noun="member" />
+        {controls.visible.length === 0 ? (
+          <p className="text-gray-500 text-sm">No members match your search.</p>
+        ) : (
         <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>{['Name', 'Email', 'Role', 'Joined', ''].map((h) => <th key={h} className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">{h}</th>)}</tr>
+                <tr>
+                  {FIELDS.map((f) => <SortableTh key={f.key} field={f} controls={controls} />)}
+                  <PlainTh label="" />
+                </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {users.map((user) => {
+                {controls.visible.map((user) => {
                   // SUPER_ADMIN accounts are engineer-managed only — never editable from this screen.
                   const locked = user.role === 'SUPER_ADMIN';
                   return (
@@ -184,6 +204,8 @@ export default function UsersPage() {
             </table>
           </div>
         </div>
+        )}
+        </>
       )}
     </div>
   );

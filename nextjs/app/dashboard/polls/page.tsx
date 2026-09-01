@@ -3,9 +3,25 @@
 import { useEffect, useState } from 'react';
 import { useSession } from '@/context/session';
 import { isStaff } from '@/lib/roles';
+import { useListControls } from '@/hooks/useListControls';
+import { ListToolbar } from '@/components/ui/ListToolbar';
+import type { ListField } from '@/lib/list-controls';
 
 interface Option { id: string; text: string; _count: { votes: number }; }
 interface Poll { id: string; question: string; description?: string; closesAt?: string; options: Option[]; _count: { votes: number }; createdBy: { firstName: string; lastName: string }; }
+
+function isClosed(poll: Poll) {
+  return poll.closesAt ? new Date(poll.closesAt) < new Date() : false;
+}
+
+const FIELDS: ListField<Poll>[] = [
+  { key: 'question', label: 'Question', value: (p) => p.question },
+  { key: 'description', label: 'Description', value: (p) => p.description ?? '', sortable: false },
+  { key: 'state', label: 'State', value: (p) => (isClosed(p) ? 'Closed' : 'Open'), filterable: true },
+  { key: 'votes', label: 'Votes', type: 'number', value: (p) => p._count.votes },
+  { key: 'closesAt', label: 'Closes', type: 'date', value: (p) => p.closesAt ?? null, text: (p) => (p.closesAt ? new Date(p.closesAt).toLocaleString() : '') },
+  { key: 'createdBy', label: 'Created by', value: (p) => `${p.createdBy.firstName} ${p.createdBy.lastName}`, filterable: true },
+];
 
 export default function PollsPage() {
   const { role } = useSession();
@@ -17,6 +33,7 @@ export default function PollsPage() {
   const [form, setForm] = useState({ question: '', description: '', closesAt: '', options: ['', ''] });
   const [voted, setVoted] = useState<Set<string>>(new Set());
   const [submitting, setSubmitting] = useState(false);
+  const controls = useListControls(polls, FIELDS);
 
   async function load() {
     const res = await fetch('/api/polls');
@@ -92,11 +109,16 @@ export default function PollsPage() {
       )}
 
       {loading ? <p className="text-gray-500 text-sm">Loading…</p> : polls.length === 0 ? <p className="text-gray-500 text-sm">No polls yet.</p> : (
+        <>
+        <ListToolbar controls={controls} searchPlaceholder="Search question, description, author…" showSort noun="poll" />
+        {controls.visible.length === 0 ? (
+          <p className="text-gray-500 text-sm">No polls match your search.</p>
+        ) : (
         <div className="space-y-4">
-          {polls.map((poll) => {
+          {controls.visible.map((poll) => {
             const total = poll._count.votes;
             const hasVoted = voted.has(poll.id);
-            const closed = poll.closesAt ? new Date(poll.closesAt) < new Date() : false;
+            const closed = isClosed(poll);
             return (
               <div key={poll.id} className="bg-white border border-gray-200 rounded-xl p-5">
                 <div className="flex items-start justify-between gap-4 mb-3">
@@ -125,6 +147,8 @@ export default function PollsPage() {
             );
           })}
         </div>
+        )}
+        </>
       )}
     </div>
   );

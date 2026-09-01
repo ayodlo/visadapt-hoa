@@ -2,6 +2,45 @@
 
 ---
 
+## 2026-08-31 (List search / filter / sort across /dashboard — deliverables #8, #9, #21)
+
+**Files changed:**
+- `nextjs/lib/list-controls.ts` (new) — generic engine. A list describes its columns once as `ListField<T>[]` (`key`, `label`, `type`, `value`, optional `text`, `filterable`, `sortable`); `searchRows` / `filterRows` / `sortRows` / `distinctValues` / `applyListControls` all derive from that one description, so adding a column makes it searchable, filterable, and sortable at once. Pure and Prisma-free.
+- `nextjs/hooks/useListControls.ts` (new) — first file in a new `hooks/` directory. Holds search/filter/sort state and memoises the visible rows.
+- `nextjs/components/ui/ListToolbar.tsx` (new) — search + per-column filter selects + (for card lists) a sort dropdown and direction toggle, a Clear button, and an "N of M" count. Reuses the existing `SearchInput` and `FilterSelect`.
+- `nextjs/components/ui/SortableTh.tsx` (new) — clickable column header with `aria-sort`; exports `PlainTh` for non-sortable columns.
+- Wired into all six `/dashboard` list views: `users`, `communities`, `dues` (sortable headers) and `maintenance`, `events`, `polls` (sort dropdown, since they render cards not tables).
+- `nextjs/__tests__/lib/list-controls.test.ts` (new) — 25 tests.
+- `nextjs/app/api/documents/route.ts` — GET now accepts `sort` (whitelist: `title`, `category`, `fileName`, `createdAt`) and `dir`; defaults unchanged at `createdAt desc`. Search widened to cover `fileName` alongside title and description.
+- `nextjs/components/documents/DocumentList.tsx` — new opt-in `showSort` prop adding a sort dropdown + direction toggle; changing sort resets to page 1.
+- `nextjs/app/admin/documents/page.tsx` — passes `showSort`.
+
+**Decisions made:**
+- **Client-side.** Every one of these screens already fetches its whole collection in one request, so filtering in the browser keeps typing instant and adds no round trips. The `ListField` descriptors are the natural thing to translate into query params if a collection ever outgrows one response.
+- **Filter = exact match on distinct values present in the data**, options built from the *unfiltered* rows so a filter never hides its own alternatives. Filters, search, and sort combine (filter → search → sort).
+- **Filters were applied to low-cardinality columns only** (Role, Status, Priority, Submitted by, Label, Resident, State, Location, Created by). Name/Email/Title-style columns are covered by search instead — a dropdown of 26 distinct emails helps nobody. Every column is still sortable and searchable.
+- Blank values sort last in *both* directions, so a descending sort doesn't open with a wall of empty cells.
+- `sortRows` copies before sorting — never mutates React state arrays.
+- An unknown filter key drops every row rather than silently passing them through, so a typo'd key fails loudly.
+
+**Next steps:**
+- `/dashboard/announcements` and `/dashboard/documents` are only redirects to `/admin/*` or `/resident/*` equivalents. `/admin/{announcements,issues,violations,architectural-requests,payments}` already have bespoke search/filter and were left alone — retrofitting them onto the shared toolbar is optional cleanup, not a gap.
+- Resident and board document views deliberately still have no sort (see `showSort` below); flip the prop if that parity is wanted.
+- If literal "filter by *every* column" is wanted, flip `filterable: true` on the remaining fields — the engine already supports it.
+
+**Gotchas:**
+- **`e2e/users.spec.ts:30` now finds 2 comboboxes, not 1.** It asserts a board member sees zero `combobox` roles. It was *already* failing on 1 (the multi-tenancy `CommunitySwitcher`); the new read-only Role *filter* is the second. The test's intent — no role-*editing* selects for board members — still holds, since those remain gated behind `isAdmin`. The selector is simply too broad and should target the editing selects by accessible name. Left failing rather than rewritten.
+- `/dashboard/communities` is SUPER_ADMIN-only (`layout.tsx` redirects everyone else to `/dashboard/users`), so verifying it needs the `superadmin@communityhq.local` account, not the ADMIN demo user.
+- The dev DB has **0 dues records**, so `/dashboard/dues` shows its "No dues records yet" state and no toolbar — the toolbar deliberately sits inside the non-empty branch. Not a bug; don't chase it.
+- Filter option labels are just "All", not "All <column>" — pluralising arbitrary headers produces "All statuss".
+- **`/admin/documents` already had search + a category filter**; they live in the shared `DocumentList`, not in `app/admin/documents/page.tsx`, so grepping the page file alone reports "no controls" and is wrong. Only sort was genuinely missing.
+- The documents list is **server-paginated (12/page)**, so its sorting had to go in the API — client-side `useListControls` would only have sorted the visible page. That is why documents uses a different mechanism from the six `/dashboard` lists.
+- `DocumentList` is shared by admin, board, and resident. Sort is behind an opt-in `showSort` prop (default false) so only `/admin/documents` changed; verified the resident view still renders no Sort control.
+
+**Verification:** `tsc --noEmit` clean; `eslint` clean (same 2 pre-existing warnings in `dashboard/users/[id]/page.tsx`); 173 vitest tests pass (148 → 173); `next build` succeeds. Browser-verified per page: search narrows, filters combine with search, Clear restores the full set, and column sort flips `aria-sort` with the row order exactly reversed. Full Playwright suite: 24 pass, the same 3 pre-existing failures as on `main` (`dues`, `theme`, `users`) — confirmed unchanged by stashing this work and re-running.
+
+---
+
 ## 2026-08-31 (Dashboard historical trend charts — deliverable #5)
 
 **Files changed:**
