@@ -10,6 +10,18 @@
 
 :root {
   color-scheme: light;
+
+  /*
+   * Chart tokens. Dashboard charts render as SVG, so they could inherit the
+   * remapped --color-* vars below — but the brand steps that double as solid
+   * button backgrounds (blue-600/700) deliberately stay saturated in dark mode
+   * and are too dark against the dark card surface. These series/grid steps are
+   * therefore chosen per theme rather than inherited.
+   */
+  --chart-series: #2563eb; /* blue-600 on white */
+  --chart-series-fill: #2563eb1f;
+  --chart-grid: #e5e7eb; /* gray-200 */
+  --chart-axis: #6b7280; /* gray-500 */
 }
 
 /*
@@ -33,6 +45,12 @@
  */
 [data-theme="dark"] {
   color-scheme: dark;
+
+  /* chart tokens — lighter series step for the #141d33 card surface */
+  --chart-series: #60a5fa; /* blue-400 */
+  --chart-series-fill: #60a5fa29;
+  --chart-grid: #263757;
+  --chart-axis: #94a5c4;
 
   /* neutrals — slate-tinted ramp */
   --color-gray-50: #0d1424;   /* page background, recessed fills, table headers */

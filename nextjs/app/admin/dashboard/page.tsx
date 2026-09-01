@@ -18,7 +18,11 @@ import { redirect } from 'next/navigation';
 import { StatCard } from '@/components/ui/StatCard';
 import { EmptyCard } from '@/components/ui/EmptyCard';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { MetricChartCard } from '@/components/dashboard/MetricChartCard';
+import { RangeSelector } from '@/components/dashboard/RangeSelector';
 import { getAdminDashboard, formatDollars } from '@/lib/dashboard';
+import { getTimeseries } from '@/lib/metrics';
+import { DEFAULT_RANGE, isRangePreset, resolveRange } from '@/lib/metrics-shared';
 
 const QUICK_ACTIONS: { href: string; label: string; icon: LucideIcon; description: string }[] = [
   { href: '/admin/announcements', label: 'Post Announcement', icon: Megaphone, description: 'Share news with residents' },
@@ -43,14 +47,38 @@ function fmt(iso: string) {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 }
 
-export default async function AdminDashboardPage() {
+/** Server-rendered first paint for the trend cards; the cards refetch on change. */
+function loadTrends(communityId: string, from: Date, to: Date) {
+  return Promise.all([
+    getTimeseries(communityId, 'unpaid-balance', 'month', from, to),
+    getTimeseries(communityId, 'payments-collected', 'month', from, to),
+    getTimeseries(communityId, 'issues-created', 'month', from, to),
+    getTimeseries(communityId, 'violations-created', 'month', from, to),
+  ]);
+}
+
+export default async function AdminDashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ range?: string }>;
+}) {
   const session = await getSession();
   if (!session || session.role === 'RESIDENT') redirect('/resident/dashboard');
 
+  const rangeParam = (await searchParams).range;
+  const range = rangeParam && isRangePreset(rangeParam) ? rangeParam : DEFAULT_RANGE;
+  const { from, to } = resolveRange(range);
+
   let data: Awaited<ReturnType<typeof getAdminDashboard>> | null = null;
+  let trends: Awaited<ReturnType<typeof loadTrends>> | null = null;
   try {
     const communityId = await getActiveCommunityId(session);
-    if (communityId) data = await getAdminDashboard(communityId);
+    if (communityId) {
+      [data, trends] = await Promise.all([
+        getAdminDashboard(communityId),
+        loadTrends(communityId, from, to),
+      ]);
+    }
   } catch {
     // show partial UI with error banner
   }
@@ -111,6 +139,48 @@ export default async function AdminDashboardPage() {
           color={(data?.openViolations ?? 0) > 0 ? 'yellow' : 'default'}
         />
       </div>
+
+      {/* Trends */}
+      {trends && (
+        <section aria-labelledby="admin-trends-heading">
+          <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
+            <h2 id="admin-trends-heading" className="text-base font-semibold text-gray-900">
+              Trends
+            </h2>
+            <RangeSelector active={range} basePath="/admin/dashboard" />
+          </div>
+          <div className="grid md:grid-cols-2 gap-6">
+            <MetricChartCard
+              key={`unpaid-balance-${range}`}
+              initial={trends[0]}
+              range={range}
+              defaultChartType="line"
+              emptyMessage="No billing history yet."
+            />
+            <MetricChartCard
+              key={`payments-collected-${range}`}
+              initial={trends[1]}
+              range={range}
+              defaultChartType="bar"
+              emptyMessage="No payments recorded yet."
+            />
+            <MetricChartCard
+              key={`issues-created-${range}`}
+              initial={trends[2]}
+              range={range}
+              defaultChartType="bar"
+              emptyMessage="No issues yet."
+            />
+            <MetricChartCard
+              key={`violations-created-${range}`}
+              initial={trends[3]}
+              range={range}
+              defaultChartType="bar"
+              emptyMessage="No violations yet."
+            />
+          </div>
+        </section>
+      )}
 
       <div className="grid md:grid-cols-2 gap-6">
         {/* Needs attention */}

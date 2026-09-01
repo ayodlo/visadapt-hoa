@@ -2,6 +2,41 @@
 
 ---
 
+## 2026-08-31 (Dashboard historical trend charts — deliverable #5)
+
+**Files changed:**
+- `nextjs/lib/metrics-shared.ts` (new) — types, constants, and pure helpers (`truncate`, `nextBucket`, `bucketRange`, `bucketLabel`, `zeroFill`, `runningTotal`, `periodChange`, `resolveRange`, formatters). Split out from `lib/metrics.ts` for the same reason `lib/roles.ts` is split from `lib/auth.ts`: client components cannot import anything that pulls in Prisma.
+- `nextjs/lib/metrics.ts` (new) — query layer. `getTimeseries(communityId, metric, granularity, from, to)` over Postgres `date_trunc` via `$queryRaw`.
+- `nextjs/app/api/admin/metrics/timeseries/route.ts` (new) — staff-only, community-scoped, Zod-validated; mirrors `app/api/admin/reports/payments/route.ts`.
+- `nextjs/components/dashboard/{MetricChartCard,TrendChart,MetricTable,RangeSelector}.tsx` (new) — card shell with line/bar/table toggles, W|M|Q|Y granularity, CSV export, and a help toggle; `TrendChart.tsx` is the only file importing `recharts`.
+- `nextjs/app/admin/dashboard/page.tsx` — new "Trends" section with four cards; reads `searchParams.range` (Next 16: `searchParams` is a Promise) and server-renders the first paint.
+- `nextjs/app/globals.css` — added `--chart-series`/`--chart-series-fill`/`--chart-grid`/`--chart-axis`, chosen per theme rather than inherited.
+- `nextjs/e2e/setup/auth.setup.ts` — **fixed**: still clicked the demo-account buttons that commit 4053da9 removed from the login page, which broke the setup project and therefore every e2e test. Now fills credentials directly, matching what 4053da9 did to `auth.spec.ts`.
+- `nextjs/package.json` + root `package-lock.json` — added `recharts@3.10.1`.
+- `nextjs/__tests__/lib/metrics-shared.test.ts` (new) — 35 tests.
+
+**Decisions made:**
+- **Recharts 3.10.1** over Chart.js/uPlot/hand-rolled SVG. It is the heaviest (7.45 MB unpacked; pulls @reduxjs/toolkit, react-redux, immer, d3 via victory-vendor) but SVG-based, so it inherits the CSS-variable dark theme; both canvas options would need JS theme plumbing and a re-render on every toggle. Pure JS, so the npm/cli#4828 native-binding trap does not apply. Contained behind `TrendChart.tsx` so swapping it touches one file.
+- **Charges are bucketed on `dueDate`, never `createdAt`.** `prisma/seed.ts` never sets `createdAt`, so every seeded charge carries the seed-run timestamp and would collapse into one bucket.
+- **Unpaid balance is derived, not stored:** `Σ charges due ≤ T − Σ payments paid ≤ T`. No schema change. Verified against the dev DB: the final bucket is 585000, exactly matching the StatCard's `Σ(PENDING+OVERDUE)`.
+- Hero number is the latest value for the cumulative balance but the **range total** for per-period flows — the newest bucket is a partial period, so flows would headline `$0.00`.
+- Granularity is parameterized into `date_trunc($1, col)`, plus a whitelist guard; table fragments come from a closed set, never input.
+
+**Next steps:**
+- Extend the same cards to the board dashboard (resident has no equivalent metrics).
+- Optional 3rd card set: "Issues by Category" — `lib/dashboard.ts` already returns `issuesByCategory`, no new query needed.
+- Consider `Charge.paidAt` + `Payment.chargeId` for exact charge-level history (see Gotchas). Not done here: backfilling existing rows would mean inventing timestamps.
+
+**Gotchas:**
+- **The seeded ledger goes negative for early months, and it is not a bug.** `prisma/seed.ts` stamps `paidAt = dueDate − 2 days`, so the payment settling March dues (due 3/1) lands in the *February* bucket. Cumulatively that is a real credit balance. Confirmed by bucket dump: payments run 2026-02..2026-07, charges 2026-03..2026-07. If the demo should show a monotonically rising balance, change the seed so `paidAt` falls *after* `dueDate` — do not "fix" the ledger math.
+- **`next dev` served stale CSS for hours.** The dashboard's dark chart tokens silently fell back to light values; the served `[data-theme="dark"]` rule was missing them entirely while the `:root` ones from the *same* editing session were present. The dev server (PID started 1:16 PM) never picked up a later `globals.css` edit — likely OneDrive breaking file watching. Playwright's `reuseExistingServer: true` hides this. **Restart the dev server before trusting any CSS-level verification**, and probe `getComputedStyle` rather than eyeballing a screenshot.
+- `prisma generate` can fail with `EPERM ... query_engine-windows.dll.node` when a node process holds the DLL. `next build` alone works if the client is already generated.
+- Three e2e specs fail on `main` **independent of this work** — verified by stashing and re-running: `dues.spec.ts` (create dues record), `theme.spec.ts` (toggle persists across reload), `users.spec.ts` (board member roster expects 0 comboboxes, but the CommunitySwitcher is one). 24 pass.
+
+**Verification:** `tsc --noEmit` clean; `eslint` clean (2 pre-existing warnings in `dashboard/users/[id]/page.tsx`); 148 vitest tests pass (113 → 148); `next build` succeeds; Playwright run of the admin dashboard shows no console errors, and a `getComputedStyle` probe confirms the series/grid tokens resolve per theme (dark `#60a5fa`/`#263757`, light `#2563eb`/`#e5e7eb`).
+
+---
+
 ## 2026-07-28 (Production database provisioned; Resend domain still unverified)
 
 **Files changed:** none — this session was operational only (running scripts against remote databases), no code edits.
