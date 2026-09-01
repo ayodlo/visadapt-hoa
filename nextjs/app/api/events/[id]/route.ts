@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
 import { getActiveCommunityId } from '@/lib/community';
 import { ok, err, unauthorized, forbidden, notFound } from '@/lib/api';
+import { deleteS3Object } from '@/lib/s3';
 
 const schema = z.object({
   title: z.string().min(1).optional(),
@@ -48,6 +49,12 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
   const { id } = await params;
   const existing = await prisma.event.findUnique({ where: { id } });
   if (!existing || existing.communityId !== communityId) return notFound('Event');
+
+  // Drop the stored image too, or deleting events would orphan objects in the
+  // bucket forever. Best-effort: a failed cleanup must not block the delete.
+  if (existing.imageKey) {
+    await deleteS3Object(existing.imageKey).catch(() => {});
+  }
 
   await prisma.event.delete({ where: { id } });
   return ok({ deleted: true });

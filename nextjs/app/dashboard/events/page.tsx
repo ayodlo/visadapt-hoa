@@ -6,9 +6,10 @@ import { isStaff } from '@/lib/roles';
 import { useListControls } from '@/hooks/useListControls';
 import { ListToolbar } from '@/components/ui/ListToolbar';
 import type { ListField } from '@/lib/list-controls';
+import { IMAGE_ACCEPT, MAX_IMAGE_BYTES, formatBytes, validateImage } from '@/lib/uploads';
 
 interface Creator { id: string; firstName: string; lastName: string; }
-interface Event { id: string; title: string; description?: string; location?: string; startAt: string; endAt?: string; createdBy: Creator; }
+interface Event { id: string; title: string; description?: string; location?: string; startAt: string; endAt?: string; createdBy: Creator; imageUrl?: string | null; }
 
 const FIELDS: ListField<Event>[] = [
   { key: 'title', label: 'Title', value: (e) => e.title },
@@ -28,7 +29,35 @@ export default function EventsPage() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ title: '', description: '', location: '', startAt: '', endAt: '' });
   const [submitting, setSubmitting] = useState(false);
+  const [image, setImage] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imageError, setImageError] = useState('');
   const controls = useListControls(items, FIELDS);
+
+  function clearImage() {
+    // Object URLs are leaked memory until revoked.
+    if (imagePreview) URL.revokeObjectURL(imagePreview);
+    setImage(null);
+    setImagePreview(null);
+    setImageError('');
+  }
+
+  function handleImagePick(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    clearImage();
+    if (!file) return;
+
+    // Same rules the API enforces, checked here so an oversized file is caught
+    // before it is uploaded rather than after.
+    const invalid = validateImage({ type: file.type, size: file.size, name: file.name });
+    if (invalid) {
+      setImageError(invalid);
+      e.target.value = '';
+      return;
+    }
+    setImage(file);
+    setImagePreview(URL.createObjectURL(file));
+  }
 
   async function load() {
     const res = await fetch('/api/events');
@@ -51,7 +80,31 @@ export default function EventsPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
-    if (res.ok) { setForm({ title: '', description: '', location: '', startAt: '', endAt: '' }); setShowForm(false); load(); }
+
+    if (res.ok) {
+      // The image is a second step so the JSON create contract stays unchanged.
+      // A failed image upload must not discard an event that was created fine —
+      // report it and keep the event.
+      if (image) {
+        const created = await res.json().catch(() => null);
+        if (created?.id) {
+          const body = new FormData();
+          body.append('image', image);
+          const imgRes = await fetch(`/api/events/${created.id}/image`, { method: 'POST', body });
+          if (!imgRes.ok) {
+            const data = await imgRes.json().catch(() => null);
+            setImageError(data?.error ?? 'Event was created, but the image could not be uploaded.');
+            setSubmitting(false);
+            load();
+            return;
+          }
+        }
+      }
+      setForm({ title: '', description: '', location: '', startAt: '', endAt: '' });
+      clearImage();
+      setShowForm(false);
+      load();
+    }
     setSubmitting(false);
   }
 
@@ -79,9 +132,35 @@ export default function EventsPage() {
             <div><label className="block text-xs text-gray-500 mb-1">Start</label><input required type="datetime-local" value={form.startAt} onChange={(e) => setForm((f) => ({ ...f, startAt: e.target.value }))} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" /></div>
             <div><label className="block text-xs text-gray-500 mb-1">End (optional)</label><input type="datetime-local" value={form.endAt} onChange={(e) => setForm((f) => ({ ...f, endAt: e.target.value }))} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" /></div>
           </div>
+          <div>
+            <label htmlFor="event-image" className="block text-xs text-gray-500 mb-1">
+              Image <span className="text-gray-400">(optional — JPEG, PNG, WebP, or GIF, up to {formatBytes(MAX_IMAGE_BYTES)})</span>
+            </label>
+            <input
+              id="event-image"
+              type="file"
+              accept={IMAGE_ACCEPT}
+              onChange={handleImagePick}
+              aria-describedby={imageError ? 'event-image-error' : undefined}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 file:mr-3 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-sm file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200"
+            />
+            {imageError && (
+              <p id="event-image-error" role="alert" className="mt-1 text-xs text-red-600">{imageError}</p>
+            )}
+            {imagePreview && (
+              <div className="mt-2 flex items-start gap-3">
+                {/* Local object URL for a just-picked file — next/image adds nothing here. */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={imagePreview} alt="" className="h-24 w-40 object-cover rounded-lg border border-gray-200" />
+                <button type="button" onClick={clearImage} className="text-xs text-gray-500 hover:text-red-600 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded px-1">
+                  Remove image
+                </button>
+              </div>
+            )}
+          </div>
           <div className="flex gap-2">
             <button type="submit" disabled={submitting} className="bg-blue-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50">{submitting ? 'Saving…' : 'Save'}</button>
-            <button type="button" onClick={() => setShowForm(false)} className="text-sm px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-50">Cancel</button>
+            <button type="button" onClick={() => { setShowForm(false); clearImage(); }} className="text-sm px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-50">Cancel</button>
           </div>
         </form>
       )}
@@ -94,7 +173,17 @@ export default function EventsPage() {
         ) : (
         <div className="space-y-4">
           {controls.visible.map((item) => (
-            <div key={item.id} className="bg-white border border-gray-200 rounded-xl p-5">
+            <div key={item.id} className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+              {/* Rendered only when an image exists — no placeholder, no empty frame. */}
+              {item.imageUrl && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={item.imageUrl}
+                  alt={`${item.title} event image`}
+                  className="w-full h-48 sm:h-56 object-cover border-b border-gray-200"
+                />
+              )}
+              <div className="p-5">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <h3 className="font-semibold text-gray-900">{item.title}</h3>
@@ -108,6 +197,7 @@ export default function EventsPage() {
                 )}
               </div>
               {item.description && <p className="mt-3 text-sm text-gray-700">{item.description}</p>}
+              </div>
             </div>
           ))}
         </div>

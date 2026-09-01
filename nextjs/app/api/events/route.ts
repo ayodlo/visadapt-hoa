@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
 import { getActiveCommunityId } from '@/lib/community';
 import { ok, err, unauthorized, forbidden } from '@/lib/api';
+import { getPresignedViewUrl } from '@/lib/s3';
 
 const schema = z.object({
   title: z.string().min(1),
@@ -25,7 +26,18 @@ export async function GET() {
     orderBy: { startAt: 'asc' },
     include: { createdBy: { select: { id: true, firstName: true, lastName: true } } },
   });
-  return ok(events);
+
+  // Swap the private storage key for a short-lived view URL. `imageKey` itself
+  // never leaves the server. Signing is local (no network round trip), and a
+  // signing failure degrades to no image rather than failing the whole list.
+  return ok(
+    await Promise.all(
+      events.map(async ({ imageKey, ...event }) => ({
+        ...event,
+        imageUrl: imageKey ? await getPresignedViewUrl(imageKey).catch(() => null) : null,
+      }))
+    )
+  );
 }
 
 export async function POST(req: NextRequest) {

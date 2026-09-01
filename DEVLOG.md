@@ -2,6 +2,41 @@
 
 ---
 
+## 2026-09-01 (Optional event feature image — deliverable #10)
+
+**Files changed:**
+- `nextjs/prisma/schema.prisma` + `migrations/20260901025226_add_event_image/` — one additive nullable column: `Event.imageKey`. Applied to the Neon dev DB via `migrate dev`. **Not yet applied to prod** — needs `migrate deploy`.
+- `nextjs/lib/uploads.ts` (new) — shared, pure upload rules: allowed MIME types, 5 MB cap, `validateImage`, `formatBytes`, `eventImageKey`. Imported by both the API route and the browser form so one definition governs both sides.
+- `nextjs/lib/s3.ts` — added `getPresignedViewUrl`. The existing `getPresignedDownloadUrl` sets `Content-Disposition: attachment`, which makes an `<img>` fail, so inline display needed its own helper.
+- `nextjs/app/api/events/[id]/image/route.ts` (new) — POST (multipart) and DELETE. Staff-only, community-scoped.
+- `nextjs/app/api/events/route.ts` — GET strips `imageKey` and returns a presigned `imageUrl` instead.
+- `nextjs/app/api/events/[id]/route.ts` — DELETE now removes the S3 object too, so deleting events can't orphan objects.
+- `nextjs/app/dashboard/events/page.tsx` — optional file input with client-side validation, live preview, "Remove image", and a feature image on the card rendered only when one exists.
+- `nextjs/.env.example` — documented what the AWS block is actually for.
+- `nextjs/__tests__/lib/uploads.test.ts` (new) — 12 tests.
+
+**Decisions made:**
+- **Reused `lib/s3.ts` rather than adding a storage provider**, per the deliverable. Worth knowing: that module was **dead code** — nothing imported it. Documents only ever stored an admin-pasted `fileUrl` string; no upload pipeline existed. This is the first real writer.
+- **Image upload is a second request, not part of `POST /api/events`.** Keeps the JSON create contract intact for the mobile client (`mobile/src/api/events.ts` reads this endpoint) and lets an image be attached to an existing event later.
+- **Bucket stays private; the client gets a 1-hour presigned URL.** `imageKey` never leaves the server. Consistent with how documents were designed to work, and avoids a public-read bucket policy.
+- Upload to S3 happens *before* the DB write, so a storage failure can't leave an event pointing at an object that was never stored. Replacing an image deletes the old object best-effort.
+- Keys are `communities/<communityId>/events/<eventId>/<uuid>.<ext>` — tenant-prefixed for bucket policies/lifecycle rules, UUID-suffixed so a replacement never collides with what it replaces.
+- Used a plain `<img>`, not `next/image`: sources are presigned URLs on a private bucket that change every hour, which defeats the optimizer's caching and would need `remotePatterns` for a host that varies per deployment.
+
+**Next steps:**
+1. **`AWS_S3_BUCKET` in `.env.local` names a bucket that does not exist** — verified directly: credentials authenticate (the error is `NoSuchBucket`, not an auth failure) but the bucket is absent. Create it (or point the var at a real one) and the upload path works end to end; until then the UI correctly reports "Could not store the image."
+2. Run `prisma migrate deploy` against prod before deploying, and confirm `AWS_*` is set in Vercel — flagged as unconfirmed since the 07-28 handoff.
+3. `lib/uploads.ts` is deliberately generic: violation attachments (#14) and real document uploads (#18) can reuse `validateImage` and the key-naming pattern.
+
+**Gotchas:**
+- **The S3 round trip has never actually succeeded** — no real bucket exists, so `uploadToS3` is exercised only through its failure path. The graceful-failure behaviour *is* verified; the success path is not. Test it the moment a bucket exists.
+- Presigning is local signing, not a network call, so mapping keys → URLs in the events list adds no latency and works even against a non-existent bucket — it just yields a URL that 404s. Signing failures degrade to `imageUrl: null` rather than failing the whole list.
+- Two Playwright selector traps hit while verifying, both worth knowing: Next injects `<div role="alert" id="__next-route-announcer__">` into every page, so `getByRole('alert')` is never unique — scope to the element's own id. And the new events search box placeholder contains "title", so `getByPlaceholder('Title')` now matches two inputs — scope to `form`.
+
+**Verification:** `tsc --noEmit` clean; `eslint` clean (same 2 pre-existing warnings); 185 vitest tests pass (173 → 185); `npm run build` succeeds. Browser-verified against the dev DB: events with no image render **no `<img>` at all** (0 elements, no placeholder frame); a PDF is rejected client-side with "Choose a JPEG, PNG, WebP, or GIF image."; a 6 MB file is rejected with "Image must be 5.0 MB or smaller (that one is 6.0 MB)."; a valid image shows a preview; and on submit against the missing bucket the event is still created, the error is surfaced, and `imageKey` stays `null` — no broken reference stored. Full Playwright suite: 24 pass, same 3 pre-existing failures. Test event removed from the dev DB afterwards.
+
+---
+
 ## 2026-08-31 (List search / filter / sort across /dashboard — deliverables #8, #9, #21)
 
 **Files changed:**

@@ -338,6 +338,10 @@ model Event {
   location    String?
   startAt     DateTime
   endAt       DateTime?
+  // S3 object key for the optional feature image. Nullable: events without an
+  // image are the norm. The client never sees the key — the API swaps it for a
+  // short-lived presigned URL so the bucket stays private.
+  imageKey    String?
   createdById String
   createdBy   User      @relation(fields: [createdById], references: [id])
   communityId String

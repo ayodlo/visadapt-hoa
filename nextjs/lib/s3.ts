@@ -21,6 +21,16 @@ export async function uploadToS3(
   );
 }
 
+/**
+ * Presigned URL for displaying an object inline (e.g. an <img> src).
+ *
+ * Separate from `getPresignedDownloadUrl`, which forces a download by setting
+ * Content-Disposition: attachment — that would make an <img> tag fail.
+ */
+export async function getPresignedViewUrl(key: string, expiresIn = 3600): Promise<string> {
+  return getSignedUrl(s3, new GetObjectCommand({ Bucket: BUCKET, Key: key }), { expiresIn });
+}
+
 export async function getPresignedDownloadUrl(key: string, filename: string): Promise<string> {
   const command = new GetObjectCommand({
     Bucket: BUCKET,
