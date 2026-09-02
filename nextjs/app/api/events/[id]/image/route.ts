@@ -32,13 +32,28 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const invalid = validateImage({ type: file.type, size: file.size, name: file.name });
   if (invalid) return err(invalid, 400);
 
+  // Misconfiguration is not a transient failure — say so distinctly instead of
+  // asking the admin to "try again" against a bucket that was never set.
+  if (!process.env.AWS_S3_BUCKET) {
+    console.error('[event-image] AWS_S3_BUCKET is not set — image storage is unconfigured');
+    return err('Image storage is not configured. Contact your administrator.', 503);
+  }
+
   const key = eventImageKey(communityId, id, file.type, randomUUID());
 
   // Upload before touching the database: if S3 rejects the object we must not
   // leave the event pointing at a key that was never stored.
   try {
     await uploadToS3(key, Buffer.from(await file.arrayBuffer()), file.type);
-  } catch {
+  } catch (error) {
+    // The client gets a generic message — the cause (NoSuchBucket, AccessDenied,
+    // InvalidAccessKeyId…) is infrastructure detail. Log it so it is diagnosable
+    // from the deployment logs instead of vanishing into a bare 502.
+    const { name, message } = error as Error;
+    console.error(
+      `[event-image] S3 upload failed: ${name}: ${message} ` +
+        `(bucket=${process.env.AWS_S3_BUCKET}, region=${process.env.AWS_REGION ?? 'us-east-1'}, key=${key})`
+    );
     return err('Could not store the image. Please try again.', 502);
   }
 
