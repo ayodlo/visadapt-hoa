@@ -1,20 +1,15 @@
 import { getSession } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
-import { ok, unauthorized, forbidden } from '@/lib/api';
+import { unauthorized, forbidden } from '@/lib/api';
 
+/**
+ * A resident's own architectural requests — closed.
+ *
+ * Architectural requests are staff-only; residents no longer submit or track
+ * them in the app. Kept as a 403 rather than deleted so any still-deployed
+ * mobile client gets a clear refusal instead of a 404.
+ */
 export async function GET() {
   const session = await getSession();
   if (!session) return unauthorized();
-  if (session.role !== 'RESIDENT') return forbidden();
-
-  const requests = await prisma.architecturalRequest.findMany({
-    where: { residentId: session.id },
-    orderBy: { createdAt: 'desc' },
-    include: {
-      property: { select: { streetAddress: true, unitNumber: true } },
-      _count: { select: { comments: { where: { isInternal: false } } } },
-    },
-  });
-
-  return ok({ requests });
+  return forbidden();
 }

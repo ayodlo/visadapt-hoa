@@ -1,61 +1,20 @@
-import { NextRequest } from 'next/server';
-import { z } from 'zod';
 import { getSession } from '@/lib/auth';
-import { getActiveCommunityId } from '@/lib/community';
-import { prisma } from '@/lib/prisma';
-import { ok, err, unauthorized, forbidden } from '@/lib/api';
-import { createAuditLog } from '@/lib/audit';
+import { unauthorized, forbidden } from '@/lib/api';
 
-const schema = z.object({
-  requestType: z.enum(['FENCE', 'EXTERIOR_PAINT', 'LANDSCAPING', 'SOLAR', 'ROOF', 'SHED', 'OTHER']),
-  description: z.string().min(20, 'Description must be at least 20 characters').max(5000),
-  desiredStartDate: z.string().datetime({ offset: true }).nullable().optional(),
-  propertyId: z.string().optional(),
-  submitNow: z.boolean().default(false),
-});
-
-export async function POST(req: NextRequest) {
+/**
+ * Architectural request submission — closed.
+ *
+ * Residents no longer submit architectural requests through the app; that
+ * process is handled outside it. This route only ever accepted RESIDENT
+ * submissions, so it is now closed to every role rather than deleted, which
+ * keeps the endpoint returning a clear 403 to any still-deployed mobile client
+ * instead of a confusing 404.
+ *
+ * Staff continue to review and decide existing requests through
+ * /api/admin/architectural-requests and /api/board/architectural-requests.
+ */
+export async function POST() {
   const session = await getSession();
   if (!session) return unauthorized();
-  if (session.role !== 'RESIDENT') return forbidden();
-
-  const communityId = await getActiveCommunityId(session);
-  if (!communityId) return err('No community selected', 400);
-
-  const body = await req.json().catch(() => null);
-  const parsed = schema.safeParse(body);
-  if (!parsed.success) return err(parsed.error.issues[0].message, 400);
-
-  const { submitNow, desiredStartDate, propertyId, ...rest } = parsed.data;
-  const status = submitNow ? 'SUBMITTED' : 'DRAFT';
-
-  const request = await prisma.architecturalRequest.create({
-    data: {
-      residentId: session.id,
-      communityId,
-      status,
-      desiredStartDate: desiredStartDate ? new Date(desiredStartDate) : null,
-      propertyId: propertyId ?? null,
-      ...rest,
-    },
-  });
-
-  await prisma.architecturalRequestActivity.create({
-    data: {
-      requestId: request.id,
-      actorId: session.id,
-      action: 'created',
-      details: submitNow ? 'Request submitted for review' : 'Draft saved',
-    },
-  });
-
-  await createAuditLog({
-    userId: session.id,
-    action: 'arch_request.create',
-    entityType: 'ArchitecturalRequest',
-    entityId: request.id,
-    metadata: { requestType: request.requestType, status } as object,
-  });
-
-  return ok({ request }, 201);
+  return forbidden();
 }

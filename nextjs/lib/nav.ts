@@ -52,10 +52,13 @@ function issuesHref(role: Role) {
   return '/resident/issues';
 }
 
+/**
+ * Architectural requests are staff-only. Residents do not submit or track them
+ * through the app — that process is handled outside it — so the entry is absent
+ * from resident navigation entirely (see `buildNav`).
+ */
 function archRequestsHref(role: Role) {
-  if (isAdmin(role)) return '/admin/architectural-requests';
-  if (role === 'BOARD_MEMBER') return '/board/architectural-requests';
-  return '/resident/architectural-requests';
+  return isAdmin(role) ? '/admin/architectural-requests' : '/board/architectural-requests';
 }
 
 function violationsHref(role: Role) {
@@ -72,7 +75,7 @@ export function buildNav(role: Role): NavItem[] {
     { href: announcementsHref(role), label: 'Announcements', icon: Megaphone },
     { href: '/dashboard/events', label: 'Events', icon: Calendar },
     { href: issuesHref(role), label: 'Issues', icon: Hammer },
-    { href: archRequestsHref(role), label: 'Arch. Requests', icon: PencilRuler },
+    ...(staff ? [{ href: archRequestsHref(role), label: 'Arch. Requests', icon: PencilRuler }] : []),
     { href: violationsHref(role), label: 'Violations', icon: TriangleAlert },
     { href: '/dashboard/maintenance', label: 'Maintenance', icon: Wrench },
     { href: '/dashboard/polls', label: 'Polls', icon: ChartColumn },

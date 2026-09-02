@@ -144,6 +144,25 @@
     background-color: #141d33;
   }
 
+  /*
+   * Native <select> dropdown lists.
+   *
+   * Tailwind's preflight sets `color: inherit` on form controls, so options
+   * inherit the dark theme's light text — but nothing gives them a background,
+   * so the popup falls back to the platform's light surface. The result is
+   * light text on white, unreadable, and invisible to page screenshots because
+   * the popup is drawn by the OS rather than the page.
+   *
+   * Only option/optgroup are targeted, never `select` itself: several selects
+   * carry status or role tints (bg-purple-100, bg-green-100, …) and these rules
+   * are unlayered, so they would override those utilities.
+   */
+  option,
+  optgroup {
+    background-color: #141d33;
+    color: var(--color-gray-900);
+  }
+
   /* blue-400 / red-400 / green-400 are not remapped above, so the vars still
      hold their light-palette values, which read well on dark surfaces.
      blue-300 / red-300 ARE remapped (to border tints), so those text
