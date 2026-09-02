@@ -99,6 +99,7 @@ model User {
   createdViolations              Violation[]                     @relation("CreatedViolations")
   violationComments              ViolationComment[]
   violationActivities            ViolationActivity[]
+  violationAttachments           ViolationAttachment[]
   violationAppeals               ViolationAppeal[]               @relation("AppealSubmitter")
   reviewedAppeals                ViolationAppeal[]               @relation("AppealReviewer")
 
@@ -667,6 +668,7 @@ model Violation {
   comments        ViolationComment[]
   activities      ViolationActivity[]
   appeal          ViolationAppeal?
+  attachments     ViolationAttachment[]
 
   @@index([communityId])
   @@map("violations")
@@ -696,6 +698,24 @@ model ViolationActivity {
   createdAt   DateTime  @default(now())
 
   @@map("violation_activities")
+}
+
+/// Evidence files attached to a violation. `storageKey` is the S3 object key —
+/// it never leaves the server; clients receive short-lived presigned URLs.
+model ViolationAttachment {
+  id           String    @id @default(cuid())
+  violationId  String
+  violation    Violation @relation(fields: [violationId], references: [id], onDelete: Cascade)
+  storageKey   String
+  fileName     String
+  contentType  String
+  sizeBytes    Int
+  uploadedById String
+  uploadedBy   User      @relation(fields: [uploadedById], references: [id])
+  createdAt    DateTime  @default(now())
+
+  @@index([violationId])
+  @@map("violation_attachments")
 }
 
 model ViolationAppeal {

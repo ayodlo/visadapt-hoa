@@ -1,8 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import {
+  ATTACHMENT_MIME_TYPES,
   IMAGE_ACCEPT,
   IMAGE_MIME_TYPES,
   MAX_IMAGE_BYTES,
+  MAX_UPLOAD_BYTES,
+  isImageType,
+  sanitizeFileName,
+  validateAttachment,
+  violationAttachmentKey,
   eventImageKey,
   extensionFor,
   formatBytes,
@@ -28,7 +34,7 @@ describe('validateImage', () => {
 
   it('accepts a file exactly at the limit but not one byte over', () => {
     expect(validateImage({ type: 'image/png', size: MAX_IMAGE_BYTES })).toBeNull();
-    expect(validateImage({ type: 'image/png', size: MAX_IMAGE_BYTES + 1 })).toMatch(/5.0 MB or smaller/);
+    expect(validateImage({ type: 'image/png', size: MAX_IMAGE_BYTES + 1 })).toMatch(/4.0 MB or smaller/);
   });
 
   it('reports the offending size in the message', () => {
@@ -75,5 +81,83 @@ describe('eventImageKey', () => {
 describe('IMAGE_ACCEPT', () => {
   it('is derived from the same list the validator uses', () => {
     for (const type of IMAGE_MIME_TYPES) expect(IMAGE_ACCEPT).toContain(type);
+  });
+});
+
+describe('validateAttachment', () => {
+  it('accepts images and documents alike', () => {
+    for (const type of ATTACHMENT_MIME_TYPES) {
+      expect(validateAttachment({ type, size: 1024 })).toBeNull();
+    }
+    expect(validateAttachment({ type: 'application/pdf', size: 2048 })).toBeNull();
+  });
+
+  it('rejects types outside the allowed set', () => {
+    expect(validateAttachment({ type: 'application/zip', size: 1024 })).toMatch(/image .* or a document/i);
+    expect(validateAttachment({ type: 'image/svg+xml', size: 1024 })).not.toBeNull();
+  });
+
+  it('shares the 4 MB ceiling with images', () => {
+    expect(validateAttachment({ type: 'application/pdf', size: MAX_UPLOAD_BYTES })).toBeNull();
+    expect(validateAttachment({ type: 'application/pdf', size: MAX_UPLOAD_BYTES + 1 })).toMatch(/4.0 MB or smaller/);
+  });
+
+  it('rejects empty files', () => {
+    expect(validateAttachment({ type: 'application/pdf', size: 0 })).toMatch(/empty/);
+  });
+});
+
+describe('MAX_UPLOAD_BYTES', () => {
+  it('stays under Vercel\'s ~4.5 MB request body cap', () => {
+    expect(MAX_UPLOAD_BYTES).toBeLessThan(4.5 * 1024 * 1024);
+    expect(MAX_IMAGE_BYTES).toBe(MAX_UPLOAD_BYTES);
+  });
+});
+
+describe('isImageType', () => {
+  it('separates inline-renderable images from documents', () => {
+    expect(isImageType('image/png')).toBe(true);
+    expect(isImageType('application/pdf')).toBe(false);
+  });
+});
+
+describe('sanitizeFileName', () => {
+  it('strips path separators so a key cannot escape its prefix', () => {
+    expect(sanitizeFileName('../../etc/passwd')).toBe('passwd');
+    expect(sanitizeFileName(String.raw`C:\evil\notes.pdf`)).toBe('notes.pdf');
+  });
+
+  it('replaces characters that are unsafe in a key', () => {
+    expect(sanitizeFileName('my photo (1).png')).toBe('my_photo__1_.png');
+  });
+
+  it('never returns an empty segment', () => {
+    expect(sanitizeFileName('...')).toBe('file');
+    expect(sanitizeFileName('')).toBe('file');
+  });
+
+  it('caps absurdly long names', () => {
+    expect(sanitizeFileName('a'.repeat(300)).length).toBeLessThanOrEqual(100);
+  });
+});
+
+describe('violationAttachmentKey', () => {
+  it('namespaces by community and violation, under the shared bucket', () => {
+    expect(violationAttachmentKey('c1', 'v1', 'photo.jpg', 'abc')).toBe(
+      'communities/c1/violations/v1/abc-photo.jpg'
+    );
+  });
+
+  it('keeps events and violations on separate prefixes in the same bucket', () => {
+    const ev = eventImageKey('c1', 'e1', 'image/png', 'x');
+    const vi = violationAttachmentKey('c1', 'v1', 'a.png', 'x');
+    expect(ev.startsWith('communities/c1/events/')).toBe(true);
+    expect(vi.startsWith('communities/c1/violations/')).toBe(true);
+  });
+
+  it('sanitizes the supplied filename', () => {
+    expect(violationAttachmentKey('c1', 'v1', '../secret.pdf', 'u')).toBe(
+      'communities/c1/violations/v1/u-secret.pdf'
+    );
   });
 });

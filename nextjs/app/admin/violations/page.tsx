@@ -1,7 +1,11 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Paperclip } from 'lucide-react';
 import { useToast } from '@/context/toast';
+import { useSession } from '@/context/session';
+import { isAdmin as isAdminRole } from '@/lib/roles';
+import { ViolationAttachments } from '@/components/violations/ViolationAttachments';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { LoadingState } from '@/components/ui/LoadingState';
@@ -27,6 +31,15 @@ interface ViolationRow {
   property: { streetAddress: string; unitNumber: string | null } | null;
   appeal: { id: string; status: string } | null;
   _count: { comments: number };
+}
+
+/** Shape of the entries GET /api/users returns (a bare array, not { users }). */
+interface Resident {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  role: string;
 }
 
 interface ViolationDetail extends ViolationRow {
@@ -60,6 +73,7 @@ type PanelMode = 'list' | 'create' | 'detail';
 
 export default function AdminViolationsPage() {
   const { toast } = useToast();
+  const session = useSession();
   const [violations, setViolations] = useState<ViolationRow[]>([]);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
@@ -93,7 +107,9 @@ export default function AdminViolationsPage() {
   const [confirmAppeal, setConfirmAppeal] = useState<string | null>(null);
 
   // Create form state
-  const [residents, setResidents] = useState<{ id: string; firstName: string; lastName: string; email: string }[]>([]);
+  const [residents, setResidents] = useState<Resident[]>([]);
+  const [residentsLoading, setResidentsLoading] = useState(true);
+  const [residentsError, setResidentsError] = useState('');
   const [createForm, setCreateForm] = useState({
     residentId: '', violationType: '', ruleCitation: '', description: '',
     observedAt: '', deadline: '', resolutionSteps: '', sendNow: false,
@@ -117,7 +133,29 @@ export default function AdminViolationsPage() {
   useEffect(() => { fetchList(search, statusFilter, typeFilter, appealFilter, page); }, [fetchList, search, statusFilter, typeFilter, appealFilter, page]);
 
   useEffect(() => {
-    fetch('/api/users').then(r => r.json()).then(j => setResidents((j.users ?? []).filter((u: {role:string}) => u.role === 'RESIDENT'))).catch(() => {});
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/users');
+        if (!res.ok) throw new Error(String(res.status));
+        // GET /api/users returns a bare array. This previously read `j.users`,
+        // which is always undefined, so the resident dropdown was silently
+        // empty for every admin rather than only "unreliable".
+        const data: unknown = await res.json();
+        if (!Array.isArray(data)) throw new Error('unexpected response shape');
+        if (!cancelled) {
+          setResidents((data as Resident[]).filter((u) => u.role === 'RESIDENT'));
+          setResidentsError('');
+        }
+      } catch {
+        // Never fail silently here — an empty dropdown with no explanation is
+        // exactly how this bug stayed invisible.
+        if (!cancelled) setResidentsError('Could not load residents. Refresh to try again.');
+      } finally {
+        if (!cancelled) setResidentsLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
   }, []);
 
   function handleSearch(v: string) {
@@ -303,16 +341,28 @@ export default function AdminViolationsPage() {
             <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Resident <span className="text-red-500">*</span></label>
-                  <select value={createForm.residentId} onChange={e => setCreateForm(f => ({ ...f, residentId: e.target.value }))}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <option value="">Select resident…</option>
+                  <label htmlFor="violation-resident" className="block text-xs font-medium text-gray-700 mb-1">Resident <span className="text-red-500">*</span></label>
+                  <select
+                    id="violation-resident"
+                    value={createForm.residentId}
+                    onChange={e => setCreateForm(f => ({ ...f, residentId: e.target.value }))}
+                    disabled={residentsLoading || residents.length === 0}
+                    aria-describedby={residentsError || residents.length === 0 ? 'violation-resident-help' : undefined}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60">
+                    <option value="">
+                      {residentsLoading ? 'Loading residents…' : residents.length === 0 ? 'No residents available' : 'Select resident…'}
+                    </option>
                     {residents.map(r => <option key={r.id} value={r.id}>{r.firstName} {r.lastName} — {r.email}</option>)}
                   </select>
+                  {!residentsLoading && (residentsError || residents.length === 0) && (
+                    <p id="violation-resident-help" role="alert" className="mt-1 text-xs text-red-600">
+                      {residentsError || 'No residents found in this community. Add a resident before recording a violation.'}
+                    </p>
+                  )}
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Violation Type <span className="text-red-500">*</span></label>
-                  <select value={createForm.violationType} onChange={e => setCreateForm(f => ({ ...f, violationType: e.target.value }))}
+                  <label htmlFor="violation-type" className="block text-xs font-medium text-gray-700 mb-1">Violation Type <span className="text-red-500">*</span></label>
+                  <select id="violation-type" value={createForm.violationType} onChange={e => setCreateForm(f => ({ ...f, violationType: e.target.value }))}
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                     <option value="">Select type…</option>
                     {VIOLATION_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
@@ -352,10 +402,10 @@ export default function AdminViolationsPage() {
               <div>
                 <p className="text-xs font-medium text-gray-700 mb-1">Evidence</p>
                 <div className="flex items-center gap-2 border border-dashed border-gray-300 rounded-lg px-3 py-2.5 bg-gray-50">
-                  <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-                  <span className="text-xs text-gray-500">Photo / document upload coming soon. Evidence reference can be added after creation.</span>
+                  <Paperclip className="w-4 h-4 text-gray-400 flex-shrink-0" aria-hidden="true" />
+                  <span className="text-xs text-gray-500">
+                    Save the violation first, then attach photos or documents from its Evidence section.
+                  </span>
                 </div>
               </div>
 
@@ -425,6 +475,8 @@ export default function AdminViolationsPage() {
                 <div className="mt-2 text-xs text-blue-600 font-medium">Evidence on file: {selected.evidenceUrl}</div>
               )}
             </div>
+
+            <ViolationAttachments violationId={selected.id} canEdit={isAdminRole(session.role)} />
 
             {/* Admin actions */}
             {!['RESOLVED', 'CLOSED'].includes(selected.status) && (
