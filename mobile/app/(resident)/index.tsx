@@ -47,10 +47,6 @@ export default function ResidentDashboard() {
             <Text style={styles.subtext}>{formatCents(data.nextDueAmountCents)}</Text>
           )}
         </Card>
-        <Card style={styles.statCard} onPress={() => router.push('/more/architectural-requests')}>
-          <Text style={styles.statValue}>{data.openArchRequests}</Text>
-          <Text style={styles.statLabel}>Arch Requests</Text>
-        </Card>
       </View>
 
       <Text style={styles.sectionTitle}>Active Violations</Text>

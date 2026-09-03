@@ -8,7 +8,13 @@ import {
   isImageType,
   sanitizeFileName,
   validateAttachment,
+  validateDirectUpload,
   violationAttachmentKey,
+  MAX_DIRECT_UPLOAD_BYTES,
+  isUploadScope,
+  stagedUploadKey,
+  isStagedKeyFor,
+  maintenanceAttachmentKey,
   eventImageKey,
   extensionFor,
   formatBytes,
@@ -159,5 +165,76 @@ describe('violationAttachmentKey', () => {
     expect(violationAttachmentKey('c1', 'v1', '../secret.pdf', 'u')).toBe(
       'communities/c1/violations/v1/u-secret.pdf'
     );
+  });
+});
+
+describe('direct (presigned) uploads', () => {
+  it('allows a larger ceiling than server-relayed uploads', () => {
+    expect(MAX_DIRECT_UPLOAD_BYTES).toBeGreaterThan(MAX_UPLOAD_BYTES);
+    expect(validateDirectUpload({ type: 'image/png', size: 10 * 1024 * 1024 })).toBeNull();
+  });
+
+  it('still refuses disallowed types and oversized or empty files', () => {
+    expect(validateDirectUpload({ type: 'application/zip', size: 1024 })).not.toBeNull();
+    expect(validateDirectUpload({ type: 'image/png', size: 0 })).toMatch(/empty/);
+    expect(validateDirectUpload({ type: 'image/png', size: MAX_DIRECT_UPLOAD_BYTES + 1 })).toMatch(/25.0 MB or smaller/);
+  });
+
+  it('only recognises the scopes that may request a URL', () => {
+    expect(isUploadScope('maintenance')).toBe(true);
+    expect(isUploadScope('violations')).toBe(false);
+    expect(isUploadScope('')).toBe(false);
+  });
+});
+
+describe('stagedUploadKey / isStagedKeyFor', () => {
+  it('round-trips a key it generated', () => {
+    const key = stagedUploadKey('c1', 'maintenance', 'photo.jpg', 'u1');
+    expect(key).toBe('_staging/communities/c1/maintenance/u1-photo.jpg');
+    expect(isStagedKeyFor(key, 'c1', 'maintenance')).toBe(true);
+  });
+
+  it('starts with the literal prefix the bucket lifecycle rule filters on', () => {
+    // The S3 rule matches the prefix `_staging/` with no wildcard, so this
+    // ordering is what makes abandoned uploads expirable. Reordering the
+    // segments would silently stop the rule from ever matching.
+    expect(stagedUploadKey('c1', 'maintenance', 'photo.jpg', 'u1')).toMatch(/^_staging\//);
+  });
+
+  it('rejects a key belonging to another community', () => {
+    const key = stagedUploadKey('c2', 'maintenance', 'photo.jpg', 'u1');
+    expect(isStagedKeyFor(key, 'c1', 'maintenance')).toBe(false);
+  });
+
+  it('rejects keys outside the staging prefix, including real attachments', () => {
+    expect(isStagedKeyFor('communities/c1/maintenance/r1/u-photo.jpg', 'c1', 'maintenance')).toBe(false);
+    expect(isStagedKeyFor(violationAttachmentKey('c1', 'v1', 'a.png', 'u'), 'c1', 'maintenance')).toBe(false);
+    expect(isStagedKeyFor(eventImageKey('c1', 'e1', 'image/png', 'u'), 'c1', 'maintenance')).toBe(false);
+  });
+
+  it('rejects traversal and nested paths', () => {
+    expect(isStagedKeyFor('_staging/communities/c1/maintenance/../../secret', 'c1', 'maintenance')).toBe(false);
+    expect(isStagedKeyFor('_staging/communities/c1/maintenance/sub/dir.png', 'c1', 'maintenance')).toBe(false);
+  });
+
+  it('rejects a prefix-lookalike community id', () => {
+    // "c1x" must not satisfy a check for community "c1".
+    const key = stagedUploadKey('c1x', 'maintenance', 'a.png', 'u');
+    expect(isStagedKeyFor(key, 'c1', 'maintenance')).toBe(false);
+  });
+
+  it('sanitises the filename in the staged key', () => {
+    expect(stagedUploadKey('c1', 'maintenance', '../evil name.png', 'u')).toBe(
+      '_staging/communities/c1/maintenance/u-evil_name.png'
+    );
+  });
+});
+
+describe('maintenanceAttachmentKey', () => {
+  it('lands outside the staging prefix so lifecycle rules cannot expire it', () => {
+    const key = maintenanceAttachmentKey('c1', 'r1', 'photo.jpg', 'u1');
+    expect(key).toBe('communities/c1/maintenance/r1/u1-photo.jpg');
+    expect(key).not.toContain('_staging');
+    expect(isStagedKeyFor(key, 'c1', 'maintenance')).toBe(false);
   });
 });

@@ -2,6 +2,101 @@
 
 ---
 
+## 2026-09-03 (S3 CORS + lifecycle rule for staged uploads)
+
+**Files changed:**
+- `nextjs/lib/uploads.ts` — `stagedUploadKey` and `isStagedKeyFor` now lead with `_staging/`: keys are `_staging/communities/<communityId>/<scope>/<uuid>-<name>` instead of `communities/<communityId>/_staging/<scope>/...`.
+- `nextjs/__tests__/lib/uploads.test.ts` — 4 assertions updated, 1 test added pinning the key to `/^_staging\//` (250 tests total).
+- **Not in the repo:** the CORS policy and lifecycle rule were applied to the `communityhq-documents-test` bucket through the AWS console. Bucket configuration is not in version control — if the bucket is ever recreated, both must be reapplied.
+
+**Decisions made:**
+- **`_staging/` leads the key.** DEVLOG 2026-09-02 planned a rule on `communities/*/_staging/`, which cannot work: an S3 lifecycle `Filter.Prefix` is a literal string with no wildcard support, and S3 accepts such a prefix silently — the rule would have been created, looked correct in the console, and never matched anything. Leading with `_staging/` lets one rule cover every tenant. The community segment still follows it, so per-community bucket policies are unaffected.
+- **Rejected the alternatives.** Tagging staged objects and using a tag filter would mean signing `x-amz-tagging` into the presigned PUT, having the browser send that exact header, adding it to CORS `AllowedHeaders`, and granting `s3:PutObjectTagging` — four more things to get wrong for the same outcome. One rule per community prefix hits the 1000-rule bucket cap and needs a new rule per tenant.
+- **The app's IAM user stays object-scoped.** `dev-visadapt-hoa` gets `AccessDenied` on `s3:GetLifecycleConfiguration` and `s3:GetBucketVersioning`, which is correct — bucket configuration is an admin action, and the runtime key should not be able to change or read it. Applied via the console instead.
+- **CORS is `PUT` + `content-type` only.** That is exactly what `MaintenanceRequestForm.tsx` sends; the client reads only `put.ok`, so `ExposeHeaders` stays empty. `GET` is not needed — attachments display through presigned URLs in `<img src>`/download links, which are not CORS requests.
+
+**Next steps:**
+1. **`AllowedOrigins` covers only `https://account.portalhoa.com` and `http://localhost:3000`.** Direct uploads will fail on every Vercel preview deployment until `https://*.vercel.app` is added, and on `localhost:3001` when Next shifts port because 3000 is taken.
+2. **Bucket versioning status is unknown** — the app key cannot read it. If versioning is on, expiration only writes a delete marker and the staged bytes stay billable; the rule then needs `NoncurrentVersionExpiration`.
+3. Carried over: the staff maintenance view still shows none of the rich intake data, and three upload paths still exist (server-relayed events, server-relayed violations, presigned maintenance).
+
+**Gotchas:**
+- **`PutBucketLifecycleConfiguration` replaces the entire configuration**, it does not append. Always `get-bucket-lifecycle-configuration` and merge before writing.
+- **Expiry is not 24h.** S3 rounds to midnight UTC after the 1-day threshold, so a staged object created 2026-09-03 expires 2026-09-05 00:00 UTC — roughly 24-48h. Fine for abandoned uploads, but do not treat the window as exact.
+- **A form open across the deploy loses its attachments.** Staged keys held in browser memory use the old layout, so `isStagedKeyFor` rejects them and `/api/maintenance` returns 400 "An attachment could not be verified. Please re-upload it." Correct behavior, clears on re-upload. No stored data is affected — nothing persists a `_staging/` key.
+- **Do not verify a lifecycle rule by waiting for a deletion.** `HeadObject` returns `x-amz-expiration` with the scheduled date and rule id as soon as the rule matches, and needs only `s3:GetObject`.
+
+**Verification:** `tsc --noEmit` clean; `eslint` clean on both touched files; 250 vitest tests passing (249 -> 250). CORS preflight confirmed live against the bucket — `OPTIONS` with `Access-Control-Request-Method: PUT` and `Access-Control-Request-Headers: content-type` returns 200 for both `http://localhost:3000` and `https://account.portalhoa.com`. `scripts/check-s3.ts` passes all four checks (bucket reachable, PutObject, presigned read, DeleteObject). Lifecycle rule confirmed by probe: a `_staging/` object returns `expiry-date="Sat, 05 Sep 2026 00:00:00 GMT", rule-id="expire-staged-uploads"`, while an existing `communities/.../violations/...` attachment returns no expiration header. Probe object deleted. Bucket held only 2 objects before this work, both violation attachments, and `_staging/` was empty — so no old-layout keys needed cleaning up.
+
+---
+
+## 2026-09-02 (Presigned direct-to-S3 uploads for maintenance attachments)
+
+**Files changed:**
+- `nextjs/lib/s3.ts` — added `getPresignedUploadUrl` (presigned PUT), `headS3Object`, `copyS3Object`.
+- `nextjs/lib/uploads.ts` — `MAX_DIRECT_UPLOAD_BYTES` (25 MB), `validateDirectUpload`, upload scopes, `stagedUploadKey`, `isStagedKeyFor`, `maintenanceAttachmentKey`.
+- `nextjs/app/api/uploads/presign/route.ts` (new) — issues one short-lived (5 min) upload URL per object.
+- `nextjs/app/api/maintenance/route.ts` — accepts `attachmentKeys[]`, verifies each against S3, then promotes them out of staging.
+- `nextjs/components/maintenance/MaintenanceRequestForm.tsx` — files upload on pick, with per-file status and retry; submit is blocked while any upload is unfinished.
+- `nextjs/__tests__/lib/uploads.test.ts` — 10 new tests (249 total).
+
+**Decisions made:**
+- **Presigned PUT + `HeadObject`, not `createPresignedPost`.** The POST-policy form can have S3 enforce `content-length-range` directly, but it lives in `@aws-sdk/s3-presigned-post`, which is not installed — and new dependencies need approval. The stored object is verified server-side before any DB row is written, so size is still enforced; it is just enforced after the bytes land rather than during. Worth revisiting with that one package.
+- **Uploads happen on pick, not on submit.** This is the whole point of the change: a storage failure now surfaces on the Attachments step, next to the file, with a Retry — the form cannot be submitted referencing a file that never stored.
+- **Staged objects are copied out of `_staging/`, never left there.** A lifecycle rule that expires abandoned uploads would otherwise delete confirmed attachments.
+- **The server chooses every key.** The client only echoes back keys the server issued, and `isStagedKeyFor` re-checks the community and scope prefix — a forged key is rejected before the request is created.
+
+**Next steps:**
+1. **Bucket CORS is required before this works in a browser** — see Gotchas for the policy.
+2. Add an S3 lifecycle rule expiring `communities/*/_staging/` after ~1 day.
+3. Events and violations still use the server-relayed multipart path (4 MB cap). Three upload paths now exist; worth consolidating.
+
+**Gotchas:**
+- **The browser PUT needs a bucket CORS policy** allowing `PUT` from the app origins, or the preflight fails and the upload never starts. Server-relayed uploads never needed this because the browser only ever talked to our own origin.
+- **`browser.newContext()` in Playwright inherits the project's `storageState`**, so an "anonymous" request is silently authenticated — an early version of the auth test reported 200 and looked like an unauthenticated endpoint. Use `request.newContext()` and assert the cookie count is 0. Re-verified: both routes return 401 without a session.
+- The presigned URL is generated by local crypto, so a valid-looking signed URL proves nothing about the bucket existing. Verified the host, key shape, and `X-Amz-Signature`; the actual PUT is still unverified locally because `.env.local` points at a bucket that does not exist.
+
+**Verification:** `tsc` clean; `eslint` clean (same 2 pre-existing warnings); 249 vitest tests (239 → 249); `next build` succeeds; Playwright 35 passing with the 2 known pre-existing failures. Server-side checks verified live: disallowed type, oversized declaration, unknown scope and forged key all rejected 400, with **no request created**; a valid call returns a server-chosen key matching `communities/<id>/_staging/maintenance/<uuid>-<name>`; unauthenticated calls return 401.
+
+---
+
+## 2026-09-02 (Resident maintenance submission form — deliverable #15)
+
+**Files changed:**
+- `nextjs/lib/maintenance.ts` (new) — the vocabulary (18 categories, location types, urgency, ongoing status, property scope, entry permission, contact method), length caps, specific-location map, `needsAccessDetails`, `formatRequestNumber`, and both zod schemas. One definition feeds the Prisma enums, the form controls and the server validation.
+- `nextjs/prisma/schema.prisma` + `migrations/20260902120000_expand_maintenance_requests/` — expanded `MaintenanceRequest` (requestNumber, category, locationType, specificLocation, residentUrgency, firstObservedAt, ongoingStatus, propertyScope, entryPermission, accessInstructions, petsOnProperty, preferredContactMethod, propertyId), added `MaintenanceAttachment`, added `SUBMITTED` to `RequestStatus`.
+- `nextjs/app/api/maintenance/route.ts` — GET now scopes residents to their own requests; POST validates, verifies property ownership, and allocates a request number.
+- `nextjs/app/api/maintenance/[id]/attachments/route.ts` (new) — GET/POST, same bucket as events and violations under a `maintenance/` prefix.
+- `nextjs/components/maintenance/MaintenanceRequestForm.tsx` (new) — the 5-step form.
+- `nextjs/app/dashboard/maintenance/page.tsx` — residents get the wizard, staff keep quick entry; adds `SUBMITTED` styling and the request number.
+- `nextjs/__tests__/lib/maintenance.test.ts` (new, 21 tests) and `nextjs/e2e/maintenance-form.spec.ts` (new, 13 tests).
+- `nextjs/e2e/maintenance.spec.ts` — resident test rewritten for the wizard.
+
+**Decisions made:**
+- **Two server schemas, not one loosened schema.** Residents must satisfy the full resident schema server-side; staff may also post the quick-entry shape (title/description/priority). Making the new fields optional would have meant resident required-fields were only enforced in the browser, which the requirements forbid. Inventing a `residentUrgency` for a staff-logged request would have been worse — fabricated data.
+- **Server assigns tenancy.** `communityId` and `submittedById` come from the session and are absent from the schema entirely. A supplied `propertyId` is re-queried against the community *and* the owner before use — a foreign id returns 403 before anything is created (covered by a test).
+- **Request numbers** are `MR-<year>-<seq>`, derived from a per-community per-year count, retried on the unique-index collision. The index is the real guarantee; the retry just converts a race into another attempt.
+- **Attachments upload after the request is created**, so a storage failure never costs the resident the form they filled in; failed filenames are reported and the request still succeeds.
+- **Access step is skipped entirely** unless the request concerns a private property (`MY_UNIT`/`SHARED`), and the progress indicator shows it struck through.
+- Reused the existing `lib/uploads.ts` validation and `lib/s3.ts` rather than adding a third upload pattern (presigned direct-to-S3 was requested but needs bucket CORS — see Next steps).
+
+**Next steps:**
+1. **Admin side.** The intake now collects entry permission, pets, access instructions, urgency and attachments, but the staff maintenance view is still a status dropdown — none of it is visible during triage. The rich data has nowhere to be read.
+2. **Presigned direct-to-S3 uploads**, which the requirements preferred, still need a bucket CORS policy. Until then attachments are capped at 4 MB by Vercel's request-body limit.
+3. Prod needs `prisma migrate deploy` before this ships.
+4. `MaintenanceRequest` and `Issue` remain two parallel resident-submission systems, both in the nav. Worth a product decision.
+
+**Gotchas:**
+- **`prisma migrate dev` cannot run here** — it is interactive, and the new unique index on `requestNumber` triggers a confirmation prompt. Generate with `prisma migrate diff --from-schema-datasource --to-schema-datamodel --script` into a timestamped folder, then `prisma migrate deploy`. Verified the SQL contained zero `DROP`/`DELETE`/`TRUNCATE`.
+- **Deriving zod enums with `.map()` widens them to `string`** and breaks assignability to the generated Prisma enum types. `lib/maintenance.ts` keeps the literal tuple via a mapped type (`ChoiceValues`) instead.
+- **`getByRole('button', { name: 'Next' })` is ambiguous in dev** — Next.js injects an "Open Next.js Dev Tools" button whose name contains "Next". Use `exact: true`.
+- Tightening `POST /api/maintenance` would have broken the staff quick-entry form, which posts `{title, description, priority}`. Checked first that no mobile client posts to this route — none does.
+- The success screen only appears because the page no longer closes the form on submit; an earlier version called `setShowForm(false)` in `onSubmitted` and destroyed the request number before it could be read.
+
+**Verification:** `tsc --noEmit` clean; `eslint` clean (same 2 pre-existing warnings); 239 vitest tests (218 → 239); `next build` succeeds; Playwright 35 passing with the 2 known pre-existing failures (`theme`, `users`). E2E covers required-field validation, conditional specific-location choices, step navigation and skipping, the emergency warning and its `aria-describedby`, state preservation across Back/Next, successful submission showing `MR-2026-####` and `SUBMITTED`, resident-only list scoping, rejection of out-of-vocabulary values, and the cross-property 403. Test data removed from the dev DB afterwards.
+
+---
+
 ## 2026-09-01 (Optional event feature image — deliverable #10)
 
 **Files changed:**

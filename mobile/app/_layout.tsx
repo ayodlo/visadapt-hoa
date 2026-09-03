@@ -22,7 +22,10 @@ function resolveNotificationRoute(type: string, id: string, role: string): strin
     case 'violation':
       return role === 'RESIDENT' ? `/more/violations/${id}` : `/violations/${id}`;
     case 'architectural-request':
-      return `/more/architectural-requests/${id}`;
+      // Residents no longer have an architectural requests screen — a decision
+      // notification still arrives, it just has nothing to open. Board members
+      // review these under /requests.
+      return role === 'BOARD_MEMBER' ? `/requests/${id}` : null;
     default:
       return null;
   }

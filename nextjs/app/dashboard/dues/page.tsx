@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSession } from '@/context/session';
 import { isStaff } from '@/lib/roles';
 import { useListControls } from '@/hooks/useListControls';
 import { ListToolbar } from '@/components/ui/ListToolbar';
+import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { SortableTh, PlainTh } from '@/components/ui/SortableTh';
 import type { ListField } from '@/lib/list-controls';
 
@@ -42,6 +43,10 @@ export default function DuesPage() {
   const [form, setForm] = useState({ userId: '', label: '', amountCents: '', dueDate: '' });
   const [submitting, setSubmitting] = useState(false);
   const controls = useListControls(records, FIELDS);
+  const userOptions = useMemo(
+    () => users.map((u) => ({ value: u.id, label: `${u.firstName} ${u.lastName}`, description: u.email })),
+    [users]
+  );
 
   async function load() {
     const [duesRes, usersRes] = await Promise.all([fetch('/api/dues'), fetch('/api/users')]);
@@ -95,10 +100,15 @@ export default function DuesPage() {
 
       {isAdmin && showForm && (
         <form onSubmit={handleCreate} className="bg-white border border-gray-200 rounded-xl p-5 mb-6 space-y-3">
-          <select required value={form.userId} onChange={(e) => setForm((f) => ({ ...f, userId: e.target.value }))} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-            <option value="">Select resident…</option>
-            {users.map((u) => <option key={u.id} value={u.id}>{u.firstName} {u.lastName} ({u.email})</option>)}
-          </select>
+          <SearchableSelect
+            id="dues-resident"
+            ariaLabel="Resident"
+            options={userOptions}
+            value={form.userId}
+            onChange={(userId) => setForm((f) => ({ ...f, userId }))}
+            placeholder="Type a name or email…"
+            emptyMessage="No residents match that search"
+          />
           <input required placeholder="Label (e.g. Q1 2026 HOA Dues)" value={form.label} onChange={(e) => setForm((f) => ({ ...f, label: e.target.value }))} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
           <div className="grid grid-cols-2 gap-3">
             <input required type="number" step="0.01" min="0" placeholder="Amount ($)" value={form.amountCents} onChange={(e) => setForm((f) => ({ ...f, amountCents: e.target.value }))} className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />

@@ -2,6 +2,8 @@
 
 import { SearchInput } from './SearchInput';
 import { FilterSelect } from './FilterSelect';
+import { SearchableSelect } from './SearchableSelect';
+import { SEARCHABLE_THRESHOLD } from '@/lib/combobox';
 import type { ListControls } from '@/hooks/useListControls';
 
 interface Props<T> {
@@ -40,18 +42,38 @@ export function ListToolbar<T>({
           className="min-w-[16rem] flex-1"
         />
 
-        {filterOptions.map(({ field, values }) => (
-          <FilterSelect
-            key={field.key}
-            id={`filter-${field.key}`}
-            label={field.label}
-            value={filters[field.key] ?? ''}
-            onChange={(value) => setFilter(field.key, value)}
-            // Just "All" — the select's own label already names the column, and
-            // pluralising arbitrary headers produces things like "All statuss".
-            options={[{ label: 'All', value: '' }, ...values.map((v) => ({ label: v, value: v }))]}
-          />
-        ))}
+        {filterOptions.map(({ field, values }) =>
+          // A column with many distinct values (residents, submitters) becomes an
+          // unusable dropdown; past the threshold it gets a type-to-filter combo
+          // box instead. Short lists stay native selects, which are quicker.
+          values.length > SEARCHABLE_THRESHOLD ? (
+            <div key={field.key} className="flex items-center gap-2">
+              <label htmlFor={`filter-${field.key}`} className="text-sm text-gray-500 whitespace-nowrap">
+                {field.label}
+              </label>
+              <SearchableSelect
+                id={`filter-${field.key}`}
+                options={values.map((v) => ({ value: v, label: v }))}
+                value={filters[field.key] ?? ''}
+                onChange={(value) => setFilter(field.key, value)}
+                placeholder={`All ${field.label.toLowerCase()}`}
+                emptyMessage="No matches"
+                className="min-w-[12rem]"
+              />
+            </div>
+          ) : (
+            <FilterSelect
+              key={field.key}
+              id={`filter-${field.key}`}
+              label={field.label}
+              value={filters[field.key] ?? ''}
+              onChange={(value) => setFilter(field.key, value)}
+              // Just "All" — the select's own label already names the column, and
+              // pluralising arbitrary headers produces things like "All statuss".
+              options={[{ label: 'All', value: '' }, ...values.map((v) => ({ label: v, value: v }))]}
+            />
+          )
+        )}
 
         {showSort && sortableFields.length > 0 && (
           <>

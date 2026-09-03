@@ -10,12 +10,20 @@ test('resident can submit a maintenance request', async ({ page }) => {
   await page.goto('/dashboard/maintenance');
   await expect(page.getByRole('heading', { name: 'Maintenance Requests' })).toBeVisible();
 
+  // Residents submit through the multi-step form; staff keep the quick-entry
+  // form. Detailed step coverage lives in maintenance-form.spec.ts.
   await page.getByRole('button', { name: '+ New Request' }).click();
-  await page.getByPlaceholder('Title').fill(RESIDENT_TITLE);
-  await page.getByPlaceholder('Description').fill('The kitchen faucet is leaking.');
-  await page.getByRole('button', { name: 'Submit' }).click();
+  await page.locator('#mr-category').selectOption('PLUMBING');
+  await page.locator('#mr-location').selectOption('INTERIOR');
+  await page.locator('#mr-title').fill(RESIDENT_TITLE);
+  await page.locator('#mr-description').fill('The kitchen faucet is leaking.');
+  await page.getByRole('button', { name: 'Next', exact: true }).click();
+  await page.locator('#mr-scope').selectOption('HOA_COMMON');
+  await page.getByRole('button', { name: 'Next', exact: true }).click(); // Attachments
+  await page.getByRole('button', { name: 'Next', exact: true }).click(); // Review
+  await page.getByRole('button', { name: 'Submit request' }).click();
 
-  await expect(page.getByText(RESIDENT_TITLE)).toBeVisible();
+  await expect(page.getByRole('status').filter({ hasText: 'Request submitted' })).toBeVisible({ timeout: 15000 });
 
   // Clean up via API
   const resp = await page.context().request.get('/api/maintenance');

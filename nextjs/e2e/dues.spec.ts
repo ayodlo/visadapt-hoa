@@ -17,13 +17,22 @@ test('admin can create a dues record for a resident', async ({ page }) => {
   const label = `E2E Dues ${Date.now()}`;
 
   await page.getByRole('button', { name: '+ New Record' }).click();
-  await page.getByRole('combobox').selectOption(resident!.id);
+
+  // The resident picker is a searchable combobox, not a native <select>:
+  // type to filter, then pick the matching option.
+  const residentPicker = page.locator('#dues-resident');
+  await residentPicker.click();
+  await residentPicker.fill(`${resident!.firstName} ${resident!.lastName}`);
+  // Scope to the open listbox — a bare option lookup also matches the hidden
+  // <option> elements inside the community switcher's native select.
+  await page.getByRole('listbox').getByRole('option').first().click();
   await page.getByPlaceholder('Label (e.g. Q1 2026 HOA Dues)').fill(label);
   await page.getByPlaceholder('Amount ($)').fill('250');
   await page.locator('input[type="date"]').fill('2026-12-31');
   await page.getByRole('button', { name: 'Save' }).click();
 
-  await expect(page.getByText(label)).toBeVisible();
+  // Scope to the table: the label also appears as an option in the Label filter.
+  await expect(page.locator('tbody').getByText(label)).toBeVisible();
 
   // Clean up via API
   const duesResp = await page.context().request.get('/api/dues');

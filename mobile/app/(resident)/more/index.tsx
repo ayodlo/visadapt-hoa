@@ -8,7 +8,6 @@ import { useAuth } from '@/auth/AuthContext';
 const MENU: { icon: string; label: string; href: string }[] = [
   { icon: '📢', label: 'Announcements', href: '/more/announcements' },
   { icon: '📅', label: 'Events', href: '/more/events' },
-  { icon: '🏗️', label: 'Architectural Requests', href: '/more/architectural-requests' },
   { icon: '⚠️', label: 'Violations', href: '/more/violations' },
   { icon: '📄', label: 'Documents', href: '/more/documents' },
   { icon: '🗳️', label: 'Polls', href: '/more/polls' },

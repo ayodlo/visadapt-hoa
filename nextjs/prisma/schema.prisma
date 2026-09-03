@@ -100,6 +100,7 @@ model User {
   violationComments              ViolationComment[]
   violationActivities            ViolationActivity[]
   violationAttachments           ViolationAttachment[]
+  maintenanceAttachments         MaintenanceAttachment[]
   violationAppeals               ViolationAppeal[]               @relation("AppealSubmitter")
   reviewedAppeals                ViolationAppeal[]               @relation("AppealReviewer")
 
@@ -136,6 +137,7 @@ model Property {
   issues                 Issue[]
   architecturalRequests  ArchitecturalRequest[]
   violations             Violation[]
+  maintenanceRequests    MaintenanceRequest[]
 
   @@index([communityId])
   @@map("properties")
@@ -356,22 +358,124 @@ model Event {
 
 model MaintenanceRequest {
   id            String          @id @default(cuid())
+  /// Human-readable identifier residents can quote, e.g. MR-2026-0007.
+  requestNumber String?         @unique
   title         String
   description   String
   status        RequestStatus   @default(OPEN)
+  /// Staff-assigned priority. Distinct from residentUrgency, which is the
+  /// resident's own assessment and is never overwritten by triage.
   priority      RequestPriority @default(MEDIUM)
+
+  category               MaintenanceCategory?
+  locationType           MaintenanceLocationType?
+  specificLocation       String?
+  residentUrgency        MaintenanceUrgency?
+  firstObservedAt        DateTime?
+  ongoingStatus          MaintenanceOngoing?
+  propertyScope          MaintenancePropertyScope?
+  entryPermission        MaintenanceEntryPermission?
+  accessInstructions     String?
+  petsOnProperty         Boolean?
+  preferredContactMethod MaintenanceContactMethod?
+
+  propertyId    String?
+  property      Property?       @relation(fields: [propertyId], references: [id])
   submittedById String
   submittedBy   User            @relation(fields: [submittedById], references: [id])
   communityId   String
   community     Community       @relation(fields: [communityId], references: [id])
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
+  attachments   MaintenanceAttachment[]
 
   @@index([communityId])
+  @@index([submittedById])
   @@map("maintenance_requests")
 }
 
+/// Evidence attached to a maintenance request. `storageKey` is the S3 object
+/// key and never leaves the server; clients receive short-lived presigned URLs.
+model MaintenanceAttachment {
+  id           String             @id @default(cuid())
+  requestId    String
+  request      MaintenanceRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  storageKey   String
+  fileName     String
+  contentType  String
+  sizeBytes    Int
+  uploadedById String
+  uploadedBy   User               @relation(fields: [uploadedById], references: [id])
+  createdAt    DateTime           @default(now())
+
+  @@index([requestId])
+  @@map("maintenance_attachments")
+}
+
+enum MaintenanceCategory {
+  PLUMBING
+  ELECTRICAL
+  HVAC
+  ROOFING
+  LANDSCAPING
+  IRRIGATION
+  STRUCTURAL
+  DOORS_WINDOWS
+  FENCING
+  COMMON_AREA
+  POOL_SPA
+  LIGHTING
+  TRASH_RECYCLING
+  PEST_CONTROL
+  SECURITY_ACCESS
+  SNOW_ICE
+  CLEANING_JANITORIAL
+  OTHER
+}
+
+enum MaintenanceLocationType {
+  INTERIOR
+  EXTERIOR
+  COMMON_AREA
+  BOTH
+  NOT_SURE
+}
+
+enum MaintenanceOngoing {
+  YES
+  NO
+  INTERMITTENTLY
+  NOT_SURE
+}
+
+enum MaintenanceUrgency {
+  LOW
+  NORMAL
+  HIGH
+  EMERGENCY
+}
+
+enum MaintenancePropertyScope {
+  MY_UNIT
+  HOA_COMMON
+  SHARED
+  NOT_SURE
+}
+
+enum MaintenanceEntryPermission {
+  YES
+  NO
+  CONTACT_FIRST
+}
+
+enum MaintenanceContactMethod {
+  EMAIL
+  PHONE
+  TEXT
+}
+
 enum RequestStatus {
+  SUBMITTED
   OPEN
   IN_PROGRESS
   RESOLVED

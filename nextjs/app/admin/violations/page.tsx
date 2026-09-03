@@ -1,11 +1,12 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Paperclip } from 'lucide-react';
 import { useToast } from '@/context/toast';
 import { useSession } from '@/context/session';
 import { isAdmin as isAdminRole } from '@/lib/roles';
 import { ViolationAttachments } from '@/components/violations/ViolationAttachments';
+import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { LoadingState } from '@/components/ui/LoadingState';
@@ -110,6 +111,11 @@ export default function AdminViolationsPage() {
   const [residents, setResidents] = useState<Resident[]>([]);
   const [residentsLoading, setResidentsLoading] = useState(true);
   const [residentsError, setResidentsError] = useState('');
+  // Name is the primary label; email disambiguates two residents sharing a name.
+  const residentOptions = useMemo(
+    () => residents.map((r) => ({ value: r.id, label: `${r.firstName} ${r.lastName}`, description: r.email })),
+    [residents]
+  );
   const [createForm, setCreateForm] = useState({
     residentId: '', violationType: '', ruleCitation: '', description: '',
     observedAt: '', deadline: '', resolutionSteps: '', sendNow: false,
@@ -256,7 +262,14 @@ export default function AdminViolationsPage() {
   return (
     <div className="flex h-full min-h-0 gap-0">
       {/* List panel */}
-      <div className={`flex flex-col min-h-0 ${mode !== 'list' ? 'hidden lg:flex lg:w-80 xl:w-96 flex-shrink-0 border-r border-gray-200' : 'flex-1'}`}>
+      {/*
+        Width is set by the filter row, not by taste: the status and type selects
+        size to their longest option ("Landscaping & Maintenance"), needing 393px
+        together, and a flex item will not shrink below its content. At the old
+        w-80/w-96 the row overflowed the column by 50px. 28rem leaves the pair
+        room to render in full.
+      */}
+      <div className={`flex flex-col min-h-0 ${mode !== 'list' ? 'hidden lg:flex lg:w-[28rem] flex-shrink-0 border-r border-gray-200' : 'flex-1'}`}>
         <div className="flex-shrink-0 px-5 pt-5 pb-4 border-b border-gray-200">
           <PageHeader
             title="Violations"
@@ -342,18 +355,21 @@ export default function AdminViolationsPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label htmlFor="violation-resident" className="block text-xs font-medium text-gray-700 mb-1">Resident <span className="text-red-500">*</span></label>
-                  <select
+                  <SearchableSelect
                     id="violation-resident"
+                    options={residentOptions}
                     value={createForm.residentId}
-                    onChange={e => setCreateForm(f => ({ ...f, residentId: e.target.value }))}
+                    onChange={(residentId) => setCreateForm(f => ({ ...f, residentId }))}
                     disabled={residentsLoading || residents.length === 0}
-                    aria-describedby={residentsError || residents.length === 0 ? 'violation-resident-help' : undefined}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60">
-                    <option value="">
-                      {residentsLoading ? 'Loading residents…' : residents.length === 0 ? 'No residents available' : 'Select resident…'}
-                    </option>
-                    {residents.map(r => <option key={r.id} value={r.id}>{r.firstName} {r.lastName} — {r.email}</option>)}
-                  </select>
+                    placeholder={
+                      residentsLoading
+                        ? 'Loading residents…'
+                        : residents.length === 0
+                          ? 'No residents available'
+                          : 'Type a name or email…'
+                    }
+                    emptyMessage="No residents match that search"
+                  />
                   {!residentsLoading && (residentsError || residents.length === 0) && (
                     <p id="violation-resident-help" role="alert" className="mt-1 text-xs text-red-600">
                       {residentsError || 'No residents found in this community. Add a resident before recording a violation.'}

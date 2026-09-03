@@ -120,3 +120,78 @@ export function sanitizeFileName(fileName: string): string {
   const cleaned = base.replace(/[^A-Za-z0-9._-]/g, '_').replace(/^\.+/, '').slice(0, 100);
   return cleaned || 'file';
 }
+
+/**
+ * Ceiling for browser-direct (presigned) uploads.
+ *
+ * Larger than MAX_UPLOAD_BYTES because these bytes bypass the application
+ * server entirely, so the platform's request-body limit does not apply. Server
+ * paths that still receive the file keep the smaller limit.
+ */
+export const MAX_DIRECT_UPLOAD_BYTES = 25 * 1024 * 1024;
+
+/** Upload scopes permitted to request a presigned URL. */
+export const UPLOAD_SCOPES = ['maintenance'] as const;
+export type UploadScope = (typeof UPLOAD_SCOPES)[number];
+
+export function isUploadScope(value: string): value is UploadScope {
+  return (UPLOAD_SCOPES as readonly string[]).includes(value);
+}
+
+/** Same allow-list as attachments, measured against the direct-upload ceiling. */
+export function validateDirectUpload(file: UploadCandidate): string | null {
+  if (!(ATTACHMENT_MIME_TYPES as readonly string[]).includes(file.type)) {
+    return 'Choose an image (JPEG, PNG, WebP, GIF) or a document (PDF, Word, or text file).';
+  }
+  if (file.size <= 0) return 'That file is empty.';
+  if (file.size > MAX_DIRECT_UPLOAD_BYTES) {
+    return `File must be ${formatBytes(MAX_DIRECT_UPLOAD_BYTES)} or smaller (that one is ${formatBytes(file.size)}).`;
+  }
+  return null;
+}
+
+/**
+ * Where a browser-uploaded file lands before the record it belongs to exists.
+ *
+ * `_staging/` leads the key rather than sitting under the community. An S3
+ * lifecycle filter matches a literal prefix with no wildcard, so a per-community
+ * staging prefix could not be expired by one rule; leading with `_staging/` lets
+ * a single rule expire abandoned uploads for every tenant without touching
+ * confirmed attachments — which is why a confirmed upload is copied out of this
+ * prefix, never left here. The tenant segment still follows, so per-community
+ * bucket policies are unaffected.
+ */
+export function stagedUploadKey(
+  communityId: string,
+  scope: UploadScope,
+  fileName: string,
+  unique: string
+): string {
+  return `_staging/communities/${communityId}/${scope}/${unique}-${sanitizeFileName(fileName)}`;
+}
+
+/**
+ * Guard for a client-supplied staged key.
+ *
+ * The client returns keys the server issued, so they must match the prefix this
+ * community and scope would have produced — otherwise a caller could name any
+ * object in the bucket and have it attached to their own record.
+ */
+export function isStagedKeyFor(key: string, communityId: string, scope: UploadScope): boolean {
+  const prefix = `_staging/communities/${communityId}/${scope}/`;
+  return (
+    key.startsWith(prefix) &&
+    !key.slice(prefix.length).includes('/') &&
+    !key.includes('..')
+  );
+}
+
+/** Permanent home for a maintenance attachment once its request exists. */
+export function maintenanceAttachmentKey(
+  communityId: string,
+  requestId: string,
+  fileName: string,
+  unique: string
+): string {
+  return `communities/${communityId}/maintenance/${requestId}/${unique}-${sanitizeFileName(fileName)}`;
+}
