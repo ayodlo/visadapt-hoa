@@ -1,4 +1,4 @@
-# CommunityHQ
+# Portal HOA
 
 A full-stack HOA (homeowners association) management platform built with Next.js 16, Prisma, and PostgreSQL. It covers the day-to-day workflows of a single community: announcements, events, issue tracking, architectural review, violation enforcement with appeals, dues/payments, document distribution, polls, and role-based dashboards for residents, admins (property management staff), and board members.
 
@@ -60,13 +60,13 @@ All seeded accounts use the password **`password123`**.
 
 | Role | Email |
 |---|---|
-| Resident | `resident@communityhq.local` |
-| Admin | `admin@communityhq.local` |
-| Board Member | `board@communityhq.local` |
+| Resident | `resident@portalhoa.local` |
+| Admin | `admin@portalhoa.local` |
+| Board Member | `board@portalhoa.local` |
 
 The seed (`nextjs/prisma/seed.ts`) is **destructive**: it runs `deleteMany` on every table and recreates everything. Never run it against a database with real data. It creates:
 
-- **20 residents** (`resident@communityhq.local` + 19 like `james.carter@example.com`), **2 admins**, **3 board members**, **5 vendors**, **10 properties** with resident profiles
+- **20 residents** (`resident@portalhoa.local` + 19 like `james.carter@example.com`), **2 admins**, **3 board members**, **5 vendors**, **10 properties** with resident profiles
 - **6 announcements** (mix of priorities, one pinned, one emergency)
 - **~100 charges + payments**: $250/month HOA dues March–July 2026 per resident; 15 residents fully paid, 3 with an overdue June + late fee, 2 with June pending; capital-improvement and roof-repair special assessments sprinkled in — so dashboards show realistic delinquency numbers out of the box
 - **12 documents** (metadata only — see [Documents](#documents))

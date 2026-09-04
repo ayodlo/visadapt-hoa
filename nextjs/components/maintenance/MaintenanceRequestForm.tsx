@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { CircleCheck, Paperclip, TriangleAlert, X } from 'lucide-react';
+import { CircleCheck, Paperclip, TriangleAlert, Upload, X } from 'lucide-react';
 import {
   ACCESS_INSTRUCTIONS_MAX,
   CATEGORIES,
@@ -456,8 +456,25 @@ export function MaintenanceRequestForm({ properties, onSubmitted }: Props) {
           <label htmlFor="mr-files" className={labelCls}>
             Photos or documents <span className="font-normal text-gray-500">(optional)</span>
           </label>
-          <input id="mr-files" type="file" multiple accept={ATTACHMENT_ACCEPT} onChange={addFiles}
-            aria-describedby="mr-files-help" className={field} />
+          {/*
+            The native file input is replaced by a styled label wrapping an
+            sr-only input — the same pattern as ViolationAttachments. The
+            browser-drawn "Choose Files" button takes no background from our
+            palette (so it stays light in dark mode) and sits flush against an
+            unexplained "No file chosen", which reads as two undifferentiated
+            controls. Chosen files are listed below, so that native text was
+            redundant as well as confusing. focus-within keeps the sr-only
+            input's focus visible to keyboard users.
+          */}
+          <label
+            htmlFor="mr-files"
+            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 cursor-pointer transition-colors hover:bg-gray-50 hover:border-gray-400 focus-within:outline-none focus-within:ring-2 focus-within:ring-blue-500"
+          >
+            <Upload className="w-4 h-4 text-gray-500" aria-hidden="true" />
+            {files.length > 0 ? 'Add more files' : 'Choose files'}
+            <input id="mr-files" type="file" multiple accept={ATTACHMENT_ACCEPT} onChange={addFiles}
+              aria-describedby="mr-files-help" className="sr-only" />
+          </label>
           <p id="mr-files-help" className="text-xs text-gray-500">
             Images and PDFs, up to {formatBytes(MAX_DIRECT_UPLOAD_BYTES)} each. Files upload as soon as you choose them.
           </p>

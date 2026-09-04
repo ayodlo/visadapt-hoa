@@ -1,4 +1,6 @@
 import Link from 'next/link';
+import type { LucideIcon } from 'lucide-react';
+import { Calendar, CircleCheck, FileText, Hammer, Megaphone, PencilRuler, Wallet } from 'lucide-react';
 import { getSession } from '@/lib/auth';
 import { getActiveCommunityId } from '@/lib/community';
 import { StatCard } from '@/components/ui/StatCard';
@@ -7,11 +9,11 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { getResidentDashboard, formatDollars } from '@/lib/dashboard';
 import { violationTypeLabel, residentStatusLabel } from '@/lib/violations';
 
-const QUICK_ACTIONS = [
-  { href: '/resident/payments', label: 'Pay Dues', icon: '💰', description: 'View and pay your balance' },
-  { href: '/resident/issues', label: 'Submit Issue', icon: '🔨', description: 'Report a maintenance problem' },
-  { href: '/resident/documents', label: 'Browse Documents', icon: '📄', description: 'Rules, minutes & forms' },
-  { href: '/resident/announcements', label: 'Announcements', icon: '📢', description: "What's happening in the community" },
+const QUICK_ACTIONS: { href: string; label: string; icon: LucideIcon; description: string }[] = [
+  { href: '/resident/payments', label: 'Pay Dues', icon: Wallet, description: 'View and pay your balance' },
+  { href: '/resident/issues', label: 'Submit Issue', icon: Hammer, description: 'Report a maintenance problem' },
+  { href: '/resident/documents', label: 'Browse Documents', icon: FileText, description: 'Rules, minutes & forms' },
+  { href: '/resident/announcements', label: 'Announcements', icon: Megaphone, description: "What's happening in the community" },
 ];
 
 export default async function ResidentDashboardPage() {
@@ -45,26 +47,26 @@ export default async function ResidentDashboardPage() {
         <StatCard
           label="Current Balance"
           value={data ? formatDollars(data.balanceCents) : '—'}
-          icon="💰"
+          icon={<Wallet className="w-6 h-6 text-gray-400" />}
           color={(data?.balanceCents ?? 0) > 0 ? 'red' : 'green'}
           href="/resident/payments"
         />
         <StatCard
           label="Next Due Date"
           value={data?.nextDueDateLabel ?? '—'}
-          icon="📅"
+          icon={<Calendar className="w-6 h-6 text-gray-400" />}
           subtext={data?.nextDueAmountCents ? formatDollars(data.nextDueAmountCents) : 'Quarterly dues'}
         />
         <StatCard
           label="Open Issues"
           value={data?.openIssues ?? '—'}
-          icon="🔨"
+          icon={<Hammer className="w-6 h-6 text-gray-400" />}
           href="/resident/issues"
         />
         <StatCard
           label="Arch Requests"
           value={data?.openArchRequests ?? '—'}
-          icon="🏗️"
+          icon={<PencilRuler className="w-6 h-6 text-gray-400" />}
           href="/resident/architectural-requests"
         />
       </div>
@@ -113,7 +115,7 @@ export default async function ResidentDashboardPage() {
           {!data || data.activeViolations.length === 0 ? (
             <div className="bg-white border border-gray-200 rounded-xl">
               <EmptyState
-                icon="✅"
+                icon={<CircleCheck className="w-10 h-10 text-green-600" />}
                 title="You're all clear"
                 description="No open community standards notices on your account."
               />
@@ -152,7 +154,7 @@ export default async function ResidentDashboardPage() {
               href={action.href}
               className="bg-white border border-gray-200 rounded-xl p-4 hover:border-blue-300 hover:shadow-sm transition-all text-left group focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <span className="text-2xl mb-2 block" aria-hidden="true">{action.icon}</span>
+              <action.icon className="w-6 h-6 mb-2 text-blue-600" aria-hidden="true" />
               <p className="text-sm font-medium text-gray-900 group-hover:text-blue-700 transition-colors">
                 {action.label}
               </p>

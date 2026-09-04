@@ -64,7 +64,7 @@ export default function IssueDetail() {
       <Text style={styles.sectionTitle}>Comments</Text>
       {issue.comments.length === 0 ? (
         <Card>
-          <EmptyState icon="💬" message="No comments yet" />
+          <EmptyState icon="chat-bubble-outline" message="No comments yet" />
         </Card>
       ) : (
         issue.comments.map((c) => (

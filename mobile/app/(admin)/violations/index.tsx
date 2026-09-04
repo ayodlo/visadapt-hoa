@@ -51,7 +51,7 @@ export default function AdminViolationsList() {
         ) : error || !data ? (
           <ErrorView message={error ?? undefined} onRetry={refresh} />
         ) : data.violations.length === 0 ? (
-          <EmptyState icon="⚠️" message="No violations found" />
+          <EmptyState icon="warning" message="No violations found" />
         ) : (
           <ListCard>
             {data.violations.map((v) => (

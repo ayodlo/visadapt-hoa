@@ -41,7 +41,7 @@ export default function BoardViolationsList() {
       ) : error || !data ? (
         <ErrorView message={error ?? undefined} onRetry={refresh} />
       ) : data.violations.length === 0 ? (
-        <EmptyState icon="✅" message="Nothing here right now" />
+        <EmptyState icon="check-circle" message="Nothing here right now" />
       ) : (
         <ListCard>
           {data.violations.map((v) => (

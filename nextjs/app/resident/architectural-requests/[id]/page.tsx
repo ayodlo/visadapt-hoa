@@ -2,6 +2,7 @@
 
 import { use, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { CircleCheck, CircleX, TriangleAlert } from 'lucide-react';
 import { useToast } from '@/context/toast';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { LoadingState } from '@/components/ui/LoadingState';
@@ -172,7 +173,7 @@ export default function ResidentArchRequestDetailPage({ params }: { params: Prom
       {/* Needs more info banner */}
       {needsInfo && (
         <div className="bg-amber-50 border border-amber-300 rounded-xl p-4 flex gap-3">
-          <span className="text-xl flex-shrink-0" aria-hidden="true">⚠️</span>
+          <TriangleAlert className="w-5 h-5 flex-shrink-0 text-amber-600" aria-hidden="true" />
           <div>
             <p className="text-sm font-semibold text-amber-800">Action Required — More Information Needed</p>
             <p className="text-sm text-amber-700 mt-0.5">The reviewer has requested additional information. Please review the comments below and provide a response or update your request description.</p>
@@ -183,7 +184,9 @@ export default function ResidentArchRequestDetailPage({ params }: { params: Prom
       {/* Approved / Denied banner */}
       {isDecided && (
         <div className={`rounded-xl p-4 flex gap-3 ${request.status === 'APPROVED' ? 'bg-green-50 border border-green-300' : 'bg-red-50 border border-red-300'}`}>
-          <span className="text-xl flex-shrink-0" aria-hidden="true">{request.status === 'APPROVED' ? '✅' : '❌'}</span>
+          {request.status === 'APPROVED'
+            ? <CircleCheck className="w-5 h-5 flex-shrink-0 text-green-600" aria-hidden="true" />
+            : <CircleX className="w-5 h-5 flex-shrink-0 text-red-600" aria-hidden="true" />}
           <div>
             <p className={`text-sm font-semibold ${request.status === 'APPROVED' ? 'text-green-800' : 'text-red-800'}`}>
               Request {request.status === 'APPROVED' ? 'Approved' : 'Denied'}

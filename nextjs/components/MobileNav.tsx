@@ -42,7 +42,7 @@ export default function MobileNav({ user }: { user: SessionUser }) {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
           </svg>
         </button>
-        <span className="ml-3 text-base font-bold text-blue-600">CommunityHQ</span>
+        <span className="ml-3 text-base font-bold text-blue-600">Portal HOA</span>
         <ThemeToggle className="ml-auto" />
       </div>
 
@@ -52,7 +52,7 @@ export default function MobileNav({ user }: { user: SessionUser }) {
           <div className="absolute inset-0 bg-black/40" onClick={() => setOpen(false)} aria-hidden="true" />
           <aside className="relative w-64 max-w-[80vw] h-full bg-white flex flex-col shadow-xl">
             <div className="flex items-center justify-between px-4 py-4 border-b border-gray-200">
-              <span className="text-base font-bold text-blue-600">CommunityHQ</span>
+              <span className="text-base font-bold text-blue-600">Portal HOA</span>
               <button
                 onClick={() => setOpen(false)}
                 aria-label="Close navigation menu"

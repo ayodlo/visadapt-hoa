@@ -34,7 +34,7 @@ export default function IssuesList() {
       ) : (
         <ScreenContainer onRefresh={refresh} refreshing={refreshing}>
           {data.issues.length === 0 ? (
-            <EmptyState icon="🔨" message="No issues reported yet. Tap + New to report one." />
+            <EmptyState icon="build" message="No issues reported yet. Tap + New to report one." />
           ) : (
             <ListCard>
               {data.issues.map((issue) => (

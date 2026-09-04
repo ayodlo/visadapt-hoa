@@ -6,8 +6,8 @@ import { registerPushToken } from '@/notifications/registerPushToken';
 import type { SessionUser } from '@/types/auth';
 import type { Community } from '@/types/community';
 
-const TOKEN_KEY = 'communityhq_token';
-const COMMUNITY_KEY = 'communityhq_active_community';
+const TOKEN_KEY = 'portalhoa_token';
+const COMMUNITY_KEY = 'portalhoa_active_community';
 
 interface LoginResponse {
   user: SessionUser;

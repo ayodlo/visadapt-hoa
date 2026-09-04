@@ -31,7 +31,7 @@ export default function VendorsList() {
       ) : (
         <ScreenContainer onRefresh={refresh} refreshing={refreshing}>
           {data.vendors.length === 0 ? (
-            <EmptyState icon="🧰" message="No vendors yet. Tap + New to add one." />
+            <EmptyState icon="handyman" message="No vendors yet. Tap + New to add one." />
           ) : (
             <ListCard>
               {data.vendors.map((v) => (

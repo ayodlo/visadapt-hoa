@@ -12,6 +12,7 @@ import { useApi } from '@/hooks/useApi';
 import { useAuth } from '@/auth/AuthContext';
 import { getMyCommunities, createCommunity } from '@/api/community';
 import { ApiError } from '@/api/client';
+import { MaterialIcons } from '@expo/vector-icons';
 import { colors } from '@/theme';
 
 export function CommunitiesScreen() {
@@ -56,7 +57,7 @@ export function CommunitiesScreen() {
             key={c.id}
             title={c.name}
             subtitle={c.id === activeCommunityId ? 'Active' : undefined}
-            right={switching === c.id ? <Text style={styles.pending}>Switching…</Text> : c.id === activeCommunityId ? <Text style={styles.check}>✓</Text> : undefined}
+            right={switching === c.id ? <Text style={styles.pending}>Switching…</Text> : c.id === activeCommunityId ? <MaterialIcons name="check" size={18} color={colors.primary} /> : undefined}
             onPress={() => handleSelect(c.id)}
           />
         ))}

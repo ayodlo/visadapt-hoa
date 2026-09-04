@@ -4,10 +4,10 @@ import { ListCard } from '@/components/ListCard';
 import { ListRow } from '@/components/ListRow';
 
 const REPORTS: { icon: string; label: string; href: string }[] = [
-  { icon: '🔨', label: 'Issues Report', href: '/more/reports/issues' },
-  { icon: '💰', label: 'Payments Report', href: '/more/reports/payments' },
-  { icon: '🏗️', label: 'Architectural Requests Report', href: '/more/reports/architectural-requests' },
-  { icon: '⚠️', label: 'Violations Report', href: '/more/reports/violations' },
+  { icon: 'build', label: 'Issues Report', href: '/more/reports/issues' },
+  { icon: 'payments', label: 'Payments Report', href: '/more/reports/payments' },
+  { icon: 'architecture', label: 'Architectural Requests Report', href: '/more/reports/architectural-requests' },
+  { icon: 'warning', label: 'Violations Report', href: '/more/reports/violations' },
 ];
 
 export default function ReportsMenu() {

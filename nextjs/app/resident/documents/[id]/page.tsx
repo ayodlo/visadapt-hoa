@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { FileText } from 'lucide-react';
 import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
@@ -37,7 +38,7 @@ export default async function ResidentDocumentDetailPage({
 
       <div className="bg-white border border-gray-200 rounded-2xl p-6">
         <div className="flex flex-wrap items-start gap-3 mb-4">
-          <span className="text-3xl" aria-hidden="true">📄</span>
+          <FileText className="w-8 h-8 flex-shrink-0 text-gray-400" aria-hidden="true" />
           <div className="flex-1 min-w-0">
             <h1 className="text-xl font-bold text-gray-900 mb-1">{doc.title}</h1>
             <StatusBadge status={doc.category} />

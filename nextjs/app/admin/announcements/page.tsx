@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Pin } from 'lucide-react';
 import { useSession } from '@/context/session';
 import { useToast } from '@/context/toast';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -118,7 +119,7 @@ function PreviewCard({ form }: { form: FormData }) {
               {form.priority === 'EMERGENCY' ? 'Emergency' : 'Important'}
             </span>
           )}
-          {form.isPinned && <span className="text-xs text-gray-500">📌 Pinned</span>}
+          {form.isPinned && <span className="text-xs text-gray-500 inline-flex items-center gap-1"><Pin className="w-3 h-3" aria-hidden="true" /> Pinned</span>}
           {form.audience === 'BOARD_MEMBERS' && (
             <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">Board Only</span>
           )}
@@ -490,7 +491,7 @@ export default function AdminAnnouncementsPage() {
                         {a.priority === 'NORMAL' ? 'Normal' : a.priority === 'IMPORTANT' ? 'Important' : 'Emergency'}
                       </span>
                       <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${st.cls}`}>{st.label}</span>
-                      {a.isPinned && <span className="text-xs text-gray-400">📌</span>}
+                      {a.isPinned && <span className="text-xs text-gray-400"><Pin className="w-3 h-3" aria-hidden="true" /><span className="sr-only">Pinned</span></span>}
                       <span className="text-xs text-gray-400">{audienceLabel(a.audience)}</span>
                     </div>
                     <p className="text-sm font-semibold text-gray-900 truncate">{a.title}</p>

@@ -52,7 +52,7 @@ export default function ResidentDashboard() {
       <Text style={styles.sectionTitle}>Active Violations</Text>
       {data.activeViolations.length === 0 ? (
         <Card>
-          <EmptyState icon="✅" message="No active violations" />
+          <EmptyState icon="check-circle" message="No active violations" />
         </Card>
       ) : (
         <ListCard>
@@ -71,7 +71,7 @@ export default function ResidentDashboard() {
       <Text style={styles.sectionTitle}>Recent Announcements</Text>
       {data.recentAnnouncements.length === 0 ? (
         <Card>
-          <EmptyState icon="📢" message="No announcements yet" />
+          <EmptyState icon="campaign" message="No announcements yet" />
         </Card>
       ) : (
         <ListCard>

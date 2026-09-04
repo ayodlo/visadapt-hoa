@@ -49,7 +49,7 @@ export default function BoardDashboard() {
       <Text style={styles.sectionTitle}>Decision Queue</Text>
       {data.decisionQueueCount === 0 ? (
         <Card>
-          <EmptyState icon="✅" message="Nothing needs your review right now" />
+          <EmptyState icon="check-circle" message="Nothing needs your review right now" />
         </Card>
       ) : (
         <ListCard>
@@ -80,7 +80,7 @@ export default function BoardDashboard() {
       <Text style={styles.sectionTitle}>Recent Announcements</Text>
       {data.recentAnnouncements.length === 0 ? (
         <Card>
-          <EmptyState icon="📢" message="No announcements yet" />
+          <EmptyState icon="campaign" message="No announcements yet" />
         </Card>
       ) : (
         <ListCard>

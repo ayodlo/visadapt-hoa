@@ -18,7 +18,7 @@ export function EventsListScreen() {
   return (
     <ScreenContainer onRefresh={refresh} refreshing={refreshing}>
       {data.length === 0 ? (
-        <EmptyState icon="📅" message="No upcoming events" />
+        <EmptyState icon="event" message="No upcoming events" />
       ) : (
         <ListCard>
           {data.map((e) => (

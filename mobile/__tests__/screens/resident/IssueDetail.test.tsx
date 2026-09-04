@@ -27,7 +27,7 @@ function makeIssue(overrides: Partial<IssueDetailData> = {}): IssueDetailData {
     dueDate: null,
     createdAt: '2026-07-14T12:00:00.000Z',
     updatedAt: '2026-07-14T12:00:00.000Z',
-    resident: { id: 'r1', firstName: 'Demo', lastName: 'Resident', email: 'r@communityhq.local' },
+    resident: { id: 'r1', firstName: 'Demo', lastName: 'Resident', email: 'r@portalhoa.local' },
     assignedTo: null,
     vendor: null,
     comments: [],

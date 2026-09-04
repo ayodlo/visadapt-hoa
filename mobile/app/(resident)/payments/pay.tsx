@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { ScreenContainer } from '@/components/ScreenContainer';
 import { Card } from '@/components/Card';
@@ -66,7 +67,7 @@ export default function PayScreen() {
     return (
       <ScreenContainer>
         <Card style={styles.receiptCard}>
-          <Text style={styles.receiptIcon}>✅</Text>
+          <MaterialIcons name="check-circle" size={40} color={colors.successText} style={styles.receiptIcon} />
           <Text style={styles.receiptTitle}>Payment Successful</Text>
           <View style={styles.receiptRow}>
             <Text style={styles.receiptLabel}>Confirmation</Text>

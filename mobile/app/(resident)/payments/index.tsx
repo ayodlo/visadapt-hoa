@@ -66,7 +66,7 @@ export default function PaymentsScreen() {
       <Text style={styles.sectionTitle}>Outstanding Charges</Text>
       {pendingCharges.length === 0 ? (
         <Card>
-          <EmptyState icon="✅" message="You have no outstanding charges" />
+          <EmptyState icon="check-circle" message="You have no outstanding charges" />
         </Card>
       ) : (
         <ListCard>
@@ -89,7 +89,7 @@ export default function PaymentsScreen() {
       <Text style={styles.sectionTitle}>Payment History</Text>
       {payments.length === 0 ? (
         <Card>
-          <EmptyState icon="🧾" message="No payments yet" />
+          <EmptyState icon="receipt-long" message="No payments yet" />
         </Card>
       ) : (
         <ListCard>

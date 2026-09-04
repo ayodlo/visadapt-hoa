@@ -62,7 +62,7 @@ export default function PaymentsReportScreen() {
       <Text style={styles.sectionTitle}>Recent Payments</Text>
       {data.recentPayments.length === 0 ? (
         <Card>
-          <EmptyState icon="🧾" message="No payments yet" />
+          <EmptyState icon="receipt-long" message="No payments yet" />
         </Card>
       ) : (
         <ListCard>

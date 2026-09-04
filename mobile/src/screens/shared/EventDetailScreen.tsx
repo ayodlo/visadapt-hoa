@@ -1,4 +1,4 @@
-import { StyleSheet, Text } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { ScreenContainer } from '@/components/ScreenContainer';
 import { Card } from '@/components/Card';
@@ -6,6 +6,7 @@ import { LoadingView } from '@/components/LoadingView';
 import { ErrorView } from '@/components/ErrorView';
 import { useApi } from '@/hooks/useApi';
 import { listEvents } from '@/api/events';
+import { MaterialIcons } from '@expo/vector-icons';
 import { colors } from '@/theme';
 import { formatDateTime } from '@/utils/format';
 
@@ -26,7 +27,12 @@ export function EventDetailScreen() {
       <Card style={styles.card}>
         <Text style={styles.title}>{event.title}</Text>
         <Text style={styles.meta}>{formatDateTime(event.startAt)}{event.endAt ? ` – ${formatDateTime(event.endAt)}` : ''}</Text>
-        {event.location && <Text style={styles.meta}>📍 {event.location}</Text>}
+        {event.location && (
+          <View style={styles.locationRow} testID="event-location">
+            <MaterialIcons name="place" size={14} color={colors.textMuted} />
+            <Text style={styles.meta}>{event.location}</Text>
+          </View>
+        )}
         {event.description && <Text style={styles.body}>{event.description}</Text>}
         <Text style={styles.meta}>
           Organized by {event.createdBy.firstName} {event.createdBy.lastName}
@@ -38,6 +44,7 @@ export function EventDetailScreen() {
 
 const styles = StyleSheet.create({
   card: { gap: 8 },
+  locationRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   title: { fontSize: 19, fontWeight: '700', color: colors.text },
   meta: { fontSize: 13, color: colors.textMuted },
   body: { fontSize: 15, color: colors.text, lineHeight: 22, marginTop: 4 },

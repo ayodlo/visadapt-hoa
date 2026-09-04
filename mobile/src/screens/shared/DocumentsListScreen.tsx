@@ -27,7 +27,7 @@ export function DocumentsListScreen() {
       ) : error || !data ? (
         <ErrorView message={error ?? undefined} onRetry={refresh} />
       ) : data.documents.length === 0 ? (
-        <EmptyState icon="📄" message="No documents found" />
+        <EmptyState icon="description" message="No documents found" />
       ) : (
         <ListCard>
           {data.documents.map((d) => (

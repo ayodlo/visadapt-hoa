@@ -24,7 +24,7 @@ export default function Login() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>CommunityHQ</Text>
+      <Text style={styles.title}>Portal HOA</Text>
 
       <TextInput
         style={styles.input}

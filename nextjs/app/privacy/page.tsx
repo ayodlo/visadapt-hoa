@@ -1,7 +1,7 @@
 import Link from 'next/link';
 
 export const metadata = {
-  title: 'Privacy Policy — CommunityHQ',
+  title: 'Privacy Policy — Portal HOA',
 };
 
 export default function PrivacyPolicyPage() {
@@ -9,7 +9,7 @@ export default function PrivacyPolicyPage() {
     <div className="min-h-screen bg-white">
       <div className="max-w-3xl mx-auto px-6 py-12">
         <Link href="/login" className="text-sm text-blue-600 hover:underline">
-          ← Back to CommunityHQ
+          ← Back to Portal HOA
         </Link>
 
         <h1 className="text-3xl font-bold text-gray-900 mt-6 mb-2">Privacy Policy</h1>
@@ -18,11 +18,11 @@ export default function PrivacyPolicyPage() {
         <div className="space-y-8 text-sm leading-6 text-gray-700">
           <section>
             <p>
-              CommunityHQ (&ldquo;we,&rdquo; &ldquo;our,&rdquo; or &ldquo;the app&rdquo;) is a community
+              Portal HOA (&ldquo;we,&rdquo; &ldquo;our,&rdquo; or &ldquo;the app&rdquo;) is a community
               management platform used by residents, board members, and property staff of a homeowners
               association (HOA) to manage announcements, maintenance issues, architectural requests,
               violations, payments, and community documents. This policy explains what information we
-              collect through the CommunityHQ web and mobile apps, how it&rsquo;s used, and who can see it.
+              collect through the Portal HOA web and mobile apps, how it&rsquo;s used, and who can see it.
             </p>
           </section>
 
@@ -45,7 +45,7 @@ export default function PrivacyPolicyPage() {
           <section>
             <h2 className="text-lg font-semibold text-gray-900 mb-2">Information We Do Not Collect</h2>
             <p>
-              CommunityHQ does not access your device&rsquo;s camera, photo library, location, or contacts,
+              Portal HOA does not access your device&rsquo;s camera, photo library, location, or contacts,
               and does not use advertising identifiers, third-party analytics SDKs, or ad networks.
             </p>
           </section>
@@ -92,7 +92,7 @@ export default function PrivacyPolicyPage() {
 
           <section>
             <h2 className="text-lg font-semibold text-gray-900 mb-2">Children&rsquo;s Privacy</h2>
-            <p>CommunityHQ is intended for adult residents, board members, and staff of a homeowners association, and is not directed at children under 13.</p>
+            <p>Portal HOA is intended for adult residents, board members, and staff of a homeowners association, and is not directed at children under 13.</p>
           </section>
 
           <section>

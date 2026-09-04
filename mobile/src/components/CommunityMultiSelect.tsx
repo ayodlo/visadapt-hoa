@@ -1,6 +1,7 @@
 import { StyleSheet, Text } from 'react-native';
 import { ListCard } from '@/components/ListCard';
 import { ListRow } from '@/components/ListRow';
+import { MaterialIcons } from '@expo/vector-icons';
 import { colors } from '@/theme';
 import type { Community } from '@/types/community';
 
@@ -21,7 +22,7 @@ export function CommunityMultiSelect({ communities, selected, onToggle }: Props)
         <ListRow
           key={c.id}
           title={c.name}
-          right={selected.includes(c.id) ? <Text style={styles.check}>✓</Text> : undefined}
+          right={selected.includes(c.id) ? <MaterialIcons name="check" size={18} color={colors.primary} /> : undefined}
           onPress={() => onToggle(c.id)}
         />
       ))}

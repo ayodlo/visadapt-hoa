@@ -2,6 +2,7 @@
 
 import { use, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { CircleCheck, CircleX } from 'lucide-react';
 import { useToast } from '@/context/toast';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { ErrorState } from '@/components/ui/ErrorState';
@@ -181,7 +182,7 @@ export default function ResidentViolationDetailPage({ params }: { params: Promis
       {/* Appeal outcome banner */}
       {violation.appeal?.status === 'APPROVED' && (
         <div className="bg-green-50 border border-green-300 rounded-xl p-4 flex gap-3">
-          <span className="text-xl flex-shrink-0" aria-hidden="true">✅</span>
+          <CircleCheck className="w-5 h-5 flex-shrink-0 text-green-600" aria-hidden="true" />
           <div>
             <p className="text-sm font-semibold text-green-800">Your Appeal Was Approved</p>
             {violation.appeal.outcome && <p className="text-sm text-green-700 mt-0.5">{violation.appeal.outcome}</p>}
@@ -190,7 +191,7 @@ export default function ResidentViolationDetailPage({ params }: { params: Promis
       )}
       {violation.appeal?.status === 'DENIED' && (
         <div className="bg-red-50 border border-red-300 rounded-xl p-4 flex gap-3">
-          <span className="text-xl flex-shrink-0" aria-hidden="true">❌</span>
+          <CircleX className="w-5 h-5 flex-shrink-0 text-red-600" aria-hidden="true" />
           <div>
             <p className="text-sm font-semibold text-red-800">Your Appeal Was Not Approved</p>
             {violation.appeal.outcome && <p className="text-sm text-red-700 mt-0.5">{violation.appeal.outcome}</p>}
@@ -271,7 +272,7 @@ export default function ResidentViolationDetailPage({ params }: { params: Promis
         )}
         <div className="col-span-2">
           <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Questions or concerns?</p>
-          <p className="text-sm text-gray-600">Contact the management office at <span className="font-medium text-gray-800">management@communityhq.local</span> or call during business hours (Mon–Fri 9 AM–5 PM).</p>
+          <p className="text-sm text-gray-600">Contact the management office at <span className="font-medium text-gray-800">management@portalhoa.local</span> or call during business hours (Mon–Fri 9 AM–5 PM).</p>
         </div>
       </div>
 

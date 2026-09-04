@@ -142,7 +142,7 @@ export function ViolationManageScreen({
       <Text style={styles.sectionTitle}>Comments</Text>
       {v.comments.length === 0 ? (
         <Card>
-          <EmptyState icon="💬" message="No comments yet" />
+          <EmptyState icon="chat-bubble-outline" message="No comments yet" />
         </Card>
       ) : (
         v.comments.map((c) => (

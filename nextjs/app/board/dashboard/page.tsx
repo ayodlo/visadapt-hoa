@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { CircleCheck, Hammer, PencilRuler, TriangleAlert } from 'lucide-react';
 import { getSession } from '@/lib/auth';
 import { getActiveCommunityId } from '@/lib/community';
 import { redirect } from 'next/navigation';
@@ -40,26 +41,26 @@ export default async function BoardDashboardPage() {
         <StatCard
           label="Open Issues"
           value={data?.openIssues ?? '—'}
-          icon="🔨"
+          icon={<Hammer className="w-6 h-6 text-gray-400" />}
           href="/admin/issues"
         />
         <StatCard
           label="Resolved This Month"
           value={data?.resolvedThisMonth ?? '—'}
-          icon="✅"
+          icon={<CircleCheck className="w-6 h-6 text-gray-400" />}
           color="green"
         />
         <StatCard
           label="Arch Requests"
           value={data?.archRequestsNeedingReview ?? '—'}
-          icon="🏗️"
+          icon={<PencilRuler className="w-6 h-6 text-gray-400" />}
           href="/board/architectural-requests"
           color={(data?.archRequestsNeedingReview ?? 0) > 0 ? 'yellow' : 'default'}
         />
         <StatCard
           label="Pending Appeals"
           value={data?.pendingAppeals ?? '—'}
-          icon="⚠️"
+          icon={<TriangleAlert className="w-6 h-6 text-gray-400" />}
           href="/board/violations"
           color={(data?.pendingAppeals ?? 0) > 0 ? 'red' : 'default'}
         />

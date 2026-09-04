@@ -46,7 +46,7 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
       <div className="w-full max-w-md bg-white text-gray-900 rounded-2xl shadow-sm border border-gray-200 p-8">
-        <h1 className="text-2xl font-bold text-blue-600 mb-1">CommunityHQ</h1>
+        <h1 className="text-2xl font-bold text-blue-600 mb-1">Portal HOA</h1>
         <h2 className="text-xl font-semibold mb-6">Sign in to your account</h2>
 
         {error && <div className="mb-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</div>}

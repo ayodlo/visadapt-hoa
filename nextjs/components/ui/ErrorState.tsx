@@ -1,3 +1,5 @@
+import { TriangleAlert } from 'lucide-react';
+
 interface Props {
   message?: string;
   onRetry?: () => void;
@@ -9,7 +11,7 @@ export function ErrorState({
 }: Props) {
   return (
     <div role="alert" className="flex flex-col items-center justify-center py-16 text-center px-4">
-      <span className="text-4xl mb-4" aria-hidden="true">⚠️</span>
+      <TriangleAlert className="w-10 h-10 mb-4 text-red-500" aria-hidden="true" />
       <h3 className="text-base font-semibold text-gray-900 mb-1">Unable to load</h3>
       <p className="text-sm text-gray-500 max-w-xs mb-4">{message}</p>
       {onRetry && (

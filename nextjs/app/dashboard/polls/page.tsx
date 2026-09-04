@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useSession } from '@/context/session';
+import { X } from 'lucide-react';
 import { isStaff } from '@/lib/roles';
 import { useListControls } from '@/hooks/useListControls';
 import { ListToolbar } from '@/components/ui/ListToolbar';
@@ -95,7 +96,7 @@ export default function PollsPage() {
             {form.options.map((opt, i) => (
               <div key={i} className="flex gap-2">
                 <input placeholder={`Option ${i + 1}`} value={opt} onChange={(e) => { const opts = [...form.options]; opts[i] = e.target.value; setForm((f) => ({ ...f, options: opts })); }} className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                {form.options.length > 2 && <button type="button" onClick={() => setForm((f) => ({ ...f, options: f.options.filter((_, j) => j !== i) }))} className="text-xs text-red-400 hover:text-red-600">✕</button>}
+                {form.options.length > 2 && <button type="button" onClick={() => setForm((f) => ({ ...f, options: f.options.filter((_, j) => j !== i) }))} aria-label={`Remove option ${i + 1}`} className="text-red-400 hover:text-red-600"><X className="w-4 h-4" aria-hidden="true" /></button>}
               </div>
             ))}
             <button type="button" onClick={() => setForm((f) => ({ ...f, options: [...f.options, ''] }))} className="text-xs text-blue-600 hover:underline">+ Add option</button>

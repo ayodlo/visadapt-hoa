@@ -25,7 +25,7 @@ const mockedGetItem = secureStorage.getItem as jest.Mock;
 const mockedSetItem = secureStorage.setItem as jest.Mock;
 const mockedDeleteItem = secureStorage.deleteItem as jest.Mock;
 
-const user: SessionUser = { id: 'u1', email: 'r@communityhq.local', firstName: 'Demo', lastName: 'Resident', role: 'RESIDENT', communityId: 'c1' };
+const user: SessionUser = { id: 'u1', email: 'r@portalhoa.local', firstName: 'Demo', lastName: 'Resident', role: 'RESIDENT', communityId: 'c1' };
 
 function wrapper({ children }: { children: ReactNode }) {
   return <AuthProvider>{children}</AuthProvider>;
@@ -74,14 +74,14 @@ describe('AuthContext', () => {
     await waitFor(() => expect(result.current.isLoading).toBe(false));
 
     await act(async () => {
-      await result.current.login('r@communityhq.local', 'password123');
+      await result.current.login('r@portalhoa.local', 'password123');
     });
 
     expect(mockedApiFetch).toHaveBeenCalledWith(
       '/api/auth/login',
-      expect.objectContaining({ method: 'POST', body: JSON.stringify({ email: 'r@communityhq.local', password: 'password123' }) })
+      expect.objectContaining({ method: 'POST', body: JSON.stringify({ email: 'r@portalhoa.local', password: 'password123' }) })
     );
-    expect(mockedSetItem).toHaveBeenCalledWith('communityhq_token', 'new-token');
+    expect(mockedSetItem).toHaveBeenCalledWith('portalhoa_token', 'new-token');
     expect(mockedSetAuthToken).toHaveBeenCalledWith('new-token');
     expect(result.current.user).toEqual(user);
     expect(registerPushToken).toHaveBeenCalledTimes(1);
@@ -96,7 +96,7 @@ describe('AuthContext', () => {
     });
 
     expect(mockedSetAuthToken).toHaveBeenCalledWith(null);
-    expect(mockedDeleteItem).toHaveBeenCalledWith('communityhq_token');
+    expect(mockedDeleteItem).toHaveBeenCalledWith('portalhoa_token');
     expect(result.current.user).toBeNull();
   });
 
@@ -110,6 +110,6 @@ describe('AuthContext', () => {
     });
 
     expect(mockedSetAuthToken).toHaveBeenCalledWith(null);
-    expect(mockedDeleteItem).toHaveBeenCalledWith('communityhq_token');
+    expect(mockedDeleteItem).toHaveBeenCalledWith('portalhoa_token');
   });
 });

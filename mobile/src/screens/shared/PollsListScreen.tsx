@@ -17,7 +17,7 @@ export function PollsListScreen() {
   return (
     <ScreenContainer onRefresh={refresh} refreshing={refreshing}>
       {data.length === 0 ? (
-        <EmptyState icon="🗳️" message="No polls right now" />
+        <EmptyState icon="how-to-vote" message="No polls right now" />
       ) : (
         <ListCard>
           {data.map((p) => (

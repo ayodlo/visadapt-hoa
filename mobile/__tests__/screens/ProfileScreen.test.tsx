@@ -12,7 +12,7 @@ const mockedUseAuth = useAuth as jest.Mock;
 const mockedUpdateProfile = updateProfile as jest.Mock;
 const mockedChangePassword = changePassword as jest.Mock;
 
-const user: SessionUser = { id: 'u1', email: 'r@communityhq.local', firstName: 'Demo', lastName: 'Resident', role: 'RESIDENT', communityId: 'c1' };
+const user: SessionUser = { id: 'u1', email: 'r@portalhoa.local', firstName: 'Demo', lastName: 'Resident', role: 'RESIDENT', communityId: 'c1' };
 
 describe('ProfileScreen', () => {
   const updateUser = jest.fn();
@@ -24,7 +24,7 @@ describe('ProfileScreen', () => {
 
   it('renders the current email and role', async () => {
     const { findByText } = await render(<ProfileScreen />);
-    expect(await findByText(/r@communityhq.local/)).toBeTruthy();
+    expect(await findByText(/r@portalhoa.local/)).toBeTruthy();
     expect(await findByText(/Resident/)).toBeTruthy();
   });
 
@@ -55,7 +55,7 @@ describe('ProfileScreen', () => {
   it('shows an error message when saving the profile fails', async () => {
     mockedUpdateProfile.mockRejectedValue(new ApiError('Name is required', 400));
     const { findByText, getByText } = await render(<ProfileScreen />);
-    await findByText(/r@communityhq.local/);
+    await findByText(/r@portalhoa.local/);
 
     await act(async () => {
       fireEvent.press(getByText('Save Profile'));
@@ -67,7 +67,7 @@ describe('ProfileScreen', () => {
   it('calls changePassword with both fields and shows a success message', async () => {
     mockedChangePassword.mockResolvedValue({ message: 'ok' });
     const { findByText, getByText, getAllByDisplayValue } = await render(<ProfileScreen />);
-    await findByText(/r@communityhq.local/);
+    await findByText(/r@portalhoa.local/);
     const [currentPasswordInput, newPasswordInput] = getAllByDisplayValue('');
 
     await act(async () => {
@@ -87,7 +87,7 @@ describe('ProfileScreen', () => {
   it('shows an error message when changing the password fails', async () => {
     mockedChangePassword.mockRejectedValue(new ApiError('Incorrect current password', 400));
     const { findByText, getByText, getAllByDisplayValue } = await render(<ProfileScreen />);
-    await findByText(/r@communityhq.local/);
+    await findByText(/r@portalhoa.local/);
     const [currentPasswordInput, newPasswordInput] = getAllByDisplayValue('');
 
     await act(async () => {

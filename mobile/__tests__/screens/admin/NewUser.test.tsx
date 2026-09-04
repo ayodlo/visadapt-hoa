@@ -23,7 +23,7 @@ async function fillForm(getAllByDisplayValue: (v: string) => unknown[]) {
     fireEvent.changeText(lastNameInput, 'User');
   });
   await act(async () => {
-    fireEvent.changeText(emailInput, 'new.user@communityhq.local');
+    fireEvent.changeText(emailInput, 'new.user@portalhoa.local');
   });
 }
 
@@ -77,7 +77,7 @@ describe('NewUser (admin)', () => {
     expect(mockedCreateUser).toHaveBeenCalledWith({
       firstName: 'New',
       lastName: 'User',
-      email: 'new.user@communityhq.local',
+      email: 'new.user@portalhoa.local',
       password: 'password123',
       role: 'RESIDENT',
     });

@@ -2,6 +2,40 @@
 
 ---
 
+## 2026-09-03 (Emoji -> icons across both apps; CommunityHQ -> Portal HOA)
+
+**Files changed:**
+- `nextjs/components/maintenance/MaintenanceRequestForm.tsx` - the native file input is now a styled label wrapping an `sr-only` input.
+- **Web emoji -> lucide (10 files):** `app/resident/dashboard`, `app/board/dashboard`, `app/admin/announcements`, `app/dashboard/polls`, `app/resident/announcements` (list + detail), `app/resident/architectural-requests/[id]`, `app/resident/documents/[id]`, `app/resident/violations/[id]`, `components/documents/DocumentList.tsx`, `components/ui/EmptyState.tsx`, `components/ui/ErrorState.tsx`.
+- **Mobile emoji -> @expo/vector-icons (26 files):** `src/components/EmptyState.tsx` and `ListRow.tsx` (icon is now a prop, not a character in the title string), the three `_layout.tsx` tab bars, three `more/index.tsx` menus, plus inline sites in `EventDetailScreen`, `payments/pay.tsx`, `CommunityMultiSelect`, `CommunitiesScreen`.
+- **Rename (57 replacements):** web UI/auth/privacy/email, `prisma/seed.ts`, three e2e specs, `.env.example`; mobile `app.json`, `AuthContext`, login screen, 12 test files; `README.md` and `nextjs/README.md`.
+
+**Decisions made:**
+- **New dependency: `@expo/vector-icons` ^15.0.2** (approved). Mobile had no icon library at all - the emoji were the icons. Chosen over `lucide-react-native` because that needs `react-native-svg`, a native module requiring a rebuild; `@expo/vector-icons` ships with the Expo ecosystem. Cost: mobile uses MaterialIcons glyphs while web uses lucide, so the two platforms are close but not glyph-identical.
+- **Icon-only emoji needed accessible names.** An emoji carries a name to a screen reader ("pushpin"); an `aria-hidden` SVG carries nothing. The pinned marker in the admin announcements list gained an `sr-only` "Pinned", and the poll remove-option button gained `aria-label="Remove option N"` - it previously had no accessible name beyond the glyph.
+- **Web icon colours use palette classes, never literals.** `globals.css` remaps the gray/blue/red/green scales under `[data-theme="dark"]`, so `text-gray-400` and `text-green-600` adapt automatically. A hardcoded hex would have been invisible on the dark card surface.
+- **Mobile tab bars now use the colour the navigator supplies.** `tabBarIcon: () => <TabIcon symbol=... />` discarded the `color` argument because an emoji cannot be tinted; the icon version takes `({ color })`, so tabs finally show their active/inactive state.
+- **`EmptyState` icon props widened, not replaced** (`string` -> `ReactNode` on web, `string` -> `keyof MaterialIcons.glyphMap` on mobile). Existing callers keep working.
+- **Bundle identifiers renamed** (approved): `com.communityhq.app` -> `com.portalhoa.app`, slug `portal-hoa`, scheme `portalhoa`. This is a NEW app to both stores - existing installs will not upgrade, and `communityhq://` deep links break. The SecureStore keys moved with it (`communityhq_token` -> `portalhoa_token`), which is safe only because a new bundle id means a fresh install with empty storage.
+- **Demo addresses stay on `.local`** (`admin@portalhoa.local`, not `.com`). `portalhoa.com` is the real domain; keeping seed accounts non-routable prevents a stray real send.
+
+**Next steps:**
+1. **Apply `20260903120000_rename_communityhq_to_portal_hoa`** (`prisma migrate deploy`, or `migrate dev` locally). It is written and pending; nothing else updates an existing database.
+   **Re-seeding does NOT do this** - a correction to the first version of this entry. `seed.ts` upserts the community on `id` with an empty `update`, so the name never changes; and it upserts users on `email`, which no longer matches the old `@communityhq.local` rows, so it CREATES a duplicate set of accounts beside them instead of renaming. The seed is only correct against an empty database.
+2. **Prod keeps the old community name until that migration runs.** It was INSERTed by `migrations/20260715023900_add_communities/migration.sql`, which must not be edited (Prisma checksums applied migrations) - hence a separate data-only migration.
+3. `DEVLOG.md` history, `deliverables.md`, and `mobile/STORE_SUBMISSION.md` were deliberately left on the old name. STORE_SUBMISSION.md still documents `com.communityhq.app` and now contradicts `app.json`.
+4. The maintenance form has still never been exercised in a real browser against the S3 bucket.
+
+**Gotchas:**
+- **A lifecycle-rule-style silent failure exists here too:** an emoji in a `title` string (`title={`🚪  Log out`}`) is invisible to a grep for `icon=`. Both mobile menus and the ListRow rows had to be found by scanning for the characters themselves, not by prop name.
+- **`MaterialIcons.glyphMap[name]` is typed `string | number`**, so `String.fromCodePoint` on it fails typecheck. The test helper narrows before converting.
+- **`@expo/vector-icons` renders a `<Text>` holding a font glyph**, so `getByTestId(...).props.name` is undefined - the name never reaches the host element. Assert on the glyph the name resolves to instead.
+- The `<-`/`->` arrows in back-links, the `>` chevron in `ListRow`, and sort arrows are typography rather than emoji and were left alone.
+
+**Verification:** Web - `tsc` clean, `eslint` clean (same 2 pre-existing warnings), 250 vitest tests passing, `next build` compiles. Mobile - `tsc` clean, 230 jest tests passing across 51 suites. Zero emoji remain in `nextjs/{app,components,lib}` or `mobile/{app,src}`; zero `CommunityHQ`/`communityhq` remain outside the three files listed in Next steps #3 and the applied migration. All 23 MaterialIcons glyph names and every lucide name were verified against the installed packages before use.
+
+---
+
 ## 2026-09-03 (S3 CORS + lifecycle rule for staged uploads)
 
 **Files changed:**

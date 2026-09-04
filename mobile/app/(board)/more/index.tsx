@@ -1,16 +1,17 @@
 import { Alert } from 'react-native';
 import { router } from 'expo-router';
+import { MaterialIcons } from '@expo/vector-icons';
 import { ScreenContainer } from '@/components/ScreenContainer';
 import { ListCard } from '@/components/ListCard';
 import { ListRow } from '@/components/ListRow';
 import { useAuth } from '@/auth/AuthContext';
 
-const MENU: { icon: string; label: string; href: string }[] = [
-  { icon: '📢', label: 'Announcements', href: '/more/announcements' },
-  { icon: '📅', label: 'Events', href: '/more/events' },
-  { icon: '📄', label: 'Documents', href: '/more/documents' },
-  { icon: '🗳️', label: 'Polls', href: '/more/polls' },
-  { icon: '🏘️', label: 'Communities', href: '/more/communities' },
+const MENU: { icon: keyof typeof MaterialIcons.glyphMap; label: string; href: string }[] = [
+  { icon: 'campaign', label: 'Announcements', href: '/more/announcements' },
+  { icon: 'event', label: 'Events', href: '/more/events' },
+  { icon: 'description', label: 'Documents', href: '/more/documents' },
+  { icon: 'how-to-vote', label: 'Polls', href: '/more/polls' },
+  { icon: 'holiday-village', label: 'Communities', href: '/more/communities' },
 ];
 
 export default function BoardMoreMenu() {
@@ -29,7 +30,7 @@ export default function BoardMoreMenu() {
         {MENU.map((item) => (
           <ListRow
             key={item.href}
-            title={`${item.icon}  ${item.label}`}
+            icon={item.icon} title={item.label}
             onPress={() => router.push(item.href)}
           />
         ))}
@@ -37,11 +38,11 @@ export default function BoardMoreMenu() {
 
       <ListCard>
         <ListRow
-          title={`👤  ${user?.firstName} ${user?.lastName}`}
+          icon="person" title={`${user?.firstName} ${user?.lastName}`}
           subtitle="Profile & Settings"
           onPress={() => router.push('/more/profile')}
         />
-        <ListRow title="🚪  Log out" onPress={confirmLogout} />
+        <ListRow icon="logout" title="Log out" onPress={confirmLogout} />
       </ListCard>
     </ScreenContainer>
   );

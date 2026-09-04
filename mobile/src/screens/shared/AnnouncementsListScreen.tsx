@@ -23,7 +23,7 @@ export function AnnouncementsListScreen() {
   return (
     <ScreenContainer onRefresh={refresh} refreshing={refreshing}>
       {data.announcements.length === 0 ? (
-        <EmptyState icon="📢" message="No announcements yet" />
+        <EmptyState icon="campaign" message="No announcements yet" />
       ) : (
         <ListCard>
           {data.announcements.map((a) => (

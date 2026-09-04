@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { Pin, Siren } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useSession } from '@/context/session';
 import { isStaff } from '@/lib/roles';
@@ -75,7 +76,7 @@ function AnnouncementCard({ a, onClick }: { a: Announcement; onClick?: () => voi
               )}
               {a.isPinned && (
                 <span className="text-xs text-gray-500 flex items-center gap-1">
-                  <span aria-hidden="true">📌</span> Pinned
+                  <Pin className="w-3 h-3" aria-hidden="true" /> Pinned
                 </span>
               )}
               {a.audience === 'BOARD_MEMBERS' && (
@@ -156,7 +157,7 @@ export default function ResidentAnnouncementsPage() {
       {/* Emergency banner */}
       {emergencies.length > 0 && (
         <div className="bg-red-50 border border-red-300 rounded-xl p-4 flex gap-3">
-          <span className="text-2xl flex-shrink-0" aria-hidden="true">🚨</span>
+          <Siren className="w-6 h-6 flex-shrink-0 text-red-600" aria-hidden="true" />
           <div>
             <p className="text-sm font-semibold text-red-800">{emergencies.length} Emergency Notice{emergencies.length > 1 ? 's' : ''}</p>
             <p className="text-sm text-red-700">{emergencies[0].title}</p>

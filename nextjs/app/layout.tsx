@@ -5,7 +5,7 @@ import './globals.css';
 const geist = Geist({ subsets: ['latin'], variable: '--font-geist-sans' });
 
 export const metadata: Metadata = {
-  title: 'CommunityHQ',
+  title: 'Portal HOA',
   description: 'HOA community management platform',
 };
 

@@ -1,16 +1,20 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 import { colors } from '@/theme';
 
 interface Props {
   title: string;
+  /** Optional leading icon; rows without one keep their original layout. */
+  icon?: keyof typeof MaterialIcons.glyphMap;
   subtitle?: string;
   right?: React.ReactNode;
   onPress?: () => void;
 }
 
-export function ListRow({ title, subtitle, right, onPress }: Props) {
+export function ListRow({ title, icon, subtitle, right, onPress }: Props) {
   return (
     <Pressable onPress={onPress} disabled={!onPress} style={({ pressed }) => [styles.row, pressed && onPress && styles.pressed]}>
+      {icon && <MaterialIcons name={icon} size={20} color={colors.textMuted} />}
       <View style={styles.textCol}>
         <Text style={styles.title} numberOfLines={1}>
           {title}

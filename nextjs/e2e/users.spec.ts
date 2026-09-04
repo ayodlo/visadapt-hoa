@@ -6,17 +6,17 @@ test.use({ storageState: path.join(__dirname, '.auth/admin.json') });
 test('admin can view the users list', async ({ page }) => {
   await page.goto('/dashboard/users');
   await expect(page.getByRole('heading', { name: 'Users' })).toBeVisible();
-  await expect(page.getByText('admin@communityhq.local')).toBeVisible();
-  await expect(page.getByText('resident@communityhq.local')).toBeVisible();
+  await expect(page.getByText('admin@portalhoa.local')).toBeVisible();
+  await expect(page.getByText('resident@portalhoa.local')).toBeVisible();
 });
 
 test('users list shows role selects for each user', async ({ page }) => {
   await page.goto('/dashboard/users');
   // The admin user's row should have a combobox with value ADMIN
-  const adminRow = page.locator('tr').filter({ hasText: 'admin@communityhq.local' });
+  const adminRow = page.locator('tr').filter({ hasText: 'admin@portalhoa.local' });
   await expect(adminRow.getByRole('combobox')).toHaveValue('ADMIN');
   // The resident user's row should have RESIDENT
-  const residentRow = page.locator('tr').filter({ hasText: 'resident@communityhq.local' });
+  const residentRow = page.locator('tr').filter({ hasText: 'resident@portalhoa.local' });
   await expect(residentRow.getByRole('combobox')).toHaveValue('RESIDENT');
 });
 
@@ -26,7 +26,7 @@ test.describe('as board member', () => {
   test('board member sees a read-only roster (no role selects, no delete)', async ({ page }) => {
     await page.goto('/dashboard/users');
     await expect(page.getByRole('heading', { name: 'Users' })).toBeVisible();
-    await expect(page.getByText('resident@communityhq.local')).toBeVisible();
+    await expect(page.getByText('resident@portalhoa.local')).toBeVisible();
     await expect(page.getByRole('combobox')).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Delete' })).toHaveCount(0);
   });

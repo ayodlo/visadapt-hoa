@@ -42,7 +42,7 @@ export default function AdminIssuesList() {
       ) : error || !data ? (
         <ErrorView message={error ?? undefined} onRetry={refresh} />
       ) : data.issues.length === 0 ? (
-        <EmptyState icon="🔨" message="No issues found" />
+        <EmptyState icon="build" message="No issues found" />
       ) : (
         <ListCard>
           {data.issues.map((issue) => (

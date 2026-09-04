@@ -27,7 +27,7 @@ function makeViolation(overrides: Partial<ViolationDetailData> = {}): ViolationD
     evidenceUrl: null,
     createdAt: '2026-07-10T00:00:00.000Z',
     updatedAt: '2026-07-10T00:00:00.000Z',
-    resident: { id: 'r1', firstName: 'Demo', lastName: 'Resident', email: 'r@communityhq.local' },
+    resident: { id: 'r1', firstName: 'Demo', lastName: 'Resident', email: 'r@portalhoa.local' },
     property: null,
     createdBy: { firstName: 'Admin', lastName: 'User' },
     comments: [],

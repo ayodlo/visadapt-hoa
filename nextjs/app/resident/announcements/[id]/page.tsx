@@ -2,6 +2,7 @@
 
 import { use, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { Pin, Siren } from 'lucide-react';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { ErrorState } from '@/components/ui/ErrorState';
 
@@ -84,7 +85,7 @@ export default function ResidentAnnouncementDetailPage({ params }: { params: Pro
       {/* Emergency top bar */}
       {isEmergency && (
         <div className="bg-red-600 text-white rounded-xl px-4 py-3 flex items-center gap-3">
-          <span className="text-xl" aria-hidden="true">🚨</span>
+          <Siren className="w-5 h-5 flex-shrink-0" aria-hidden="true" />
           <p className="text-sm font-semibold">Emergency Notice — Please read carefully</p>
         </div>
       )}
@@ -96,7 +97,7 @@ export default function ResidentAnnouncementDetailPage({ params }: { params: Pro
             {priorityLabel(announcement.priority)}
           </span>
           {announcement.isPinned && (
-            <span className="text-xs text-gray-500">📌 Pinned</span>
+            <span className="text-xs text-gray-500 inline-flex items-center gap-1"><Pin className="w-3 h-3" aria-hidden="true" /> Pinned</span>
           )}
           {announcement.audience === 'BOARD_MEMBERS' && (
             <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-medium">Board Members Only</span>

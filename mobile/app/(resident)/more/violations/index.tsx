@@ -20,7 +20,7 @@ export default function ViolationsList() {
   return (
     <ScreenContainer onRefresh={refresh} refreshing={refreshing}>
       {data.violations.length === 0 ? (
-        <EmptyState icon="✅" message="No violations on record" />
+        <EmptyState icon="check-circle" message="No violations on record" />
       ) : (
         <ListCard>
           {data.violations.map((v) => (

@@ -44,7 +44,7 @@ export default function BoardArchRequestsList() {
       ) : error || !data ? (
         <ErrorView message={error ?? undefined} onRetry={refresh} />
       ) : data.requests.length === 0 ? (
-        <EmptyState icon="🏗️" message="No requests here right now" />
+        <EmptyState icon="architecture" message="No requests here right now" />
       ) : (
         <ListCard>
           {data.requests.map((r) => (

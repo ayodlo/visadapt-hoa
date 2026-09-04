@@ -28,7 +28,7 @@ function makeIssue(overrides: Partial<AdminIssueDetailData> = {}): AdminIssueDet
     dueDate: null,
     createdAt: '2026-07-14T12:00:00.000Z',
     updatedAt: '2026-07-14T12:00:00.000Z',
-    resident: { id: 'r1', firstName: 'Demo', lastName: 'Resident', email: 'r@communityhq.local' },
+    resident: { id: 'r1', firstName: 'Demo', lastName: 'Resident', email: 'r@portalhoa.local' },
     assignedTo: null,
     vendor: null,
     comments: [],
@@ -40,7 +40,7 @@ function makeIssue(overrides: Partial<AdminIssueDetailData> = {}): AdminIssueDet
 describe('AdminIssueDetail', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockedListUsers.mockResolvedValue([{ id: 'staff1', firstName: 'Staff', lastName: 'Member', email: 's@communityhq.local', role: 'ADMIN', createdAt: '2026-01-01T00:00:00.000Z' }]);
+    mockedListUsers.mockResolvedValue([{ id: 'staff1', firstName: 'Staff', lastName: 'Member', email: 's@portalhoa.local', role: 'ADMIN', createdAt: '2026-01-01T00:00:00.000Z' }]);
     mockedListVendorOptions.mockResolvedValue({ vendors: [{ id: 'v1', name: 'Acme Plumbing', contactName: null, category: null }] });
   });
 

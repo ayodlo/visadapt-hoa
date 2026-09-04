@@ -18,7 +18,7 @@ function makeUser(overrides: Partial<AdminUserListItem> = {}): AdminUserListItem
     id: 'r1',
     firstName: 'Demo',
     lastName: 'Resident',
-    email: 'r@communityhq.local',
+    email: 'r@portalhoa.local',
     role: 'RESIDENT',
     createdAt: '2026-01-01T00:00:00.000Z',
     ...overrides,

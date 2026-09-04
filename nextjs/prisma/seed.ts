@@ -25,18 +25,18 @@ const residents = [
   { firstName: 'Andrew', lastName: 'Lewis', email: 'andrew.lewis@example.com' },
   { firstName: 'Melissa', lastName: 'Clark', email: 'melissa.clark@example.com' },
   { firstName: 'Ryan', lastName: 'Walker', email: 'ryan.walker@example.com' },
-  { firstName: 'Demo', lastName: 'Resident', email: 'resident@communityhq.local' },
+  { firstName: 'Demo', lastName: 'Resident', email: 'resident@portalhoa.local' },
 ];
 
 const admins = [
-  { firstName: 'Admin', lastName: 'User', email: 'admin@communityhq.local' },
-  { firstName: 'Sandra', lastName: 'Brooks', email: 'sandra.brooks@communityhq.local' },
+  { firstName: 'Admin', lastName: 'User', email: 'admin@portalhoa.local' },
+  { firstName: 'Sandra', lastName: 'Brooks', email: 'sandra.brooks@portalhoa.local' },
 ];
 
 const boardMembers = [
-  { firstName: 'Board', lastName: 'Member', email: 'board@communityhq.local' },
-  { firstName: 'Thomas', lastName: 'Reed', email: 'thomas.reed@communityhq.local' },
-  { firstName: 'Patricia', lastName: 'Hall', email: 'patricia.hall@communityhq.local' },
+  { firstName: 'Board', lastName: 'Member', email: 'board@portalhoa.local' },
+  { firstName: 'Thomas', lastName: 'Reed', email: 'thomas.reed@portalhoa.local' },
+  { firstName: 'Patricia', lastName: 'Hall', email: 'patricia.hall@portalhoa.local' },
 ];
 
 const vendors = [
@@ -97,7 +97,7 @@ async function main() {
   const community = await prisma.community.upsert({
     where: { id: 'community_default_seed' },
     update: {},
-    create: { id: 'community_default_seed', name: 'CommunityHQ Demo' },
+    create: { id: 'community_default_seed', name: 'Portal HOA Demo' },
   });
   const communityId = community.id;
 
@@ -203,8 +203,8 @@ async function main() {
     createdById: string;
   }[] = [
       {
-        title: 'Welcome to CommunityHQ!',
-        body: 'We are thrilled to launch CommunityHQ — your new all-in-one community management platform. Use it to stay informed about announcements, submit maintenance issues, track your HOA payments, and connect with your neighbors. If you have feedback or questions, please reach out to the management office.',
+        title: 'Welcome to Portal HOA!',
+        body: 'We are thrilled to launch Portal HOA — your new all-in-one community management platform. Use it to stay informed about announcements, submit maintenance issues, track your HOA payments, and connect with your neighbors. If you have feedback or questions, please reach out to the management office.',
         priority: 'NORMAL',
         audience: 'ALL_RESIDENTS',
         isPinned: true,
@@ -1277,9 +1277,9 @@ async function main() {
   console.log('\nSeed complete!');
   console.log('─────────────────────────────────');
   console.log('Demo credentials (password: password123)');
-  console.log('  Resident:     resident@communityhq.local');
-  console.log('  Admin:        admin@communityhq.local');
-  console.log('  Board Member: board@communityhq.local');
+  console.log('  Resident:     resident@portalhoa.local');
+  console.log('  Admin:        admin@portalhoa.local');
+  console.log('  Board Member: board@portalhoa.local');
   console.log('─────────────────────────────────');
 }
 

@@ -73,7 +73,7 @@ export default function AdminDashboard() {
       <Text style={styles.sectionTitle}>Issues by Status</Text>
       {data.issuesByStatus.length === 0 ? (
         <Card>
-          <EmptyState icon="✅" message="No issues" />
+          <EmptyState icon="check-circle" message="No issues" />
         </Card>
       ) : (
         <ListCard>
@@ -86,7 +86,7 @@ export default function AdminDashboard() {
       <Text style={styles.sectionTitle}>Recent Activity</Text>
       {data.recentActivity.length === 0 ? (
         <Card>
-          <EmptyState icon="📋" message="No recent activity" />
+          <EmptyState icon="assignment" message="No recent activity" />
         </Card>
       ) : (
         <ListCard>
@@ -104,7 +104,7 @@ export default function AdminDashboard() {
       <Text style={styles.sectionTitle}>Recent Announcements</Text>
       {data.recentAnnouncements.length === 0 ? (
         <Card>
-          <EmptyState icon="📢" message="No announcements yet" />
+          <EmptyState icon="campaign" message="No announcements yet" />
         </Card>
       ) : (
         <ListCard>

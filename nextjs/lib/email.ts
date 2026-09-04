@@ -19,7 +19,7 @@ export async function sendPasswordResetEmail(
   await getResend().emails.send({
     from: FROM,
     to,
-    subject: 'Reset your CommunityHQ password',
+    subject: 'Reset your Portal HOA password',
     html: `
       <p>Hi ${firstName},</p>
       <p>Click the link below to reset your password. It expires in 1 hour.</p>

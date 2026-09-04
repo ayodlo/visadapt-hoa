@@ -1,19 +1,19 @@
 {
   "expo": {
-    "name": "CommunityHQ",
-    "slug": "communityhq",
-    "scheme": "communityhq",
+    "name": "Portal HOA",
+    "slug": "portal-hoa",
+    "scheme": "portalhoa",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.communityhq.app",
+      "bundleIdentifier": "com.portalhoa.app",
       "buildNumber": "1"
     },
     "android": {
-      "package": "com.communityhq.app",
+      "package": "com.portalhoa.app",
       "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",

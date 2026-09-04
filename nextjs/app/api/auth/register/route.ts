@@ -6,5 +6,5 @@ import { err } from '@/lib/api';
 // community as part of creation. This route is kept (rather than deleted)
 // so old clients get a clear, actionable error instead of a 404.
 export async function POST() {
-  return err('Self-registration is disabled. Contact your HOA administrator to be added to CommunityHQ.', 403);
+  return err('Self-registration is disabled. Contact your HOA administrator to be added to Portal HOA.', 403);
 }

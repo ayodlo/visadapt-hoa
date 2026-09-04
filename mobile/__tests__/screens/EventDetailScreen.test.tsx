@@ -31,7 +31,7 @@ describe('EventDetailScreen', () => {
     mockedListEvents.mockResolvedValue([makeEvent(), makeEvent({ id: 'e2', title: 'Other event' })]);
     const { findByText } = await render(<EventDetailScreen />);
     expect(await findByText('Community BBQ')).toBeTruthy();
-    expect(await findByText('📍 Clubhouse')).toBeTruthy();
+    expect(await findByText('Clubhouse')).toBeTruthy();
   });
 
   it('shows "Event not found" when no event matches the id', async () => {
@@ -42,8 +42,8 @@ describe('EventDetailScreen', () => {
 
   it('omits the location line when the event has none', async () => {
     mockedListEvents.mockResolvedValue([makeEvent({ location: null })]);
-    const { findByText, queryByText } = await render(<EventDetailScreen />);
+    const { findByText, queryByTestId } = await render(<EventDetailScreen />);
     await findByText('Community BBQ');
-    expect(queryByText(/📍/)).toBeNull();
+    expect(queryByTestId('event-location')).toBeNull();
   });
 });

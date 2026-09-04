@@ -29,7 +29,7 @@ export default function Sidebar({ user }: Props) {
           href={dashboardHref(user.role)}
           className="text-lg font-bold text-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded"
         >
-          CommunityHQ
+          Portal HOA
         </Link>
         <ThemeToggle />
       </div>

@@ -1,11 +1,14 @@
+import { Inbox } from 'lucide-react';
+
 interface Props {
-  icon?: string;
+  /** Accepts a node so callers can pass a lucide icon; strings still render. */
+  icon?: React.ReactNode;
   title: string;
   description?: string;
   action?: React.ReactNode;
 }
 
-export function EmptyState({ icon = '📭', title, description, action }: Props) {
+export function EmptyState({ icon = <Inbox className="w-10 h-10 text-gray-400" />, title, description, action }: Props) {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center px-4">
       <span className="text-4xl mb-4" aria-hidden="true">{icon}</span>

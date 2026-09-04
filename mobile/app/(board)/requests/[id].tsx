@@ -98,7 +98,7 @@ export default function BoardArchRequestDetail() {
       <Text style={styles.sectionTitle}>Comments</Text>
       {request.comments.length === 0 ? (
         <Card>
-          <EmptyState icon="💬" message="No comments yet" />
+          <EmptyState icon="chat-bubble-outline" message="No comments yet" />
         </Card>
       ) : (
         request.comments.map((c) => (

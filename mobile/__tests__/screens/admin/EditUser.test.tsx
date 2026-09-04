@@ -25,11 +25,11 @@ function makeUser(overrides: Partial<AdminUserDetail> = {}): AdminUserDetail {
     id: 'r1',
     firstName: 'Demo',
     lastName: 'Resident',
-    email: 'r@communityhq.local',
+    email: 'r@portalhoa.local',
     role: 'RESIDENT',
     createdAt: '2026-01-01T00:00:00.000Z',
     communityId: 'c1',
-    community: { name: 'CommunityHQ Demo' },
+    community: { name: 'Portal HOA Demo' },
     ...overrides,
   };
 }
@@ -74,7 +74,7 @@ describe('EditUser (admin)', () => {
     });
 
     const { findByText, getByText } = await render(<EditUser />);
-    await findByText(/r@communityhq.local/);
+    await findByText(/r@portalhoa.local/);
 
     await act(async () => {
       fireEvent.press(getByText('Delete User'));
@@ -89,7 +89,7 @@ describe('EditUser (admin)', () => {
     mockedGetUser.mockResolvedValue(makeUser({ id: 'r1' }));
 
     const { findByText, queryByText } = await render(<EditUser />);
-    await findByText(/r@communityhq.local/);
+    await findByText(/r@portalhoa.local/);
 
     expect(queryByText('Delete User')).toBeNull();
     expect(await findByText('You cannot delete your own account.')).toBeTruthy();

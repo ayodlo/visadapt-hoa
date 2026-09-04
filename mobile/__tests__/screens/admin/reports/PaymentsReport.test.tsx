@@ -46,7 +46,7 @@ describe('PaymentsReportScreen', () => {
     mockedGetPaymentsReport.mockResolvedValue(
       makeReport({
         recentPayments: [
-          { id: 'p1', amount: 25000, paymentMethod: 'Credit Card', status: 'PAID', paidAt: '2026-07-01T00:00:00.000Z', createdAt: '2026-07-01T00:00:00.000Z', confirmationNumber: 'CONF1', residentName: 'Demo Resident', residentEmail: 'r@communityhq.local' },
+          { id: 'p1', amount: 25000, paymentMethod: 'Credit Card', status: 'PAID', paidAt: '2026-07-01T00:00:00.000Z', createdAt: '2026-07-01T00:00:00.000Z', confirmationNumber: 'CONF1', residentName: 'Demo Resident', residentEmail: 'r@portalhoa.local' },
         ],
       })
     );

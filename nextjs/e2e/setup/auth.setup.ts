@@ -19,13 +19,13 @@ async function signIn(page: import('@playwright/test').Page, email: string, stat
 }
 
 setup('authenticate as admin', async ({ page }) => {
-  await signIn(page, 'admin@communityhq.local', 'admin.json');
+  await signIn(page, 'admin@portalhoa.local', 'admin.json');
 });
 
 setup('authenticate as resident', async ({ page }) => {
-  await signIn(page, 'resident@communityhq.local', 'resident.json');
+  await signIn(page, 'resident@portalhoa.local', 'resident.json');
 });
 
 setup('authenticate as board member', async ({ page }) => {
-  await signIn(page, 'board@communityhq.local', 'board.json');
+  await signIn(page, 'board@portalhoa.local', 'board.json');
 });
