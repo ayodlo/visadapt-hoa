@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useToast } from '@/context/toast';
 import { useListControls } from '@/hooks/useListControls';
 import { ListToolbar } from '@/components/ui/ListToolbar';
@@ -111,7 +112,14 @@ export default function CommunitiesPage() {
               <tbody className="divide-y divide-gray-100">
                 {controls.visible.map((c) => (
                   <tr key={c.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 font-medium text-gray-900 whitespace-nowrap">{c.name}</td>
+                    <td className="px-4 py-3 font-medium whitespace-nowrap">
+                      <Link
+                        href={`/dashboard/communities/${c.id}`}
+                        className="text-gray-900 hover:text-blue-700 hover:underline focus:outline-none focus:ring-2 focus:ring-blue-500 rounded"
+                      >
+                        {c.name}
+                      </Link>
+                    </td>
                     <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{c._count.users}</td>
                     <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{c._count.communityAssignments}</td>
                     <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{c._count.properties}</td>

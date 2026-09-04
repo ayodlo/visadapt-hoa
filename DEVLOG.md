@@ -2,6 +2,43 @@
 
 ---
 
+## 2026-09-04 (Community editing: name, staff, residents, properties)
+
+**Files changed:**
+- `nextjs/app/api/admin/communities/[id]/route.ts` (new) — GET detail (community + staff + residents + properties), PATCH rename.
+- `nextjs/app/api/admin/communities/[id]/staff/route.ts` (new) — PUT the whole assigned-staff set.
+- `nextjs/app/api/admin/communities/[id]/residents/route.ts` (new) — POST moves a resident in.
+- `nextjs/app/api/admin/communities/[id]/properties/route.ts` + `[propertyId]/route.ts` (new) — property CRUD and ownership transfer.
+- `nextjs/app/api/admin/communities/[id]/candidates/route.ts` (new) — who can be added.
+- `nextjs/app/dashboard/communities/[id]/page.tsx` (new) — the editor.
+- `nextjs/app/dashboard/communities/page.tsx` — rows link to the detail page.
+
+**Decisions made:**
+- **Properties never follow a resident.** The first design sketched "move the properties with the owner"; that is wrong for an HOA — a house does not relocate to another association. The property is the permanent thing and belongs to its community forever; residents turn over and ownership transfers. `communityId` is therefore not updatable on a property at all, and a move-out/move-in is recorded by changing `ownerId`.
+- **No vacancy state.** Considered making `Property.ownerId` nullable so a unit could sit empty between owners, but the decision was replacement: when someone moves out, someone else moves into the same property. That needs no schema change, and this whole feature ships without a migration.
+- **A resident is moved, never removed.** `User.communityId` is nullable in the schema, but a resident with no community is locked out — `getActiveCommunityId` returns null and every route answers "No community selected". So the API only ever moves membership from one community to another; there is no clear-community operation to leave an account stranded.
+- **Moving out is refused while the resident still owns property here** (409, naming the count). Otherwise the property would be left with an owner outside its own community, which `/api/properties` — checking owner *and* community — treats as not found. The refusal is what forces the transfer-then-move order.
+- **Community-scoped endpoints rather than reusing `/api/properties`.** Those resolve the community from the session via `getActiveCommunityId`, so a SUPER_ADMIN editing community X while switched to community Y would be told the property does not exist. Administering a community has to address it explicitly.
+- **A separate `candidates` endpoint.** `/api/users` only returns people already in the caller's active community, so it cannot answer "which residents could move in from elsewhere". Candidates carry their current community and property count, so the UI shows up front that a move will be refused.
+- **Staff assignment is a whole-set PUT**, mirroring `PUT /api/users/[id]/communities` from the other side. Both write the same `CommunityAssignment` rows. Sending the set rather than deltas means two admins editing at once cannot produce a half-applied list.
+- **Property deletion is refused when records reference it** (charges, issues, violations, architectural requests, maintenance, payments). `propertyId` is nullable with no cascade, so the delete would fail on the foreign key anyway; the route counts first and says what is holding it.
+- **SUPER_ADMIN only**, matching the existing list/create endpoints — an ADMIN administers the community they are in, not the set of communities.
+
+**Next steps:**
+1. **The delete-refusal guard is the one path still unverified.** Every record type that can reference a property (`issues`, `violations`, `maintenanceRequests`, `charges`, `payments`, `architecturalRequests`) has **zero** rows with a non-null `propertyId` in the dev database, so no property could trigger the 409. The code path is unreachable with current data; it needs a linked record to exercise.
+2. **No community deletion.** The request was to update, not remove, so DELETE was deliberately left out.
+3. **Outstanding charges do not follow a transferred property.** A debt stays with the resident who incurred it, which is usually right, but some HOAs attach liens to the unit — worth a product decision.
+4. Two `Playwright Test HOA*` communities are left over from e2e runs and now show up in the communities list.
+
+**Gotchas:**
+- **`Property.ownerId` is NOT nullable**, so a property can never be ownerless. That is what rules out a vacancy state without a migration, and why the add-property form requires an existing resident.
+- **10 of 21 residents own more than one property**, so "the resident's property" is not a 1:1 relationship — transfers are per-property, not per-person.
+- `User.communityId` is RESIDENT-only; staff membership lives in `CommunityAssignment`. Mixing them would give a staff member two conflicting memberships, so the staff endpoint rejects a RESIDENT and the residents endpoint rejects staff.
+
+**Verification:** `tsc` clean; `eslint` clean (same 2 pre-existing warnings); 259 vitest tests passing; `next build` compiles and registers all six new routes. **Walked through live against the dev server as SUPER_ADMIN, 17/17 checks passing**: rename persists and leaves id, staff, residents and properties untouched; blank name rejected 400; moving a resident who owns 3 properties refused 409 with the count named, and verified to change nothing; ownership transferred; an owner from another community refused 400; the same move then allowed once they owned nothing; a resident rejected as staff 400; a created property deleted; unknown community 404. Every mutation was reversed afterwards and the final state re-read from the database — name, resident home community and all 3 property owners confirmed restored.
+
+---
+
 ## 2026-09-04 (Document uploads to S3)
 
 **Files changed:**
