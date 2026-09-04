@@ -131,7 +131,7 @@ export function sanitizeFileName(fileName: string): string {
 export const MAX_DIRECT_UPLOAD_BYTES = 25 * 1024 * 1024;
 
 /** Upload scopes permitted to request a presigned URL. */
-export const UPLOAD_SCOPES = ['maintenance'] as const;
+export const UPLOAD_SCOPES = ['maintenance', 'documents'] as const;
 export type UploadScope = (typeof UPLOAD_SCOPES)[number];
 
 export function isUploadScope(value: string): value is UploadScope {
@@ -194,4 +194,45 @@ export function maintenanceAttachmentKey(
   unique: string
 ): string {
   return `communities/${communityId}/maintenance/${requestId}/${unique}-${sanitizeFileName(fileName)}`;
+}
+
+/**
+ * Permanent home for an uploaded community document.
+ *
+ * Deliberately keyed by a UUID rather than the document id: the record does not
+ * exist yet when the file is promoted out of staging, so keying by row id would
+ * force us to create the row first and leave an orphan behind whenever the copy
+ * failed. This way the object is in place before anything is written to the
+ * database.
+ */
+export function documentKey(communityId: string, fileName: string, unique: string): string {
+  return `communities/${communityId}/documents/${unique}-${sanitizeFileName(fileName)}`;
+}
+
+/**
+ * `Content-Disposition` value for a download, per RFC 6266.
+ *
+ * Deliberately NOT `sanitizeFileName`: that exists to make a safe S3 *key*
+ * segment and collapses a space to `_`, which is the opposite of what a
+ * human-readable download name wants. And not `encodeURIComponent(fileName)`
+ * either -- inside a quoted-string a space is legal, so percent-encoding the
+ * whole name makes the browser save "Budget 2026.pdf" as the literal
+ * "Budget%202026.pdf".
+ *
+ * What a quoted-string genuinely cannot carry is a `"`, a `\`, a control
+ * character, or any non-ASCII byte. Those are replaced in the quoted fallback,
+ * while `filename*` carries the real name for clients that support it (every
+ * current browser) -- the split RFC 6266 prescribes.
+ */
+export function contentDispositionAttachment(fileName: string): string {
+  // Basename only: a stored name containing a path separator must not get a say
+  // in where the browser writes the file.
+  const name = fileName.split(/[\\/]/).pop() || 'download';
+  const ascii =
+    name
+      .replace(/[\x00-\x1F\x7F]/g, '')  // control characters
+      .replace(/[^\x20-\x7E]/g, '_')     // non-ASCII has no place in the quoted form
+      .replace(/["\\]/g, '_')           // would otherwise terminate the quoted-string
+    || 'download';
+  return `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(name)}`;
 }

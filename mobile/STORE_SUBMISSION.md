@@ -6,9 +6,9 @@ submitted to a store; it's all local config and a plan.
 
 ## Done in this repo
 
-- [x] `app.json` — placeholder bundle identifiers (`com.communityhq.app` for
-      both iOS `bundleIdentifier` and Android `package`), initial
-      `buildNumber`/`versionCode`
+- [x] `app.json` — final bundle identifiers (`com.portalhoa.app` for both iOS
+      `bundleIdentifier` and Android `package`, the reverse form of the
+      `portalhoa.com` domain), initial `buildNumber`/`versionCode`
 - [x] Placeholder icon/splash/adaptive-icon assets (simple generated house
       glyph on blue, replacing Expo's default template icon) — see
       [Replace placeholder branding](#replace-placeholder-branding) below
@@ -20,10 +20,11 @@ submitted to a store; it's all local config and a plan.
 ## Still needed (in order)
 
 ### 1. Replace placeholder branding
-- **Bundle identifier**: `com.communityhq.app` is a placeholder. If you own a
-  real domain, prefer its reverse form (e.g. `com.yourdomain.app`). This is
-  effectively permanent once you first submit to either store — changing it
-  later means a new app listing, not an update.
+- **Bundle identifier — settled, do not change.** `com.portalhoa.app` is the
+  reverse form of the `portalhoa.com` domain and is already committed in
+  `app.json`. It becomes permanent the first time you submit to either store:
+  changing it after that creates a new app listing rather than an update, and
+  existing installs will not upgrade to it.
 - **Icons/splash**: the generated house-glyph icon is a placeholder, not
   final design. Replace `mobile/assets/icon.png`,
   `android-icon-foreground.png`, `android-icon-background.png`,
@@ -94,8 +95,9 @@ property address, financial/payment records, issue/architectural
 request/violation content, announcement read receipts, poll votes, session
 tokens), what's explicitly *not* collected (camera, location, contacts, ad
 identifiers, analytics, push), who can see it (role-based within your HOA),
-retention, and security. **Before publishing**: replace the placeholder
-contact email (`privacy@communityhq.example.com`) with a real one, and
+retention, and security. **Before publishing**: confirm the contact address
+already in the policy (`privacy@portalhoa.com`) is a mailbox that actually
+receives mail — both stores use it to reach you — and
 re-review the content if app functionality changes (e.g. if push
 notifications or file uploads are added later, the policy needs updating to
 match — it's only accurate as of what the app does today).

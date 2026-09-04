@@ -1,7 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useSession } from '@/context/session';
+import { useToast } from '@/context/toast';
 import { isStaff } from '@/lib/roles';
 import { useListControls } from '@/hooks/useListControls';
 import { ListToolbar } from '@/components/ui/ListToolbar';
@@ -46,6 +48,7 @@ const PRIORITY_COLORS: Record<Priority, string> = {
 export default function MaintenancePage() {
   const session = useSession();
   const isAdmin = isStaff(session.role);
+  const { toast } = useToast();
 
   const [items, setItems] = useState<Request[]>([]);
   const [loading, setLoading] = useState(true);
@@ -84,11 +87,15 @@ export default function MaintenancePage() {
   }
 
   async function updateStatus(id: string, status: Status) {
-    await fetch(`/api/maintenance/${id}`, {
+    const res = await fetch(`/api/maintenance/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status }),
     });
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      toast(body?.error ?? 'Could not update the status.', 'error');
+    }
     load();
   }
 
@@ -142,7 +149,14 @@ export default function MaintenancePage() {
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1">
                   <div className="flex items-center gap-2 flex-wrap mb-1">
-                    <h3 className="font-semibold text-gray-900">{item.title}</h3>
+                    <h3 className="font-semibold text-gray-900">
+                      <Link
+                        href={`/dashboard/maintenance/${item.id}`}
+                        className="hover:text-blue-700 hover:underline focus:outline-none focus:ring-2 focus:ring-blue-500 rounded"
+                      >
+                        {item.title}
+                      </Link>
+                    </h3>
                     {item.requestNumber && (
                       <span className="text-xs font-mono text-gray-500">{item.requestNumber}</span>
                     )}
@@ -150,7 +164,13 @@ export default function MaintenancePage() {
                     <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${PRIORITY_COLORS[item.priority]}`}>{item.priority}</span>
                   </div>
                   <p className="text-sm text-gray-500">{item.submittedBy.firstName} {item.submittedBy.lastName} · {new Date(item.createdAt).toLocaleDateString()}</p>
-                  <p className="mt-2 text-sm text-gray-700">{item.description}</p>
+                  <p className="mt-2 text-sm text-gray-700 line-clamp-2">{item.description}</p>
+                  <Link
+                    href={`/dashboard/maintenance/${item.id}`}
+                    className="inline-block mt-2 text-sm text-blue-600 hover:underline focus:outline-none focus:ring-2 focus:ring-blue-500 rounded"
+                  >
+                    View details{item._count?.attachments ? ` · ${item._count.attachments} file${item._count.attachments === 1 ? '' : 's'}` : ''}
+                  </Link>
                 </div>
                 {isAdmin && (
                   <div className="flex flex-col gap-1 flex-shrink-0">

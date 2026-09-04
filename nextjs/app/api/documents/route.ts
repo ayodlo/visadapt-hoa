@@ -6,16 +6,29 @@ import { getActiveCommunityId } from '@/lib/community';
 import { isAdmin } from '@/lib/roles';
 import { ok, err, unauthorized, forbidden } from '@/lib/api';
 import { createAuditLog } from '@/lib/audit';
+import { copyS3Object, deleteS3Object, headS3Object } from '@/lib/s3';
+import { MAX_DIRECT_UPLOAD_BYTES, documentKey, isStagedKeyFor } from '@/lib/uploads';
+import { randomUUID } from 'node:crypto';
 
 const CATEGORIES = ['CC_AND_RS', 'RULES_AND_REGS', 'MEETING_MINUTES', 'FINANCIALS', 'INSURANCE', 'COMMUNITY_FORMS', 'MAINTENANCE', 'OTHER'] as const;
 
-const createSchema = z.object({
-  title: z.string().min(1, 'Title is required'),
-  description: z.string().optional(),
-  category: z.enum(CATEGORIES),
-  fileUrl: z.string().min(1, 'File URL is required'),
-  fileName: z.string().min(1, 'File name is required'),
-});
+/**
+ * A document is either uploaded to our bucket (`stagedKey`) or linked to a file
+ * hosted elsewhere (`fileUrl`) -- never both, and never neither. The refinement
+ * enforces that here rather than leaving a row that points at nothing.
+ */
+const createSchema = z
+  .object({
+    title: z.string().min(1, 'Title is required'),
+    description: z.string().optional(),
+    category: z.enum(CATEGORIES),
+    fileUrl: z.string().min(1).optional(),
+    stagedKey: z.string().min(1).optional(),
+    fileName: z.string().min(1, 'File name is required'),
+  })
+  .refine((v) => Boolean(v.fileUrl) !== Boolean(v.stagedKey), {
+    message: 'Provide either an uploaded file or a file URL, not both.',
+  });
 
 const INCLUDE = { uploadedBy: { select: { id: true, firstName: true, lastName: true } } };
 
@@ -83,8 +96,46 @@ export async function POST(req: NextRequest) {
   const parsed = createSchema.safeParse(body);
   if (!parsed.success) return err(parsed.error.issues[0].message, 400);
 
+  const { stagedKey, ...fields } = parsed.data;
+
+  // An uploaded file is promoted out of `_staging/` BEFORE the row is written,
+  // so a failed copy leaves no document pointing at a file that isn't there.
+  // Staged objects are expired by a bucket lifecycle rule, which is why a
+  // confirmed upload must not be left in that prefix.
+  let stored: { storageKey: string; contentType: string; sizeBytes: number } | null = null;
+  if (stagedKey) {
+    if (!isStagedKeyFor(stagedKey, communityId, 'documents')) {
+      return err('That upload could not be verified. Please try again.', 400);
+    }
+
+    // The presigned URL could not enforce size, so the stored object is the
+    // authority -- not what the client claimed when it asked for the URL.
+    const head = await headS3Object(stagedKey);
+    if (!head || head.size <= 0 || head.size > MAX_DIRECT_UPLOAD_BYTES) {
+      await deleteS3Object(stagedKey).catch(() => {});
+      return err('That file was missing or too large. Please upload it again.', 400);
+    }
+
+    const finalKey = documentKey(communityId, fields.fileName, randomUUID());
+    try {
+      await copyS3Object(stagedKey, finalKey);
+    } catch (error) {
+      const { name, message } = error as Error;
+      console.error(`[documents] could not promote ${stagedKey}: ${name}: ${message}`);
+      return err('Could not store the file. Please try again.', 502);
+    }
+    await deleteS3Object(stagedKey).catch(() => {});
+    stored = { storageKey: finalKey, contentType: head.contentType, sizeBytes: head.size };
+  }
+
   const doc = await prisma.document.create({
-    data: { ...parsed.data, uploadedById: session.id, communityId },
+    data: {
+      ...fields,
+      fileUrl: fields.fileUrl ?? null,
+      ...(stored ?? {}),
+      uploadedById: session.id,
+      communityId,
+    },
     include: INCLUDE,
   });
 

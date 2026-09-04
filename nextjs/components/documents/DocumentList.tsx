@@ -12,6 +12,7 @@ import { LoadingState } from '@/components/ui/LoadingState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Pagination } from '@/components/ui/Pagination';
 import { CATEGORY_FILTER_OPTIONS } from '@/lib/documents';
+import { formatBytes } from '@/lib/uploads';
 
 interface Uploader { id: string; firstName: string; lastName: string; }
 export interface Doc {
@@ -19,7 +20,9 @@ export interface Doc {
   title: string;
   description: string | null;
   category: string;
-  fileUrl: string;
+  fileUrl: string | null;
+  storageKey?: string | null;
+  sizeBytes?: number | null;
   fileName: string;
   uploadedBy: Uploader;
   createdAt: string;
@@ -62,6 +65,8 @@ export default function DocumentList({ detailBase, headerAction, extraActions, s
   const [sort, setSort] = useState('createdAt');
   const [dir, setDir] = useState<'asc' | 'desc'>('desc');
   const [status, setStatus] = useState<'idle' | 'loading' | 'error'>('idle');
+  const [downloading, setDownloading] = useState<string | null>(null);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 300);
@@ -91,6 +96,30 @@ export default function DocumentList({ detailBase, headerAction, extraActions, s
   }, [page, debouncedSearch, category, sort, dir]);
 
   useEffect(() => { load(); }, [load]);
+
+  /**
+   * Downloads go through the API rather than linking at a stored URL: an
+   * uploaded file lives in a private bucket and its presigned URL is minted per
+   * request. Same-tab navigation, not window.open — the signed URL carries
+   * Content-Disposition: attachment, so the browser saves the file without
+   * leaving the page, and nothing gets caught by a popup blocker.
+   */
+  async function download(doc: Doc) {
+    setDownloading(doc.id);
+    try {
+      const res = await fetch(`/api/documents/${doc.id}/download`);
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.url) {
+        setDownloadError(data?.error ?? 'Could not prepare that download.');
+        return;
+      }
+      window.location.assign(data.url);
+    } catch {
+      setDownloadError('Could not prepare that download. Check your connection.');
+    } finally {
+      setDownloading(null);
+    }
+  }
 
   return (
     <div className="max-w-5xl mx-auto">
@@ -133,6 +162,10 @@ export default function DocumentList({ detailBase, headerAction, extraActions, s
       {status === 'loading' && <LoadingState rows={5} />}
       {status === 'error' && <ErrorState onRetry={load} />}
 
+      {downloadError && (
+        <p role="alert" className="text-sm text-red-600 mb-3">{downloadError}</p>
+      )}
+
       {status === 'idle' && docs.length === 0 && (
         <EmptyState
           icon={<FileText className="w-10 h-10 text-gray-400" />}
@@ -163,19 +196,25 @@ export default function DocumentList({ detailBase, headerAction, extraActions, s
                     )}
                     <div className="flex flex-wrap items-center gap-3 text-xs text-gray-400">
                       <span>{doc.fileName}</span>
+                      {doc.sizeBytes ? (
+                        <>
+                          <span>·</span>
+                          <span>{formatBytes(doc.sizeBytes)}</span>
+                        </>
+                      ) : null}
                       <span>·</span>
                       <span>Uploaded {new Date(doc.createdAt).toLocaleDateString()}</span>
                     </div>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
-                    <a
-                      href={doc.fileUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs text-blue-600 hover:underline focus:outline-none focus:ring-2 focus:ring-blue-500 rounded px-1"
+                    <button
+                      type="button"
+                      onClick={() => download(doc)}
+                      disabled={downloading === doc.id}
+                      className="text-xs text-blue-600 hover:underline disabled:opacity-50 disabled:no-underline focus:outline-none focus:ring-2 focus:ring-blue-500 rounded px-1"
                     >
-                      Download
-                    </a>
+                      {downloading === doc.id ? 'Preparing…' : 'Download'}
+                    </button>
                     {extraActions?.(doc)}
                   </div>
                 </div>

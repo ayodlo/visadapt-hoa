@@ -5,8 +5,10 @@ import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
 import { getActiveCommunityId } from '@/lib/community';
 import { isStaff } from '@/lib/roles';
+import { sendPushToUsers } from '@/lib/push';
+import { sendNewMaintenanceRequestEmail } from '@/lib/email';
 import { ok, err, unauthorized } from '@/lib/api';
-import { formatRequestNumber, maintenanceRequestSchema, staffQuickRequestSchema } from '@/lib/maintenance';
+import { formatRequestNumber, isEmergency, maintenanceRequestSchema, staffQuickRequestSchema } from '@/lib/maintenance';
 import { copyS3Object, deleteS3Object, headS3Object } from '@/lib/s3';
 import {
   MAX_DIRECT_UPLOAD_BYTES,
@@ -72,6 +74,67 @@ async function createWithRequestNumber(
   throw new Error('Could not allocate a request number');
 }
 
+/**
+ * Tell the people who triage that a request exists.
+ *
+ * Nothing announced a new submission before this, so the queue was only ever
+ * discovered by someone happening to open the page. Scoped to admins (mirroring
+ * `isAdmin`) rather than every non-resident: board members can read the queue
+ * but do not work it, and a push per maintenance request would be noise.
+ *
+ * Never throws. The request is already created and committed by this point, and
+ * a notification failure must not turn a successful submission into an error
+ * the resident sees.
+ */
+async function notifyStaffOfNewRequest(
+  communityId: string,
+  actorId: string,
+  request: { id: string; title: string; requestNumber: string | null },
+  submitterName: string,
+  urgent = false
+) {
+  try {
+    const recipients = await prisma.user.findMany({
+      where: {
+        id: { not: actorId },
+        role: { in: ['ADMIN', 'SUPER_ADMIN'] },
+        communityAssignments: { some: { communityId } },
+      },
+      select: { id: true, email: true, firstName: true },
+    });
+    if (recipients.length === 0) return;
+
+    // Email is the channel that actually lands: maintenance is web-only, and
+    // sendPushToUsers no-ops for anyone without a mobile push token. The push
+    // is still sent so this behaves like every other feature once a mobile
+    // maintenance screen exists.
+    await Promise.allSettled(
+      recipients.map((r) =>
+        sendNewMaintenanceRequestEmail(
+          r.email,
+          r.firstName,
+          {
+            id: request.id,
+            title: request.title,
+            requestNumber: request.requestNumber,
+            submitterName: submitterName,
+          },
+          urgent
+        )
+      )
+    );
+
+    await sendPushToUsers(recipients.map((r) => r.id), {
+      title: urgent ? 'Emergency Maintenance Request' : 'New Maintenance Request',
+      body: `${request.requestNumber ?? 'Request'}: ${request.title}`,
+      data: { type: 'maintenance', id: request.id },
+    });
+  } catch (error) {
+    const { name, message } = error as Error;
+    console.error(`[maintenance] could not notify staff of ${request.id}: ${name}: ${message}`);
+  }
+}
+
 export async function POST(req: NextRequest) {
   const session = await getSession();
   if (!session) return unauthorized();
@@ -96,6 +159,12 @@ export async function POST(req: NextRequest) {
       submittedById: session.id,
       communityId,
     });
+    await notifyStaffOfNewRequest(
+      communityId,
+      session.id,
+      request,
+      `${session.firstName} ${session.lastName}`
+    );
     return ok(request, 201);
   }
 
@@ -180,6 +249,14 @@ export async function POST(req: NextRequest) {
     });
     await deleteS3Object(file.key).catch(() => {});
   }
+
+  await notifyStaffOfNewRequest(
+    communityId,
+    session.id,
+    request,
+    `${session.firstName} ${session.lastName}`,
+    isEmergency(rest.residentUrgency ?? '')
+  );
 
   return ok(request, 201);
 }

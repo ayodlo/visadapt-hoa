@@ -15,6 +15,8 @@ import {
   stagedUploadKey,
   isStagedKeyFor,
   maintenanceAttachmentKey,
+  documentKey,
+  contentDispositionAttachment,
   eventImageKey,
   extensionFor,
   formatBytes,
@@ -182,6 +184,7 @@ describe('direct (presigned) uploads', () => {
 
   it('only recognises the scopes that may request a URL', () => {
     expect(isUploadScope('maintenance')).toBe(true);
+    expect(isUploadScope('documents')).toBe(true);
     expect(isUploadScope('violations')).toBe(false);
     expect(isUploadScope('')).toBe(false);
   });
@@ -236,5 +239,60 @@ describe('maintenanceAttachmentKey', () => {
     expect(key).toBe('communities/c1/maintenance/r1/u1-photo.jpg');
     expect(key).not.toContain('_staging');
     expect(isStagedKeyFor(key, 'c1', 'maintenance')).toBe(false);
+  });
+});
+
+describe('documentKey', () => {
+  it('is tenant-prefixed and lands outside the staging prefix', () => {
+    const key = documentKey('c1', 'Budget 2026.pdf', 'u1');
+    expect(key).toBe('communities/c1/documents/u1-Budget_2026.pdf');
+    expect(key).not.toContain('_staging');
+    expect(isStagedKeyFor(key, 'c1', 'documents')).toBe(false);
+  });
+
+  it('sanitises a filename that tries to escape the prefix', () => {
+    expect(documentKey('c1', '../../secret .pdf', 'u')).toBe('communities/c1/documents/u-secret_.pdf');
+  });
+
+  it('round-trips a staged documents key through the guard', () => {
+    const staged = stagedUploadKey('c1', 'documents', 'Budget 2026.pdf', 'u1');
+    expect(staged).toBe('_staging/communities/c1/documents/u1-Budget_2026.pdf');
+    expect(isStagedKeyFor(staged, 'c1', 'documents')).toBe(true);
+    // A documents key must not satisfy the maintenance scope check.
+    expect(isStagedKeyFor(staged, 'c1', 'maintenance')).toBe(false);
+  });
+});
+
+describe('contentDispositionAttachment', () => {
+  it('keeps spaces intact in the quoted filename', () => {
+    // The bug this replaced emitted "Budget%202026.pdf", which browsers saved
+    // under that literal name.
+    const value = contentDispositionAttachment('Budget 2026.pdf');
+    expect(value).toBe(
+      'attachment; filename="Budget 2026.pdf"; filename*=UTF-8\'\'Budget%202026.pdf'
+    );
+  });
+
+  it('keeps a non-ASCII name in filename* and degrades the quoted fallback', () => {
+    const value = contentDispositionAttachment('r\u00e9sum\u00e9.pdf');
+    expect(value).toContain('filename="r_sum_.pdf"');
+    expect(value).toContain("filename*=UTF-8''r%C3%A9sum%C3%A9.pdf");
+  });
+
+  it('cannot be broken out of the quoted string', () => {
+    const quoted = contentDispositionAttachment('ev"il-name.pdf').match(/filename="([^"]*)"/);
+    expect(quoted?.[1]).toBe('ev_il-name.pdf');
+  });
+
+  it('treats a backslash as a path separator, like the key sanitiser does', () => {
+    expect(contentDispositionAttachment('C:\\docs\\budget.pdf')).toContain('filename="budget.pdf"');
+  });
+
+  it('strips a path so the browser cannot be steered out of its download folder', () => {
+    expect(contentDispositionAttachment('../../etc/passwd')).toContain('filename="passwd"');
+  });
+
+  it('falls back to a usable name when nothing survives', () => {
+    expect(contentDispositionAttachment('')).toContain('filename="download"');
   });
 });

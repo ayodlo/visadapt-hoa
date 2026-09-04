@@ -7,6 +7,7 @@ import { getActiveCommunityId } from '@/lib/community';
 import { redirect } from 'next/navigation';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { categoryLabel } from '@/lib/documents';
+import { getPresignedDownloadUrl } from '@/lib/s3';
 
 export default async function ResidentDocumentDetailPage({
   params,
@@ -26,6 +27,13 @@ export default async function ResidentDocumentDetailPage({
   });
 
   if (!doc || doc.communityId !== communityId) notFound();
+
+  // Uploaded files live in a private bucket and need signing; linked documents
+  // already carry a usable URL. Signed here so the markup stays a plain link.
+  let downloadUrl: string | null = doc.fileUrl;
+  if (doc.storageKey) {
+    downloadUrl = await getPresignedDownloadUrl(doc.storageKey, doc.fileName).catch(() => null);
+  }
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -73,14 +81,18 @@ export default async function ResidentDocumentDetailPage({
         </div>
 
         <div className="mt-6 pt-5 border-t border-gray-100">
-          <a
-            href={doc.fileUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 bg-blue-600 text-white text-sm font-medium px-5 py-2.5 rounded-lg hover:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-          >
-            Download file
-          </a>
+          {downloadUrl ? (
+            <a
+              href={downloadUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 bg-blue-600 text-white text-sm font-medium px-5 py-2.5 rounded-lg hover:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+            >
+              Download file
+            </a>
+          ) : (
+            <p className="text-sm text-gray-500">This document&rsquo;s file is unavailable.</p>
+          )}
         </div>
       </div>
     </div>

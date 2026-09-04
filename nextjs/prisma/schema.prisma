@@ -494,7 +494,13 @@ model Document {
   title        String
   description  String?
   category     DocumentCategory @default(OTHER)
-  fileUrl      String
+  /// Link to a file hosted elsewhere. Null once the file lives in our own
+  /// bucket -- exactly one of fileUrl / storageKey is set on any document.
+  fileUrl      String?
+  /// S3 object key for an uploaded file. Null for externally linked documents.
+  storageKey   String?
+  contentType  String?
+  sizeBytes    Int?
   fileName     String
   uploadedById String
   uploadedBy   User             @relation(fields: [uploadedById], references: [id])

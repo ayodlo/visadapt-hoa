@@ -2,6 +2,75 @@
 
 ---
 
+## 2026-09-04 (Document uploads to S3)
+
+**Files changed:**
+- `nextjs/prisma/schema.prisma` + `migrations/20260904154717_add_document_uploads/` — `Document` gains `storageKey`, `contentType`, `sizeBytes` (all nullable); `fileUrl` becomes nullable. Applied.
+- `nextjs/lib/uploads.ts` — `documents` added to `UPLOAD_SCOPES`; new `documentKey`.
+- `nextjs/app/api/documents/route.ts` — POST accepts `stagedKey` OR `fileUrl` (zod refinement enforces exactly one), verifies the stored object, promotes it out of `_staging/`.
+- `nextjs/app/api/documents/[id]/download/route.ts` — returns a presigned URL when `storageKey` is set; still returns `{ url, fileName }`.
+- `nextjs/app/api/documents/[id]/route.ts` — DELETE removes the S3 object.
+- `nextjs/components/documents/DocumentList.tsx` — Download goes through the API instead of linking at a stored URL; shows file size.
+- `nextjs/app/resident/documents/[id]/page.tsx` — signs the URL server-side.
+- `nextjs/app/admin/documents/page.tsx` — file picker uploading on pick, with the external-link fields behind a `<details>`.
+- `nextjs/__tests__/lib/uploads.test.ts` — 3 new tests (253 total).
+
+**Decisions made:**
+- **Documents were never uploaded at all before this.** `fileUrl` was a free-text field an admin typed a URL into, and `/download` handed that string straight back. All 36 existing rows are seed data pointing at `https://cdn.example.com/hoa-docs/...`, a domain that does not exist — so there was no real linked file to preserve.
+- **Presigned direct-to-S3, not server-relayed.** Reuses the CORS policy and `_staging/` lifecycle rule added 2026-09-03, and raises the ceiling from the 4 MB platform request-body cap to 25 MB — which matters for CC&Rs and financial reports.
+- **`documentKey` is keyed by UUID, not document id.** Maintenance promotes attachments *after* creating the row, which leaves an orphaned row whenever the copy fails. Without the row id in the key, the object can be promoted *before* anything is written, so a failed copy creates nothing.
+- **`fileUrl` kept and made nullable rather than dropped.** A document is either uploaded or linked; the refinement rejects both-or-neither. Keeps the 36 seeded rows working and still allows registering a file hosted elsewhere.
+- **The download endpoint keeps returning JSON.** A 302 redirect would have been the cleaner shape for a plain `<a>`, but `mobile/src/api/documents.ts:14` consumes `{ url, fileName }` — changing it would have broken the mobile app silently. Web now calls the same endpoint mobile already used.
+- **Editing shows the file read-only.** PATCH does not accept `stagedKey`, so offering a picker there would have been a control that silently did nothing. The form says to delete and re-add instead.
+
+**Next steps:**
+1. **Replacing a file requires delete-and-re-add.** Supporting it means teaching PATCH to promote a new key and delete the old object — worth doing if admins hit it.
+2. **`getPresignedDownloadUrl` mangles filenames containing spaces** — see Gotchas. Affects documents, maintenance attachments and violation evidence alike.
+3. The upload was verified against the bucket with a script, not through a browser. The form's own path (presign route + fetch PUT from the page) is still unexercised by a real click.
+
+**Gotchas:**
+- **`Content-Disposition` filenames are over-encoded.** `lib/s3.ts` builds `filename="${encodeURIComponent(fileName)}"`, so `Budget 2026.pdf` is sent as `Budget%202026.pdf` and browsers save it under that literal name. Verified live. Inside a quoted string a space is legal and needs no escaping; non-ASCII names want `filename*=UTF-8''...` per RFC 6266. Pre-existing and shared by every download path.
+- **`window.location.href = url` fails `react-hooks/immutability`** under the React Compiler lint rules. `window.location.assign(url)` is equivalent and passes.
+- **`prisma generate` fails with EPERM on Windows while `next dev` is running** — the dev server holds `query_engine-windows.dll.node`. Stop the dev server first.
+- Anchoring a code insert on `'  return ('` matches `return () => clearTimeout(t)` inside a `useEffect` before it matches the component body. Anchor on `'\n  return (\n    <div'`.
+
+**Verification:** `tsc` clean; `eslint` clean (same 2 pre-existing warnings); 253 vitest tests (250 -> 253); `next build` compiles. Full path verified live against `communityhq-documents-test`: staged key shape and scope guard, presigned PUT 200, server-side `HeadObject` (40 bytes, `application/pdf`), promotion out of `_staging/`, staged object confirmed gone, presigned download 200 with `Content-Disposition: attachment`, bytes round-tripping byte-for-byte, and cleanup. Probe objects removed.
+
+---
+
+## 2026-09-03 (Maintenance detail view + staff notification on submit)
+
+**Files changed:**
+- `nextjs/app/dashboard/maintenance/[id]/page.tsx` (new) - the detail view. Every field the 5-step intake collects, the access section, and attachments rendered as image thumbnails or download tiles. Staff get status and priority controls inline.
+- `nextjs/app/api/maintenance/[id]/route.ts` - added `GET` (none existed); `SUBMITTED` added to the PUT status enum; status email now receives the request id.
+- `nextjs/app/api/maintenance/route.ts` - `notifyStaffOfNewRequest`, called from both creation paths.
+- `nextjs/lib/email.ts` - `sendNewMaintenanceRequestEmail`; `sendMaintenanceStatusEmail` now deep-links to the request rather than the list.
+- `nextjs/app/dashboard/maintenance/page.tsx` - rows link into the detail view (title + a "View details" link showing the attachment count); `updateStatus` now surfaces failures.
+
+**Decisions made:**
+- **Attachments were write-only before this.** The upload path built earlier today (presign -> S3 -> promote out of `_staging/` -> `MaintenanceAttachment` row) terminated in a dead end: `GET /api/maintenance/[id]/attachments` already returned presigned URLs and an `isImage` flag, but nothing in the UI called it. The detail page is what makes that whole chain worth having.
+- **Email, not push alone, for the staff notification.** Push is the established channel for announcements, issues, violations and arch requests, so it is sent too - but `sendPushToUsers` returns early for anyone with no `pushToken` row, and tokens only exist for mobile app users. **Mobile has no maintenance screen at all**, so a push-only notification would reach nobody who can act on it, and its `data: { type: 'maintenance' }` payload would deep-link into an app with no such route.
+- **Notification scoped to ADMIN/SUPER_ADMIN, not all staff.** `isStaff` includes BOARD_MEMBER, and board members can read the queue, but they do not work it - one email per maintenance request would be noise. Widening it is a one-line change to the `role` filter.
+- **Notification failures never fail the request.** `notifyStaffOfNewRequest` swallows and logs, and the emails go through `Promise.allSettled`, so one bad address cannot cost a resident the submission - same reasoning as the best-effort attachment promotion.
+- **`SUBMITTED` added to the PUT enum rather than removed from the dropdown.** The README states transitions are convention, not enforcement ("staff can set any status at any time"), so the dropdown was right and the schema was wrong.
+- **The detail page reuses `StatusBadge`** rather than the list page's local `STATUS_COLORS`/`PRIORITY_COLORS` maps - it already covers every status and priority value including `SUBMITTED`.
+
+**Next steps:**
+1. **No tests were added.** The vitest suite is lib-level and this change is a page plus route handlers; an e2e spec is the right shape, but it needs a seeded database, and the rename migration is still unapplied. Worth adding to `e2e/maintenance.spec.ts` once the DB is current.
+2. **`RESEND_API_KEY` gates the staff email.** `getResend()` throws without it; the throw is caught and logged, so a missing key means silent no-notification rather than a visible failure.
+3. Mobile still has no maintenance screen. Until it does, the push half of the notification is inert.
+4. `MaintenanceRequest` and `Issue` remain two parallel resident-reporting systems, both in the nav.
+
+**Gotchas:**
+- **The status dropdown was silently broken.** `page.tsx` offered `SUBMITTED` while the PUT schema accepted only `OPEN|IN_PROGRESS|RESOLVED|CLOSED`, and `updateStatus` never checked `res.ok` - the 400 was swallowed, `load()` ran, and the control snapped back with no message. Both halves fixed.
+- **The toast API is `const { toast } = useToast()` and `toast(msg, type)`**, not `toast.show(...)`.
+- Admins have no `User.communityId` (it is RESIDENT-only); recipient lookup must go through `communityAssignments`, as the announcements route does.
+- Attachment URLs are presigned and short-lived, so the detail page fetches them on each view rather than caching them with the record.
+
+**Verification:** `tsc` clean, `eslint` clean on all touched paths, 250 vitest tests passing, `next build` compiles and registers `/dashboard/maintenance/[id]`. Not exercised against a running server - see Next steps #1.
+
+---
+
 ## 2026-09-03 (Emoji -> icons across both apps; CommunityHQ -> Portal HOA)
 
 **Files changed:**

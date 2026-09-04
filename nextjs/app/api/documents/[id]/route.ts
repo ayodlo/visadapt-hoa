@@ -6,6 +6,7 @@ import { getActiveCommunityId } from '@/lib/community';
 import { isAdmin } from '@/lib/roles';
 import { ok, err, unauthorized, forbidden, notFound } from '@/lib/api';
 import { createAuditLog } from '@/lib/audit';
+import { deleteS3Object } from '@/lib/s3';
 
 const CATEGORIES = ['CC_AND_RS', 'RULES_AND_REGS', 'MEETING_MINUTES', 'FINANCIALS', 'INSURANCE', 'COMMUNITY_FORMS', 'MAINTENANCE', 'OTHER'] as const;
 
@@ -75,6 +76,16 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
   if (!existing || existing.communityId !== communityId) return notFound('Document');
 
   await prisma.document.delete({ where: { id } });
+
+  // Remove the stored object after the row, so a storage failure cannot leave a
+  // document that is listed but no longer downloadable. An orphaned object is
+  // the safer of the two failure modes.
+  if (existing.storageKey) {
+    await deleteS3Object(existing.storageKey).catch((error: Error) => {
+      console.error(`[documents] orphaned object ${existing.storageKey}: ${error.name}: ${error.message}`);
+    });
+  }
+
   await createAuditLog({ userId: session.id, action: 'document.delete', entityType: 'Document', entityId: id });
 
   return ok({ deleted: true });

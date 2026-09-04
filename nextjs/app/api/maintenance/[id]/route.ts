@@ -3,15 +3,44 @@ import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
 import { getActiveCommunityId } from '@/lib/community';
+import { isStaff } from '@/lib/roles';
 import { ok, err, unauthorized, forbidden, notFound } from '@/lib/api';
 import { sendMaintenanceStatusEmail } from '@/lib/email';
 
 const schema = z.object({
-  status: z.enum(['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED']).optional(),
+  status: z.enum(['SUBMITTED', 'OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED']).optional(),
   priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).optional(),
   title: z.string().min(1).optional(),
   description: z.string().min(1).optional(),
 });
+
+/**
+ * One request, with everything the intake collected.
+ *
+ * The list endpoint deliberately returns a thin shape; the detail view is where
+ * category, urgency, access and contact preferences finally become visible. The
+ * same scoping rule applies as everywhere else: staff see any request in the
+ * community, a resident sees only their own.
+ */
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const session = await getSession();
+  if (!session) return unauthorized();
+
+  const communityId = await getActiveCommunityId(session);
+  if (!communityId) return err('No community selected', 400);
+
+  const { id } = await params;
+  const request = await prisma.maintenanceRequest.findFirst({
+    where: { id, communityId, ...(isStaff(session.role) ? {} : { submittedById: session.id }) },
+    include: {
+      submittedBy: { select: { id: true, firstName: true, lastName: true, email: true } },
+      property: { select: { id: true, streetAddress: true, unitNumber: true, city: true, state: true } },
+    },
+  });
+  if (!request) return notFound('Maintenance request');
+
+  return ok(request);
+}
 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
@@ -41,7 +70,8 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       updated.submittedBy.email,
       updated.submittedBy.firstName,
       updated.title,
-      parsed.data.status
+      parsed.data.status,
+      updated.id
     ).catch(() => {});
   }
 
