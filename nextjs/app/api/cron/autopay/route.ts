@@ -6,26 +6,37 @@ import { runAutopay } from '@/lib/autopay';
 /**
  * The daily autopay run.
  *
- * There is no scheduler in this codebase, so this is an HTTP endpoint meant to be
- * called by a platform cron (Vercel Cron, once the app is deployed — it needs no
- * new dependency, only a `crons` entry in the project config). Until then it can
- * be invoked by hand, which is also how it is tested.
+ * There is no scheduler in this codebase, so this is an HTTP endpoint driven by a
+ * platform cron. On Vercel that is the `crons` entry in `nextjs/vercel.json`,
+ * which needs no new dependency.
  *
- * Auth is a shared secret rather than a session, because no user is present. Like
- * the Stripe webhook, this route is exempted from `proxy.ts` JWT gating and does
- * its own check.
+ * **Exported as both GET and POST on purpose.** Vercel Cron invokes the path with
+ * a **GET**; a POST-only route would return 405 and the job would silently never
+ * run. POST is kept because it is the honest verb for something that moves money,
+ * and it is what the verification script and any manual run use.
  *
- * `?dryRun=1` reports what would be charged without calling Stripe, which is the
- * only safe way to look at this in an environment holding real enrolments.
+ * Auth is a shared secret rather than a session, because no user is present.
+ * Vercel sends `Authorization: Bearer $CRON_SECRET` automatically when that
+ * environment variable is set on the project. Like the Stripe webhook, this route
+ * is exempted from `proxy.ts` JWT gating and does its own check.
+ *
+ * `?dryRun=1` reports what would be charged without calling Stripe — the only safe
+ * way to look at this in an environment holding real enrolments.
  */
 export const runtime = 'nodejs';
 
+export async function GET(req: NextRequest) {
+  return handle(req);
+}
+
 export async function POST(req: NextRequest) {
+  return handle(req);
+}
+
+async function handle(req: NextRequest) {
   const secret = process.env.CRON_SECRET;
   if (!secret) return err('CRON_SECRET is not set', 503);
 
-  // Vercel Cron sends `Authorization: Bearer <CRON_SECRET>`; the header is also
-  // accepted from anything else that knows the secret.
   const auth = req.headers.get('authorization');
   const provided = auth?.startsWith('Bearer ') ? auth.slice('Bearer '.length).trim() : null;
 
