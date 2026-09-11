@@ -27,7 +27,12 @@ test.describe('as board member', () => {
     await page.goto('/dashboard/users');
     await expect(page.getByRole('heading', { name: 'Users' })).toBeVisible();
     await expect(page.getByText('resident@portalhoa.local')).toBeVisible();
-    await expect(page.getByRole('combobox')).toHaveCount(0);
+    // Scoped to the resident row rather than the whole page. The list toolbar
+    // added in f911a11 renders its own sort and filter selects, which every role
+    // sees, so a page-wide combobox count stopped meaning "no role editing" the
+    // moment search/filter arrived on this page.
+    const residentRow = page.locator('tr').filter({ hasText: 'resident@portalhoa.local' });
+    await expect(residentRow.getByRole('combobox')).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Delete' })).toHaveCount(0);
   });
 });

@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /* Enables `dark:` utilities, keyed off the data-theme attribute set on <html>
-   by the inline script in app/layout.tsx (defaults to dark). */
+   by the inline script in app/layout.tsx (defaults to light). */
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
 @theme inline {
