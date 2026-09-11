@@ -1,4 +1,5 @@
 import { prisma } from './prisma';
+import { chargeBalance } from './charges';
 
 function monthStart() {
   const d = new Date();
@@ -70,8 +71,10 @@ export async function getAdminDashboard(communityId: string) {
       where: { status: { in: ['SUBMITTED', 'UNDER_REVIEW'] }, violation: { communityId } },
     }),
 
+    // amountPaid is summed alongside amount so partial payments reduce the
+    // outstanding figure: sum(amount - amountPaid) === sum(amount) - sum(amountPaid).
     prisma.charge.aggregate({
-      _sum: { amount: true },
+      _sum: { amount: true, amountPaid: true },
       where: { communityId, status: { in: ['PENDING', 'OVERDUE'] } },
     }),
 
@@ -112,7 +115,7 @@ export async function getAdminDashboard(communityId: string) {
 
   return {
     totalResidents,
-    unpaidBalanceCents: unpaidChargesAgg._sum.amount ?? 0,
+    unpaidBalanceCents: (unpaidChargesAgg._sum.amount ?? 0) - (unpaidChargesAgg._sum.amountPaid ?? 0),
     delinquentAccounts: delinquentResidents,
     openIssues,
     overdueIssues,
@@ -228,13 +231,13 @@ export async function getResidentDashboard(userId: string, communityId: string) 
   ] = await Promise.all([
     prisma.charge.findMany({
       where: { residentId: userId, status: { in: ['PENDING', 'OVERDUE'] } },
-      select: { amount: true },
+      select: { amount: true, amountPaid: true },
     }),
 
     prisma.charge.findFirst({
       where: { residentId: userId, status: 'PENDING', dueDate: { gte: now } },
       orderBy: { dueDate: 'asc' },
-      select: { dueDate: true, amount: true, description: true },
+      select: { dueDate: true, amount: true, amountPaid: true, description: true },
     }),
 
     prisma.issue.count({
@@ -269,14 +272,14 @@ export async function getResidentDashboard(userId: string, communityId: string) 
     }),
   ]);
 
-  const balanceCents = pendingCharges.reduce((sum, c) => sum + c.amount, 0);
+  const balanceCents = pendingCharges.reduce((sum, c) => sum + chargeBalance(c), 0);
 
   return {
     balanceCents,
     nextDueDateLabel: nextCharge?.dueDate
       ? nextCharge.dueDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
       : null,
-    nextDueAmountCents: nextCharge?.amount ?? null,
+    nextDueAmountCents: nextCharge ? chargeBalance(nextCharge) : null,
     openIssues,
     openArchRequests,
     activeViolations: activeViolations.map((v) => ({

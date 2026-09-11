@@ -3,6 +3,11 @@ import { getActiveCommunityId } from '@/lib/community';
 import { ok, err, unauthorized, forbidden } from '@/lib/api';
 import { prisma } from '@/lib/prisma';
 
+/** What a charge bucket still owes once partial payments are netted off. */
+function outstanding(agg: { _sum: { amount: number | null; amountPaid: number | null } }): number {
+  return (agg._sum.amount ?? 0) - (agg._sum.amountPaid ?? 0);
+}
+
 export async function GET() {
   const session = await getSession();
   if (!session) return unauthorized();
@@ -22,8 +27,10 @@ export async function GET() {
     chargesByStatus,
   ] = await Promise.all([
     prisma.charge.aggregate({ _sum: { amount: true }, _count: { _all: true }, where: { communityId } }),
-    prisma.charge.aggregate({ _sum: { amount: true }, _count: { _all: true }, where: { communityId, status: 'PENDING' } }),
-    prisma.charge.aggregate({ _sum: { amount: true }, _count: { _all: true }, where: { communityId, status: 'OVERDUE' } }),
+    // amountPaid is summed too: an outstanding bucket must net off partial
+    // payments, and sum(amount - amountPaid) === sum(amount) - sum(amountPaid).
+    prisma.charge.aggregate({ _sum: { amount: true, amountPaid: true }, _count: { _all: true }, where: { communityId, status: 'PENDING' } }),
+    prisma.charge.aggregate({ _sum: { amount: true, amountPaid: true }, _count: { _all: true }, where: { communityId, status: 'OVERDUE' } }),
     prisma.charge.aggregate({ _sum: { amount: true }, _count: { _all: true }, where: { communityId, status: 'PAID' } }),
     prisma.payment.aggregate({ _sum: { amount: true }, _count: { _all: true }, where: { communityId, status: 'PAID' } }),
     prisma.charge
@@ -50,11 +57,11 @@ export async function GET() {
   return ok({
     summary: {
       totalBilledCents: totalChargesAgg._sum.amount ?? 0,
-      totalPendingCents: pendingChargesAgg._sum.amount ?? 0,
-      totalOverdueCents: overdueChargesAgg._sum.amount ?? 0,
+      totalPendingCents: outstanding(pendingChargesAgg),
+      totalOverdueCents: outstanding(overdueChargesAgg),
       totalPaidCents: paidChargesAgg._sum.amount ?? 0,
       totalCollectedCents: totalPaymentsAgg._sum.amount ?? 0,
-      outstandingCents: (pendingChargesAgg._sum.amount ?? 0) + (overdueChargesAgg._sum.amount ?? 0),
+      outstandingCents: outstanding(pendingChargesAgg) + outstanding(overdueChargesAgg),
       delinquentAccounts: delinquentResidentIds.length,
       totalCharges: totalChargesAgg._count._all,
       totalPayments: totalPaymentsAgg._count._all,

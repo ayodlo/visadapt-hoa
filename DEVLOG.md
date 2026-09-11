@@ -2,6 +2,303 @@
 
 ---
 
+## 2026-09-11 (Autopay — the last Stripe piece of the AR mockup)
+
+**Files changed:**
+- `nextjs/prisma/schema.prisma` + `migrations/20260911140000_add_autopay_enrollment/` — new `AutopayEnrollment` model. Applied.
+- `nextjs/lib/autopay.ts` (new) — method description/labelling, `saveEnrollment`, `runAutopay`, failure recording.
+- `nextjs/lib/payments.ts` — `recordStripePayment` now keys idempotency on a checkout session **or** a payment intent.
+- `nextjs/app/api/payments/me/autopay/route.ts` (new) — GET status, PATCH pause/resume, DELETE cancel.
+- `nextjs/app/api/payments/me/autopay/setup/route.ts` (new) — hosted enrolment.
+- `nextjs/app/api/cron/autopay/route.ts` (new) — the daily run.
+- `nextjs/app/api/webhooks/stripe/route.ts` — `setup`-mode sessions and `payment_intent.succeeded` / `payment_intent.payment_failed`.
+- `nextjs/app/api/admin/payments/route.ts` — autopay state per row, `autopay_issues` filter.
+- `nextjs/app/admin/payments/page.tsx` — autopay indicator per row, "Autopay issues" tab, saved method in the detail panel.
+- `nextjs/app/resident/payments/page.tsx` — the autopay card: set up, pause, change method, turn off.
+- `nextjs/proxy.ts` — `/api/cron/` exempted from JWT gating.
+- `nextjs/.env.example` — `CRON_SECRET`.
+- `nextjs/__tests__/lib/autopay.test.ts` (new) — 8 tests (301 total).
+
+**Decisions made:**
+- **Enrolment uses Checkout in `setup` mode, not Elements.** It saves a card or bank account through Stripe's own hosted page, so no card details reach this app, **no new dependency is needed**, and the resident sees the same flow as a one-off payment. Elements would have meant `@stripe/stripe-js` + `@stripe/react-stripe-js` and a card form to maintain.
+- **A separate `AutopayEnrollment` model rather than columns on `User`.** This is a per-community financial arrangement with its own lifecycle, and the failure fields exist to answer one question the AR view asks directly: which residents' autopay is broken. One enrolment per resident is safe only because a RESIDENT has exactly one fixed community — which is also what makes `User.stripeCustomerId` unambiguous, since with direct charges the Customer lives on that community's connected account.
+- **The run charges the balance computed at run time**, never a stored figure, so it cannot charge more than is owed.
+- **Three independent guards against double-charging:** `lastRunAt` is checked before anything else and written *before* the Stripe call (so a crash mid-call does not cause a blind retry), and the request carries a per-resident-per-day Stripe idempotency key. Stripe itself would refuse a second intent even if our own guards failed.
+- **The run never records the payment.** The webhook does, exactly as with portal payments — `payment_intent.succeeded` keyed on the intent id. That is why `recordStripePayment` had to be generalised: autopay charges off-session and never creates a checkout session.
+- **Autopay payments get allocations like any other**, so an autopay charge is reversible through the same void path built yesterday. Verified.
+- **One resident's failure cannot stop the run.** Each is caught, recorded against the enrolment, and the loop continues.
+- **Pause keeps the saved method; cancel detaches it.** Detaching is best-effort — a resident who asks to stop must stop, and a method left attached at Stripe is harmless once the row is gone.
+- **Enabled on save.** The resident completed a hosted flow they had to opt into; treating that as consent to charge is what they expect.
+- **The cron endpoint authenticates with a shared secret, compared in constant time**, and is exempted from `proxy.ts` like the webhook. `?dryRun=1` reports what would be charged without calling Stripe — the only safe way to inspect this against real enrolments.
+
+**Verification:** `tsc` clean; `eslint` clean (same 2 pre-existing warnings); 301 vitest tests; `next build` compiles and registers all three new routes. **43/43 live checks** against the dev server and real dev database: autopay is not offered and setup is refused 409 until the community is onboarded; the cron endpoint refuses no secret and a wrong secret (401) and accepts the right one; a resident owing nothing is skipped; **once a charge exists the run selects them for exactly the outstanding balance**; a dry run writes nothing; a real run attempts the charge, records the failure against the enrolment, and **a second run the same day is skipped rather than retried**; the AR row carries `STRIPE TEST BANK •••• 4821`, is flagged as an issue, appears in the Autopay issues tab, and that tab is verified to be independent of payment status; `payment_intent.succeeded` recorded a payment **keyed on the intent with no checkout session**, settled the charge, **wrote an allocation row so the autopay payment is reversible**, and cleared the failure flag; a later `payment_intent.payment_failed` recorded the decline code with no payment row; pause retained the method, cancel removed the enrolment. Every fixture removed and the database re-read: 0 enrolments, 0 leftover charges, community Stripe fields restored.
+
+**A test expectation of mine was wrong, not the code** (second time this week, same shape): I expected the `setup`-mode webhook to answer 200 when Stripe could not be reached. 500 is correct — an enrolment cannot be saved without knowing which method was chosen, so the delivery must fail and let Stripe retry. Permanent problems (no `setup_intent`, an unreadable method, missing metadata) take the other path and ack 200, because retrying cannot help. That split is deliberate and now documented in the verification script.
+
+**Next steps:**
+1. **Nothing here has touched Stripe with a working key.** Enrolment, the off-session charge and `paymentMethods.detach` were all exercised through locally-signed webhooks, the dry run, and error paths. Everything that needs a real test-mode key is still unproven: the hosted setup page, `off_session: true` charging, and what Stripe's decline codes actually look like in `lastFailureCode`.
+2. **The run must be scheduled.** It is an endpoint with no caller. On Vercel that is a `crons` entry hitting `/api/cron/autopay` daily — no new dependency, but it needs the app deployed and `CRON_SECRET` set.
+3. **Autopay charges the full balance on the day it runs**, with no lead time, no "charge on the due date" logic and no per-resident schedule. That is the simplest thing that works and may well not be what an HOA wants.
+4. **No email on failure.** A resident whose autopay bounces finds out by logging in. Resend is wired; this wants a template.
+5. **Real Stripe refunds** are still unbuilt — voiding corrects the ledger only.
+6. An ager for overdue charges still does not exist.
+
+**Gotchas:**
+- **`checkout.session.completed` now means two different things.** A `setup` session saved a method and moved no money; a `payment` session took money. The handler branches on `session.mode` — anything added to that event must respect the split or it will treat an enrolment as a payment.
+- **Portal payments also emit `payment_intent.succeeded`.** The autopay handler ignores anything without `metadata.autopay === 'true'`, and `recordStripePayment` would treat a second call as a duplicate anyway — but both guards matter, because the checkout path records on the *session* event.
+- `lastRunAt` is written before the charge, not after. That means a Stripe timeout leaves the resident unbilled for the day rather than at risk of a double charge; the next day's run picks them up.
+
+---
+
+## 2026-09-11 (PaymentAllocation + payment void — payments are reversible)
+
+Approved from the write-up in the previous entry. This closes the "reverse the payment first" refusals that charge edit and delete were pointing at with nothing behind them.
+
+**Files changed:**
+- `nextjs/prisma/schema.prisma` + `migrations/20260911120000_add_payment_allocations_and_void/` — new `PaymentAllocation` model; `Payment` gains `voidedAt`, `voidedById`, `voidReason` and an `allocations` relation; `PaymentStatus` gains `VOIDED`; `User` gains a `voidedPayments` back-relation. Applied.
+- `nextjs/lib/payments.ts` — `applyToCharges` now writes allocation rows; new `voidPayment`.
+- `nextjs/app/api/admin/payments/[residentId]/[paymentId]/void/route.ts` (new) — `POST`, `isAdmin`-gated.
+- `nextjs/app/api/payments/me/ledger/route.ts` — `paidThisYear` excludes voided payments.
+- `nextjs/app/api/admin/payments/route.ts` — "last payment" excludes voided payments.
+- `nextjs/app/admin/payments/page.tsx` — void control per payment row, void dialog with optional reason, voided payments struck through with their reason.
+
+**Decisions made:**
+- **`Charge.amountPaid` is now a cache; the allocations are the record.** The invariant is `amountPaid === sum(allocations)` for every charge, and the live verification asserts it after every mutation rather than trusting it.
+- **Voiding deletes the allocation rows rather than flagging them.** Keeping "ghost" allocations would break that invariant, which is the thing that makes the cache trustworthy. The audit row carries the reversed breakdown, so the history survives.
+- **Payments are voided, never deleted.** The row keeps its original amount and `paidAt` — an auditor needs to see that $300 was entered and undone, and blanking the fields would lose when it was taken. Everything that means "money we have" therefore filters on status rather than on `paidAt` being set; two such places needed fixing (see files above), while the reports and dashboard aggregates already filtered on `status: 'PAID'` and were correct by accident.
+- **Charge status is recomputed on reversal, not restored from memory.** A settled charge returns to OVERDUE or PENDING according to its due date via `chargeStatusFor`, so a void cannot leave a charge marked PAID with nothing paying for it.
+- **A payment with no allocation rows is refused (409), not silently voided.** Payments recorded before this migration have no breakdown to unwind; marking them voided would leave their charges showing money the ledger now says was never paid. The message tells the admin to adjust the charges directly.
+- **A FAILED payment is refused too** — it never moved money or touched a charge.
+- **Voiding a Stripe payment does NOT refund it.** The response carries `refundRequired`, and both the toast and the dialog say plainly that the ledger is corrected but the money must be refunded in Stripe. Issuing a real refund is a separate piece of work.
+- **Scoped by resident *and* community**, so a payment id alone cannot reverse money in another association's ledger.
+
+**Verification:** `tsc` clean; `eslint` clean (same 2 pre-existing warnings); 293 vitest tests; `next build` compiles and registers the void route. **38/38 live checks** against the dev server and real dev database, on a resident with a deliberately clean ledger: a $300 payment against a $250 overdue and a $300 pending charge wrote **two allocation rows, $250 and $50**, summing to the payment; the invariant held; the settled charge then refused editing and the part-paid charge refused deletion, exactly as before. Voiding reported $300 reversed across 2 charges, **restored both charges to `amountPaid = 0`, returned the settled one to OVERDUE rather than leaving it PAID**, removed the allocation rows, kept the payment row marked VOIDED with `voidedAt`, `voidedById` and the reason, and left its amount untouched. The balance returned to $550 with $250 overdue, the list row agreed, a second void was refused 409, and **both charges then became editable and deletable again**. A payment stripped of its allocations was refused 409 and verified to be left PAID rather than half-voided. BOARD_MEMBER refused 403; voiding through the wrong resident refused 404. Every fixture removed afterwards; the database re-read shows 0 allocation rows and 0 leftover charges.
+
+**One test expectation was wrong, not the code:** the check that a voided payment is not shown as "last payment" initially expected `null`, but the fixture resident has older seeded payments, so the date correctly fell back to one of those. The exclusion was working; the assertion now compares against the voided payment's own timestamp.
+
+**Next steps:**
+1. **Autopay** is the only unbuilt Stripe piece from the AR mockup.
+2. **Refunding a Stripe payment for real** — `refundRequired` currently just tells a human to go to the Stripe dashboard. A `stripe.refunds.create` on the connected account would close the loop.
+3. **An ager for overdue charges** still does not exist.
+4. **Voiding is all-or-nothing.** There is no partial reversal — a $300 payment that should have been $200 has to be voided and re-entered.
+5. Seeded payments have no allocations, so none of them can be voided. Harmless for a demo, but worth knowing before anyone tries it on stage.
+
+**Gotchas:**
+- **`paidAt` survives a void by design**, so any new figure meaning "money received" must filter on `status`, not on `paidAt` being present. Two existing figures had exactly that bug.
+- `ALTER TYPE ... ADD VALUE` for the enum is fine on Neon (Postgres 12+) because the migration only adds the value without using it in the same transaction; a migration that did both would fail.
+- Allocation rows cascade-delete with their payment and with their charge, so a future hard delete of either will silently take the breakdown with it.
+
+---
+
+## 2026-09-11 (Editing and deleting charges + a timezone bug in due dates)
+
+**Files changed:**
+- `nextjs/app/api/admin/charges/[id]/route.ts` (new) — `PATCH` and `DELETE`.
+- `nextjs/lib/charges.ts` — `chargeStatusFor`, shared by create and edit.
+- `nextjs/app/api/admin/charges/route.ts` — `POST` now uses that helper.
+- `nextjs/app/admin/payments/page.tsx` — per-charge edit/delete controls, inline edit form, delete confirmation.
+- `nextjs/__tests__/lib/charges.test.ts` — 11 new tests (293 total).
+
+**Decisions made:**
+- **What may be edited depends on what has been paid.** Nothing paid: description, amount and due date are all free. Part paid: the amount may not drop below what arrived (409, naming the figure). Fully paid: refused outright — editing a settled charge would silently change what a receipt in someone's hand refers to.
+- **Lowering an amount onto what was already paid settles the charge.** Status is recomputed from the result rather than preserved, so this falls out of the rule instead of being a special case. Moving a due date into the past likewise marks it overdue.
+- **Delete is a hard delete, allowed only while `amountPaid` is 0.** A `VOIDED` status would mean auditing every charge filter, badge and report in the app for a state that only ever means "pretend this never happened" — the same argument that ruled out a `PARTIAL` status. The audit row carries the deleted charge's full contents, so the record outlives the row.
+- **Money applied blocks deletion** (409). Deleting the charge would strand the payment: it was applied to that row and there is no credit balance for it to fall back to.
+- **`chargeStatusFor` is now the single source of the status rule**, used by both create and edit so the two cannot drift.
+
+**A real bug the tests caught:** `chargeStatusFor` compared the due date against *local* midnight, but due dates arrive from the forms as `YYYY-MM-DD`, which `new Date()` parses as **UTC** midnight. On any machine west of UTC — the whole of the Americas, including this one — a charge due today was already OVERDUE the moment it was created, because UTC midnight on the due date is the previous evening locally. Both sides are now reduced to a UTC calendar day before comparing, with four regression tests pinning the behaviour in eastern and western timezones. Worth noting the old `POST` had this bug too, from its `startOfToday()` helper; it was invisible because the verification only ever used dates ±10 days out.
+
+**Verification:** `tsc` clean; `eslint` clean (same 2 pre-existing warnings); 293 vitest tests; `next build` compiles and registers `/api/admin/charges/[id]`. **28/28 live checks** against the dev server and real dev database: BOARD_MEMBER refused 403 on both methods; description, amount and due date all edited; due date moved into the past flipped the charge to OVERDUE and back to PENDING; six validation cases rejected including an empty body; an amount below the $100 already paid refused 409 **with the charge verified unchanged afterwards**; raising the amount on a part-paid charge allowed; lowering it onto the paid figure settled it to PAID; editing a settled charge refused 409; a clean charge deleted with an audit row carrying its full contents; a charge with $50 applied refused 409 and verified to survive; unknown id 404; edits audited with both before and after. All fixtures and audit rows removed afterwards, database re-read to confirm.
+
+**Next steps:**
+1. **Reversing a payment is still impossible, and this is now the sharpest gap.** Both 409s above tell an admin to "reverse the payment first" — and there is no way to do that. See the note below; it needs a schema decision.
+2. Autopay remains the only unbuilt Stripe piece from the mockup.
+3. An ager for overdue charges still does not exist. `chargeStatusFor` is now the obvious place to hang it, or better, to derive status at read time and drop the stored column.
+
+**The payment-reversal problem, and the proposed fix:**
+
+A payment applies across several charges and only its *effect* is stored — `Charge.amountPaid` moves, and the breakdown of which charge received how much is computed by `applyPaymentToCharges` and then thrown away. So "undo this payment" is unanswerable: a $300 payment that settled a $250 charge and put $50 on another leaves no record tying those movements together. Re-deriving it is not safe either, because later payments and edits change the picture.
+
+The fix is to stop treating `amountPaid` as the record and make it a cache of something that is:
+
+```prisma
+model PaymentAllocation {
+  id        String   @id @default(cuid())
+  paymentId String
+  payment   Payment  @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  chargeId  String
+  charge    Charge   @relation(fields: [chargeId], references: [id])
+  amount    Int      // cents applied from this payment to this charge
+  createdAt DateTime @default(now())
+
+  @@index([paymentId])
+  @@index([chargeId])
+}
+```
+
+`applyPaymentToCharges` already returns exactly these rows; today they are discarded. With them stored, reversal becomes mechanical: read the allocations, subtract each from its charge's `amountPaid`, recompute status with `chargeStatusFor`, mark the payment `VOIDED`. It also answers "what did this payment pay for?", which the resident portal cannot currently show either.
+
+Paired with it, payments should be **voided rather than deleted** — a new `VOIDED` value on `PaymentStatus` plus `voidedAt` / `voidedById` / `voidReason`. A financial record that disappears is worse than one marked reversed: an auditor needs to see that $300 was entered and undone, not an absence. Unlike `ChargeStatus`, adding to `PaymentStatus` is cheap, because payments are displayed as history rather than filtered on across the app.
+
+This is a data-shape change, so it is written up here rather than built.
+
+---
+
+## 2026-09-11 (Record payment — the offline path from the AR mockup)
+
+**Files changed:**
+- `nextjs/lib/payment-methods.ts` (new) — `MANUAL_PAYMENT_METHODS` + `ManualPaymentMethod`.
+- `nextjs/lib/payments.ts` — `recordManualPayment`, the non-Stripe sibling of `recordStripePayment`.
+- `nextjs/app/api/admin/payments/[residentId]/route.ts` — new `POST`, `isAdmin`-gated, community-scoped.
+- `nextjs/app/admin/payments/page.tsx` — "Record payment" beside "Add charge" in the ledger panel, with its own form.
+- `nextjs/__tests__/lib/payment-methods.test.ts` (new) — 3 tests (282 total).
+
+**Decisions made:**
+- **Card and debit are not recordable by hand.** The method list is Check / Cash / Bank Transfer / Money Order. Deleting `/api/payments/me/pay` closed the only route to marking a balance paid with no money behind it; letting an admin hand-enter a card payment would reopen it. Card payments go through Checkout, where the webhook is the only thing that may declare money received. Enforced by a zod enum and covered by a test that asserts no method contains the word "card".
+- **Overpayment is refused, not parked as a credit.** There is no credit-balance concept anywhere in this schema, so surplus money would apply to nothing and the ledger would quietly disagree with the bank. The route answers 400 naming the balance.
+- **A new `lib/payment-methods.ts` rather than exporting the list from `lib/payments.ts`.** That module imports Prisma, so a client component cannot import from it at runtime — the same split as `lib/roles.ts` vs `lib/auth.ts`. The admin page needs the list for its dropdown. A test reads the module's own source and fails if a Prisma or `next/headers` import ever appears in it, because that breakage shows up at runtime rather than at build time.
+- **Recorded `PAID` immediately, with no pending state.** Unlike ACH through Stripe, the admin is asserting the money is already in hand. If cheques need to clear before they count, that is a product decision and would want its own pending state.
+- **Same `isAdmin` gate as posting a charge**, for the same reason: it moves someone's balance. BOARD_MEMBER is refused.
+- **Stripe id columns stay null on these rows**, which is also how reconciliation tells offline money from Stripe money without a second field.
+- **No new application logic.** `recordManualPayment` reuses `applyToCharges`, so offline money settles charges in exactly the same order, with the same partial handling, as a Stripe payment.
+
+**Verification:** `tsc` clean; `eslint` clean (same 2 pre-existing warnings); 282 vitest tests; `next build` compiles. **28/28 live checks** against the dev server and real dev database, using a resident with a deliberately clean ledger and charges created by the test so the arithmetic depends on no seed data: a payment against a zero balance refused 400; RESIDENT and BOARD_MEMBER both refused 403; six validation cases rejected, including a card payment and an unknown method; an overpayment refused naming the $550 balance; **$100 applied entirely to the overdue charge, leaving the pending one untouched and the part-paid charge still OVERDUE**; a following $200 settled the overdue charge in full, marked it PAID, and spilled the remaining $50 onto the pending charge; the ledger then read $250 balance with $0 overdue; both rows PAID with `paidAt`, methods stored as entered, Stripe columns null; both audited. Every row deleted afterwards and the database re-read: 0 charges with `amountPaid > 0`, 0 `PH-` payments, 0 manual-payment audit rows. `/admin/payments` returns 200 with no runtime errors in the dev log.
+
+**Next steps:**
+1. **Autopay** is now the only unbuilt Stripe piece in the mockup: a SetupIntent on the connected account, fields for brand/last4/type to render `ACH ···· 4821`, an on/off flag, a last-failure reason to drive the "Autopay issues" tab, and a scheduled off-session PaymentIntent run.
+2. **Nothing can be undone.** A mistyped charge or payment is permanent — no void, no reversal — and a recorded payment mutates `Charge.amountPaid`, so the mistake is spread across rows. This is the most likely thing to hurt in a live demo and should probably come before autopay.
+3. **An ager for overdue charges** still does not exist; the mockup's "30+ days" tab and its `47 days` / `66 days` aging depend on one.
+4. **"All Communities"** portfolio view remains an open architectural question.
+5. `Send reminder` from the detail panel is still unbuilt; Resend is wired, so it needs a template and an endpoint.
+
+**Gotchas:**
+- **A client component cannot import anything that reaches Prisma.** This bit once already (`lib/roles.ts`). Any constant the UI needs must live in a module with no server-only imports, and nothing fails at build time to warn you.
+- Recording a payment writes to `Payment` *and* several `Charge` rows in one transaction, so any future void has to unwind `amountPaid` and possibly flip a charge back off `PAID` — it cannot just delete the payment row.
+
+---
+
+## 2026-09-10 (Stripe onboarding UI + charge posting — deliverable #17)
+
+Driven by the AR mockup at `payments page.png`. This covers the two prerequisites from it; autopay, Record payment, Send reminder and the portfolio view are still open.
+
+**Files changed:**
+- `nextjs/app/api/admin/charges/route.ts` (new) — `POST`, `isAdmin`-gated, community-scoped.
+- `nextjs/app/api/admin/communities/[id]/stripe/route.ts` — `GET` accepts `?refresh=1` to read the live account instead of our mirrors.
+- `nextjs/app/dashboard/communities/[id]/page.tsx` — "Online payments" section: status pill, Connect/Continue button, `?stripe=return|refresh` handling.
+- `nextjs/app/admin/payments/page.tsx` — Add charge form in the ledger panel; partial payments shown per charge.
+
+**Decisions made:**
+- **`isAdmin` to post a charge, not `isStaff`.** Reads on `/api/admin/payments` are open to all staff, but posting a charge puts a debt on someone's ledger, so it follows the same gate as vendors and announcements. A BOARD_MEMBER is refused (verified 403). If treasurers are expected to bill, that is a product decision, not a code detail.
+- **The resident must belong to the active community**, checked by query rather than trusted from the request body. Without it an admin could post a charge into another association's ledger by id. Verified: a resident from another community is refused 404 and nothing is written.
+- **A backdated charge is created `OVERDUE`, not `PENDING`.** There is still no cron or scheduler anywhere in this codebase, so nothing ages a charge — filing a past-due charge as current would have made it invisible to every overdue filter and to the mockup's aging columns. This handles the backdating case only; see Gotchas.
+- **No recurring assessments.** The mockup's "Assessments" nav item implies a schedule, and that needs a product answer (does it generate `Charge` rows, or revive `DuesRecord`?) before anything is built. This endpoint posts one-off charges only.
+- **`propertyId` is accepted but optional**, validated to belong to both the community and the resident. `Charge.propertyId` already existed and was never populated by anything.
+- **`?refresh=1` on the status endpoint.** The `account.updated` webhook is the right steady-state mechanism but is useless in the seconds after onboarding, when the admin is redirected straight back to the page — a completed account would still read "not connected". The onboarding page asks for a live read on return. A Stripe failure there returns the stale mirrors plus `refreshError` rather than failing the page.
+- **Onboarding stays SUPER_ADMIN-only**, matching its sibling routes. Verified: an ADMIN gets 403 reading onboarding status. This is now a visible friction point — the mockup implies a community manager runs this — and is the same "platform admin has no role" question still open from 2026-09-08.
+
+**Verification:** `tsc` clean; `eslint` clean (same 2 pre-existing warnings); 279 vitest tests; `next build` compiles and registers `/api/admin/charges`. **28/28 live checks** against the dev server and real dev database: RESIDENT and BOARD_MEMBER both refused 403; six validation cases rejected 400 (empty description, zero, negative, fractional cents, invalid date, missing resident); cross-community resident refused 404 with nothing written; **$250, $300 and $425 posted to the same resident and stored exactly** — the deliverable's own example — each starting at `amountPaid = 0`, scoped to the right community, `PENDING` when future-dated; a backdated charge created `OVERDUE`; the ledger balance and overdue total both picked the new charges up; every charge audited. All 4 test charges and their audit rows deleted afterwards, and the database re-read to confirm none remained. Both pages return 200, including `?stripe=return`, with no runtime errors in the dev log. The `?refresh=1` failure path was exercised by pointing a community at a fake account id: it returned 200 with the mirrors intact and `refreshError` populated.
+
+**Worth knowing:** that refresh error came back from Stripe's own API (`Invalid API Key provided: sk_test_***lkey`), so the SDK, network path and account-retrieve call are all genuinely working — the only thing missing for a first real call is a real test key.
+
+**Next steps:**
+1. **Record payment** — the offline path (check/cash) from the mockup's detail panel. `applyPaymentToCharges` and the transaction wrapper already exist in `lib/payments.ts`; it needs a non-Stripe sibling of `recordStripePayment` taking an admin-entered amount and method.
+2. **Autopay** — the real remaining Stripe work: a SetupIntent on the connected account, fields for brand/last4/type to render `ACH ···· 4821`, an on/off flag, a last-failure reason to drive the "Autopay issues" tab, and a scheduled off-session PaymentIntent run.
+3. **An ager for overdue charges.** Nothing moves a PENDING charge to OVERDUE when its due date passes. The mockup's "30+ days" tab, the `47 days` / `66 days` aging and the "Due soon" status all depend on it. Either a scheduled job or — probably better — derive overdue at read time from `dueDate` and stop storing it.
+4. **"All Communities" portfolio view** is still an open architectural question: every route resolves exactly one community via `getActiveCommunityId`.
+5. Charges can only be created, not edited or voided. The deliverable asks to "update the amount where appropriate", so a PATCH/void path is still missing.
+
+**Gotchas:**
+- **`useToast()` returns `{ toast }`, not a function.** Calling the hook result directly type-checks as `ToastContextValue` and fails with "This expression is not callable" — five call sites at once. Destructure it, as every other page does.
+- **Nothing ages charges.** A charge posted with a future due date stays PENDING forever. The backdating rule added here is a creation-time convenience, not an ager, and it is the single biggest gap between this codebase and the mockup.
+- `Charge` has no `updatedAt`, so there is no record of when a charge was last touched — worth adding before edit/void lands.
+
+---
+
+## 2026-09-10 (Stripe Connect Phase 1 — real payments, test mode)
+
+**Files changed:**
+- `nextjs/package.json` + root `package-lock.json` — added `stripe` ^22.6.2 (approved this session; the 2026-09-08 entry had it outstanding).
+- `nextjs/prisma/schema.prisma` + `migrations/20260910120000_add_stripe_connect_payments/` — `Community.stripeAccountId` (unique) + `stripeChargesEnabled` + `stripeDetailsSubmitted` + `absorbsProcessingFees`; `User.stripeCustomerId`; `Charge.amountPaid`; `Payment.stripeCheckoutSessionId` + `stripePaymentIntentId` (both unique). Applied to the Neon dev DB.
+- `nextjs/lib/stripe.ts` (new) — lazy client singleton, pinned API version, payment-method label mapping.
+- `nextjs/lib/charges.ts` (new) — pure charge-application logic: `chargeBalance`, `outstandingBalance`, `applicationOrder`, `applyPaymentToCharges`.
+- `nextjs/lib/payments.ts` (new) — `recordStripePayment`, `settlePendingStripePayment`, `failStripePayment`, `residentOutstandingBalance`, `generateConfirmationNumber`.
+- `nextjs/app/api/admin/communities/[id]/stripe/route.ts` (new) — GET status, POST create-account-and-link.
+- `nextjs/app/api/payments/me/checkout/route.ts` (new) — Checkout session on the connected account.
+- `nextjs/app/api/webhooks/stripe/route.ts` (new) — the only writer of payment records.
+- `nextjs/app/api/payments/me/pay/route.ts` — **deleted.**
+- `nextjs/proxy.ts` — `/api/webhooks/` exempted from JWT gating.
+- `nextjs/app/resident/payments/page.tsx` — modal now starts Checkout and redirects; receipt step removed; partial payments shown.
+- `nextjs/app/api/payments/me/ledger/route.ts`, `app/api/admin/payments/route.ts`, `app/api/admin/payments/[residentId]/route.ts`, `app/api/admin/reports/payments/route.ts`, `lib/dashboard.ts` — balance math now nets off `amountPaid`.
+- `nextjs/__tests__/lib/charges.test.ts` (new) — 20 tests (279 total).
+- `nextjs/.env.example` — `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`.
+
+**Decisions made:**
+- **The simulation endpoint was deleted, not kept alongside.** `/api/payments/me/pay` let any logged-in resident write a `PAID` row and mark charges paid with no money involved. Leaving it reachable next to real Checkout would have been a live way to zero a balance for free.
+- **`Charge.amountPaid`, not a `PARTIAL` status.** A new enum value would mean auditing every status filter, badge and report for a state the balance already expresses. A charge is PAID only when `amountPaid >= amount`.
+- **The partial-payment loop was rewritten, not extended**, as the 2026-09-08 entry predicted. The old one applied a charge only when the remaining amount covered it in full and dropped the rest; $300 against an $825 assessment recorded the payment and credited the charge with nothing. `applyPaymentToCharges` is pure and directly tested for exactly that case.
+- **Payment rows are created by the webhook only.** An abandoned Checkout therefore leaves no trace, and no browser response can declare a payment successful. Idempotency rests on the `stripeCheckoutSessionId` unique index, with a P2002 catch for two concurrent deliveries racing past the pre-check.
+- **ACH gets a real pending state.** `payment_status: 'unpaid'` records the payment `PENDING` and leaves charges alone; `checkout.session.async_payment_succeeded` promotes it and applies the money; `async_payment_failed` marks it `FAILED` with nothing to unwind.
+- **Payment method types are not pinned on the session.** Listing `us_bank_account` would fail session creation for any HOA that has not enabled ACH, so Stripe offers whatever the connected account supports.
+- **No `statement_descriptor` is set.** For a direct charge the connected account's own descriptor applies, which is the entire reason for this design.
+- **Onboarding is SUPER_ADMIN-only**, matching every sibling route under `/api/admin/communities/[id]`. Flagged: in production the person who onboards an association is its manager, which is the "platform admin has no role" question from 2026-09-08, still open.
+- **`absorbsProcessingFees` exists but nothing reads it.** It gives the pending fee decision a home; surcharging is regulated in some states and stays a Phase 2 product call. Default `true` = the HOA absorbs = today's behaviour.
+- **Aggregates sum `amountPaid` alongside `amount`.** Prisma cannot aggregate an expression, but `sum(amount - amountPaid) === sum(amount) - sum(amountPaid)`, so the outstanding buckets stay one query. Billed and collected totals keep face value deliberately.
+- **Confirmation numbers now use `PH-`.** The generator emitted `CHQ-`, a CommunityHQ leftover the 2026-09-03 rename missed because it is an abbreviation rather than the spelled-out brand — and it prints on resident receipts. Existing rows keep their old numbers; they are receipts people may already hold.
+
+**Verification:** `tsc` clean; `eslint` clean (same 2 pre-existing `exhaustive-deps` warnings); 279 vitest tests; `next build` compiles and registers all three new routes. **Webhook verified live, 29/29 checks**, against the dev server and the real dev database with locally-signed Stripe payloads (`generateTestHeaderString`): unsigned and wrong-secret deliveries rejected 400 (proving the `proxy.ts` exemption works and is not a 401); a partial card payment credited `amountPaid` and left the charge PENDING; a replayed delivery created no second row and did not double-credit; an ACH payment recorded PENDING with charges untouched, then settled on `async_payment_succeeded`; a failed ACH credited nothing; a session from a foreign connected account credited nothing; an event with no metadata credited nothing; `account.updated` mirrored `charges_enabled`/`details_submitted`. Every mutation was reversed and the database re-read to confirm: 0 leftover payments, 0 charges with `amountPaid > 0`, 0 communities with a `stripeAccountId`. Also confirmed by hand: the deleted pay route 404s, onboarding answers 403 to a RESIDENT, and checkout answers 409 for a community that has not onboarded.
+
+**Next steps:**
+1. **No live Stripe call has ever been made.** Onboarding, Checkout session creation and `paymentIntents.retrieve` were exercised only through locally-signed webhook payloads and guard paths — the `sk_test_...` key used for verification was a fake string. The first real test-mode run needs an actual Stripe test account, `stripe listen`, and a pass through Express onboarding.
+2. **The webhook endpoint must be subscribed to Connect events**, not just account events, or `checkout.session.*` from connected accounts never arrives.
+3. **No admin UI for onboarding.** `/dashboard/communities/[id]` does not call the new route yet, so onboarding is currently a manual POST. That page also needs to handle the `?stripe=return|refresh` parameters the account link redirects to.
+4. **Deliverable #17 is still open.** Admins still cannot assign or edit a resident's amount owed — there is no charge-posting endpoint or form. This work makes it safe to build (the money model is now honest) but does not deliver it.
+5. The three go-live questions from 2026-09-08 remain: fee absorption, platform-admin role, statement PDFs.
+
+**Gotchas:**
+- **`proxy.ts` gates everything.** Its matcher catches all paths except `PUBLIC_PATHS` and `/api/auth`, so a webhook added without an exemption 401s before its handler runs — and Stripe shows that as a delivery failure with no application log.
+- **`prisma migrate dev` cannot run in this environment.** It demands a TTY to confirm unique-constraint warnings. The working path is `migrate diff --from-url ... --script` into a hand-named migration directory, then `migrate deploy`. The Prisma update banner goes to stderr, so it does not pollute the redirected SQL — worth checking if that ever changes.
+- **The Neon dev branch cold-starts.** The first `prisma` command failed `P1001` while DNS and TCP to the host both succeeded; appending `connect_timeout=60` to `DATABASE_URL` got through. Not a dead database.
+- **`stripe` v22 moved its types.** There is no `types/` directory any more — they ship at `esm/stripe.esm.node.d.ts`, and the pinned API version lives in `esm/apiVersion.d.ts` (`2026-08-26.dahlia` here). Read that file rather than trusting a remembered version string; `lib/stripe.ts` pins it with `satisfies Stripe.LatestApiVersion` so a dependency bump that changes it fails the type check instead of drifting silently.
+- **`e2e/theme.spec.ts` fails against the uncommitted light-theme change** in `app/layout.tsx` — it asserts dark is the default and that the first toggle click yields light. Unrelated to this work and still unresolved; confirmed by reading the spec, not by running it.
+
+---
+
+## 2026-09-08 (Stripe Connect for payments — design settled, nothing built)
+
+**Files changed:** none. This entry records decisions so they are not re-litigated.
+
+**What exists today:**
+- `/api/payments/me/pay` is a **simulation**: it takes an amount and a payment-method *string*, writes a `Payment` row marked `PAID`, and marks charges paid. No card is collected, no money moves. It also abandons partial payments outright (`// partial: leave charge as-is, just stop`).
+- **Two parallel money models.** `Charge` + `Payment` back the resident payments page, admin payments, reports, dashboard and the pay endpoint. `DuesRecord` is used by nothing but `/api/dues` and `/dashboard/dues`.
+- `/admin/payments` is already close to the target AR design: resident list with balance, overdue amount, derived paid/pending/overdue status, portfolio total, and a ledger side panel. Missing autopay state, last-payment date, a community column, and the action buttons.
+- Community scoping is **already applied across every route** (`getActiveCommunityId` / `canAccessCommunity`), which covers the "a board member must never see another association's financials" requirement.
+- Resend is wired (`lib/email.ts`), so "our app sends the email, not Stripe" is half-built.
+- **No cron or scheduler of any kind**, and no `vercel.json`/`vercel.ts`.
+
+**Decisions made (from the user's spec):**
+- **Express connected accounts**, one per HOA. The platform account is the client's; each HOA is onboarded beneath it. Rationale in the user's words: nobody wants to handle a treasurer's routing number over email, and Express gives the HOA a payouts dashboard without us building one.
+- **Direct charges on the connected account**, not destination charges — the statement descriptor must be the HOA's, which requires the HOA to be merchant of record. It also puts disputes on the association rather than the client.
+- **Stripe-hosted Checkout for v1**, Elements later. Covers cards and ACH, handles SCA and receipts, far less to get wrong.
+- **`Charge` + `Payment` is the system of record.** `DuesRecord` is not to receive real money.
+- **The webhook marks a charge paid, never the browser.**
+- **The flow is ours end to end:** manager posts a charge -> billing run or "send now" -> our email (Resend) -> a payment page we control -> Checkout -> webhook -> charge marked paid.
+
+**Open, and blocking go-live rather than build:**
+1. **Who absorbs Stripe's fees** (~$24 on an $825 card assessment, ~$4 on ACH). Default proposed: the HOA absorbs, made a per-community setting. Surcharging is regulated in some states — needs a business/legal answer.
+2. **"Platform admin" has no role.** The client's reconciliation/support team needs one, but `SUPER_ADMIN` is documented here as engineer-only and deliberately unassignable through any UI. Either that constraint changes or a new role is added.
+3. **Statement PDFs need another dependency.** v1 should link to the resident portal instead.
+
+**Next steps (phased):**
+1. **Phase 1** — add `stripe` (approval still outstanding), schema (`Community.stripeAccountId` + onboarding status, `User.stripeCustomerId`, payment-intent id on `Payment`, autopay fields), Express onboarding, Checkout session, webhook, real payment recording. Test mode only.
+2. **Phase 2** — charge posting UI, billing run (Vercel Cron — no new dependency), statement emails.
+3. **Phase 3** — autopay, the full AR view, platform reconciliation.
+
+**Gotchas:**
+- Partial payments are unimplemented today and become routine the moment real money is involved — someone pays $300 against an $825 balance. The charge-application loop needs rewriting, not extending.
+- ACH settles over days and can fail *after* apparent success, so the ledger needs a pending state; a card-only mental model will not survive contact with ACH.
+
+---
+
 ## 2026-09-04 (Community editing: name, staff, residents, properties)
 
 **Files changed:**
@@ -39,6 +336,22 @@
 
 ---
 
+## 2026-09-04 (Content-Disposition filename fix)
+
+**Files changed:**
+- `nextjs/lib/uploads.ts` — new `contentDispositionAttachment`.
+- `nextjs/lib/s3.ts` — `getPresignedDownloadUrl` uses it.
+- `nextjs/__tests__/lib/uploads.test.ts` — 6 new tests (259 total).
+
+**Decisions made:**
+- **Not `sanitizeFileName`.** The first attempt reused it and broke the very thing being fixed: that function builds safe S3 *key segments* and collapses a space to `_`, so `Budget 2026.pdf` became `Budget_2026.pdf` — a different bug in the same clothes. The tests caught it, and the helper now documents why it cannot borrow that sanitiser.
+- **Two-part value per RFC 6266:** an ASCII-safe quoted `filename` plus `filename*=UTF-8''…` carrying the real name. Only `"` and `\` and non-ASCII genuinely cannot appear in a quoted-string; a space can.
+- **A backslash counts as a path separator**, so `C:\docs\budget.pdf` downloads as `budget.pdf`, matching `sanitizeFileName` and stopping a stored name from steering the browser out of its download folder.
+
+**Verification:** 259 vitest tests; `tsc` clean. Confirmed live against the bucket for three names — `Budget 2026.pdf` now emits `filename="Budget 2026.pdf"` (was `Budget%202026.pdf`), an em-dash name degrades the ASCII fallback while `filename*` keeps it, and `résumé.pdf` round-trips. Since this is the only Content-Disposition site in the codebase, maintenance attachments and violation evidence are fixed too.
+
+---
+
 ## 2026-09-04 (Document uploads to S3)
 
 **Files changed:**
@@ -62,11 +375,11 @@
 
 **Next steps:**
 1. **Replacing a file requires delete-and-re-add.** Supporting it means teaching PATCH to promote a new key and delete the old object — worth doing if admins hit it.
-2. **`getPresignedDownloadUrl` mangles filenames containing spaces** — see Gotchas. Affects documents, maintenance attachments and violation evidence alike.
+2. ~~`getPresignedDownloadUrl` mangles filenames containing spaces~~ — **fixed later the same day**, see the 2026-09-04 (Content-Disposition) entry.
 3. The upload was verified against the bucket with a script, not through a browser. The form's own path (presign route + fetch PUT from the page) is still unexercised by a real click.
 
 **Gotchas:**
-- **`Content-Disposition` filenames are over-encoded.** `lib/s3.ts` builds `filename="${encodeURIComponent(fileName)}"`, so `Budget 2026.pdf` is sent as `Budget%202026.pdf` and browsers save it under that literal name. Verified live. Inside a quoted string a space is legal and needs no escaping; non-ASCII names want `filename*=UTF-8''...` per RFC 6266. Pre-existing and shared by every download path.
+- **`Content-Disposition` filenames were over-encoded** (fixed same day). `lib/s3.ts` built `filename="${encodeURIComponent(fileName)}"`, so `Budget 2026.pdf` went out as `Budget%202026.pdf` and browsers saved it under that literal name. Verified live before and after.
 - **`window.location.href = url` fails `react-hooks/immutability`** under the React Compiler lint rules. `window.location.assign(url)` is equivalent and passes.
 - **`prisma generate` fails with EPERM on Windows while `next dev` is running** — the dev server holds `query_engine-windows.dll.node`. Stop the dev server first.
 - Anchoring a code insert on `'  return ('` matches `return () => clearTimeout(t)` inside a `useEffect` before it matches the component body. Anchor on `'\n  return (\n    <div'`.

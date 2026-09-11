@@ -21,6 +21,20 @@ model Community {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Stripe Connect (Express), one connected account per HOA. Charges are created
+  // directly ON this account, so the HOA is merchant of record and owns the
+  // statement descriptor and disputes.
+  stripeAccountId        String? @unique
+  // Mirrors of the connected account fields of the same name, refreshed by the
+  // account.updated webhook. Not invented state: charges_enabled is the only
+  // reliable signal that the account can actually take money.
+  stripeChargesEnabled   Boolean @default(false)
+  stripeDetailsSubmitted Boolean @default(false)
+  // Who eats the processing fee. Default true = the HOA absorbs it, which is
+  // current behaviour (residents are never surcharged). Nothing reads this yet —
+  // surcharging is regulated in some states and is a Phase 2 product decision.
+  absorbsProcessingFees  Boolean @default(true)
+
   users                 User[]
   communityAssignments  CommunityAssignment[]
   properties            Property[]
@@ -37,6 +51,7 @@ model Community {
   duesRecords           DuesRecord[]
   maintenanceRequests   MaintenanceRequest[]
   auditLogs             AuditLog[]
+  autopayEnrollments    AutopayEnrollment[]
 
   @@map("communities")
 }
@@ -59,50 +74,56 @@ model CommunityAssignment {
 }
 
 model User {
-  id                   String                @id @default(cuid())
-  firstName            String
-  lastName             String
-  email                String                @unique
-  passwordHash         String
-  role                 UserRole              @default(RESIDENT)
+  id                             String                         @id @default(cuid())
+  firstName                      String
+  lastName                       String
+  email                          String                         @unique
+  passwordHash                   String
+  role                           UserRole                       @default(RESIDENT)
   // Fixed home community for RESIDENT; null for ADMIN/BOARD_MEMBER/SUPER_ADMIN,
   // who use CommunityAssignment (multi-community) instead.
-  communityId          String?
-  community            Community?            @relation(fields: [communityId], references: [id])
-  createdAt            DateTime              @default(now())
-  updatedAt            DateTime              @updatedAt
-  communityAssignments     CommunityAssignment[]
-  communityAssignmentsMade CommunityAssignment[] @relation("CommunityAssignmentsMade")
-  properties              Property[]
-  residentProfile         ResidentProfile?
-  createdAnnouncements    Announcement[]
-  announcementReads       AnnouncementRead[]
-  maintenanceRequests     MaintenanceRequest[]
-  events               Event[]
-  polls                Poll[]
-  pollVotes            PollVote[]
-  duesRecords          DuesRecord[]
-  documents            Document[]
-  charges              Charge[]
-  payments             Payment[]
-  auditLogs            AuditLog[]
-  pushTokens           PushToken[]
-  passwordResetTokens  PasswordResetToken[]
-  issues               Issue[]              @relation("ResidentIssues")
-  assignedIssues       Issue[]              @relation("AssignedIssues")
-  issueComments        IssueComment[]
-  issueActivities      IssueActivity[]
-  architecturalRequests          ArchitecturalRequest[]          @relation("ResidentArchRequests")
-  architecturalRequestComments   ArchitecturalRequestComment[]   @relation("ArchRequestComments")
-  architecturalRequestActivities ArchitecturalRequestActivity[]  @relation("ArchRequestActivities")
-  violations                     Violation[]                     @relation("ResidentViolations")
-  createdViolations              Violation[]                     @relation("CreatedViolations")
+  communityId                    String?
+  community                      Community?                     @relation(fields: [communityId], references: [id])
+  // Stripe Customer id. Scoped to the resident community connected account, not
+  // to the platform — direct charges mean Customers are created on the connected
+  // account. Safe as a single column only because RESIDENT.communityId is fixed.
+  stripeCustomerId               String?                        @unique
+  createdAt                      DateTime                       @default(now())
+  updatedAt                      DateTime                       @updatedAt
+  communityAssignments           CommunityAssignment[]
+  communityAssignmentsMade       CommunityAssignment[]          @relation("CommunityAssignmentsMade")
+  properties                     Property[]
+  residentProfile                ResidentProfile?
+  createdAnnouncements           Announcement[]
+  announcementReads              AnnouncementRead[]
+  maintenanceRequests            MaintenanceRequest[]
+  events                         Event[]
+  polls                          Poll[]
+  pollVotes                      PollVote[]
+  duesRecords                    DuesRecord[]
+  documents                      Document[]
+  charges                        Charge[]
+  payments                       Payment[]
+  auditLogs                      AuditLog[]
+  pushTokens                     PushToken[]
+  passwordResetTokens            PasswordResetToken[]
+  issues                         Issue[]                        @relation("ResidentIssues")
+  assignedIssues                 Issue[]                        @relation("AssignedIssues")
+  issueComments                  IssueComment[]
+  issueActivities                IssueActivity[]
+  architecturalRequests          ArchitecturalRequest[]         @relation("ResidentArchRequests")
+  architecturalRequestComments   ArchitecturalRequestComment[]  @relation("ArchRequestComments")
+  architecturalRequestActivities ArchitecturalRequestActivity[] @relation("ArchRequestActivities")
+  violations                     Violation[]                    @relation("ResidentViolations")
+  createdViolations              Violation[]                    @relation("CreatedViolations")
   violationComments              ViolationComment[]
   violationActivities            ViolationActivity[]
   violationAttachments           ViolationAttachment[]
   maintenanceAttachments         MaintenanceAttachment[]
-  violationAppeals               ViolationAppeal[]               @relation("AppealSubmitter")
-  reviewedAppeals                ViolationAppeal[]               @relation("AppealReviewer")
+  violationAppeals               ViolationAppeal[]              @relation("AppealSubmitter")
+  reviewedAppeals                ViolationAppeal[]              @relation("AppealReviewer")
+  voidedPayments                 Payment[]                      @relation("PaymentVoidedBy")
+  autopayEnrollment              AutopayEnrollment?
 
   @@map("users")
 }
@@ -120,24 +141,24 @@ model PasswordResetToken {
 }
 
 model Property {
-  id            String   @id @default(cuid())
-  streetAddress String
-  unitNumber    String?
-  city          String
-  state         String
-  zipCode       String
-  ownerId       String
-  owner         User     @relation(fields: [ownerId], references: [id])
-  communityId   String
-  community     Community @relation(fields: [communityId], references: [id])
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  charges                Charge[]
-  payments               Payment[]
-  issues                 Issue[]
-  architecturalRequests  ArchitecturalRequest[]
-  violations             Violation[]
-  maintenanceRequests    MaintenanceRequest[]
+  id                    String                 @id @default(cuid())
+  streetAddress         String
+  unitNumber            String?
+  city                  String
+  state                 String
+  zipCode               String
+  ownerId               String
+  owner                 User                   @relation(fields: [ownerId], references: [id])
+  communityId           String
+  community             Community              @relation(fields: [communityId], references: [id])
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  charges               Charge[]
+  payments              Payment[]
+  issues                Issue[]
+  architecturalRequests ArchitecturalRequest[]
+  violations            Violation[]
+  maintenanceRequests   MaintenanceRequest[]
 
   @@index([communityId])
   @@map("properties")
@@ -157,7 +178,7 @@ model ResidentProfile {
 }
 
 model Vendor {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   name        String
   contactName String?
   email       String?
@@ -166,8 +187,8 @@ model Vendor {
   notes       String?
   communityId String
   community   Community @relation(fields: [communityId], references: [id])
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
   issues      Issue[]
 
   @@index([communityId])
@@ -205,29 +226,29 @@ enum IssuePriority {
 }
 
 model Issue {
-  id                   String          @id @default(cuid())
-  residentId           String
-  resident             User            @relation("ResidentIssues", fields: [residentId], references: [id])
-  propertyId           String?
-  property             Property?       @relation(fields: [propertyId], references: [id])
-  vendorId             String?
-  vendor               Vendor?         @relation(fields: [vendorId], references: [id])
-  assignedToId         String?
-  assignedTo           User?           @relation("AssignedIssues", fields: [assignedToId], references: [id])
-  communityId          String
-  community            Community       @relation(fields: [communityId], references: [id])
-  category             IssueCategory   @default(OTHER)
-  title                String
-  description          String
-  location             String
-  priority             IssuePriority   @default(MEDIUM)
-  status               IssueStatus     @default(SUBMITTED)
+  id                     String          @id @default(cuid())
+  residentId             String
+  resident               User            @relation("ResidentIssues", fields: [residentId], references: [id])
+  propertyId             String?
+  property               Property?       @relation(fields: [propertyId], references: [id])
+  vendorId               String?
+  vendor                 Vendor?         @relation(fields: [vendorId], references: [id])
+  assignedToId           String?
+  assignedTo             User?           @relation("AssignedIssues", fields: [assignedToId], references: [id])
+  communityId            String
+  community              Community       @relation(fields: [communityId], references: [id])
+  category               IssueCategory   @default(OTHER)
+  title                  String
+  description            String
+  location               String
+  priority               IssuePriority   @default(MEDIUM)
+  status                 IssueStatus     @default(SUBMITTED)
   preferredContactMethod String
-  dueDate              DateTime?
-  createdAt            DateTime        @default(now())
-  updatedAt            DateTime        @updatedAt
-  comments             IssueComment[]
-  activities           IssueActivity[]
+  dueDate                DateTime?
+  createdAt              DateTime        @default(now())
+  updatedAt              DateTime        @updatedAt
+  comments               IssueComment[]
+  activities             IssueActivity[]
 
   @@index([communityId])
   @@map("issues")
@@ -380,13 +401,13 @@ model MaintenanceRequest {
   preferredContactMethod MaintenanceContactMethod?
 
   propertyId    String?
-  property      Property?       @relation(fields: [propertyId], references: [id])
+  property      Property?               @relation(fields: [propertyId], references: [id])
   submittedById String
-  submittedBy   User            @relation(fields: [submittedById], references: [id])
+  submittedBy   User                    @relation(fields: [submittedById], references: [id])
   communityId   String
-  community     Community       @relation(fields: [communityId], references: [id])
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
+  community     Community               @relation(fields: [communityId], references: [id])
+  createdAt     DateTime                @default(now())
+  updatedAt     DateTime                @updatedAt
   attachments   MaintenanceAttachment[]
 
   @@index([communityId])
@@ -525,19 +546,19 @@ enum DocumentCategory {
 }
 
 model DuesRecord {
-  id           String     @id @default(cuid())
-  userId       String
-  user         User       @relation(fields: [userId], references: [id])
-  communityId  String
-  community    Community  @relation(fields: [communityId], references: [id])
-  label        String
-  amountCents  Int
-  dueDate      DateTime
-  status       DuesStatus @default(PENDING)
-  paidAt       DateTime?
-  notes        String?
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  id          String     @id @default(cuid())
+  userId      String
+  user        User       @relation(fields: [userId], references: [id])
+  communityId String
+  community   Community  @relation(fields: [communityId], references: [id])
+  label       String
+  amountCents Int
+  dueDate     DateTime
+  status      DuesStatus @default(PENDING)
+  paidAt      DateTime?
+  notes       String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
 
   @@index([communityId])
   @@map("dues_records")
@@ -560,9 +581,17 @@ model Charge {
   community   Community    @relation(fields: [communityId], references: [id])
   description String
   amount      Int
+  // How much has actually landed against this charge. A charge is PAID only when
+  // amountPaid >= amount; until then it stays PENDING/OVERDUE and the remainder
+  // is amount - amountPaid. No PARTIAL status was added on purpose — that would
+  // mean auditing every status filter and badge in the app for a state the
+  // balance already expresses.
+  amountPaid  Int          @default(0)
   dueDate     DateTime
   status      ChargeStatus @default(PENDING)
   createdAt   DateTime     @default(now())
+
+  allocations PaymentAllocation[]
 
   @@index([communityId])
   @@map("charges")
@@ -575,28 +604,114 @@ enum ChargeStatus {
 }
 
 model Payment {
-  id                 String        @id @default(cuid())
-  residentId         String
-  resident           User          @relation(fields: [residentId], references: [id])
-  propertyId         String?
-  property           Property?     @relation(fields: [propertyId], references: [id])
-  communityId        String
-  community          Community     @relation(fields: [communityId], references: [id])
-  amount             Int
-  paymentMethod      String
-  status             PaymentStatus @default(PAID)
-  paidAt             DateTime?
-  confirmationNumber String        @unique
-  createdAt          DateTime      @default(now())
+  id                      String        @id @default(cuid())
+  residentId              String
+  resident                User          @relation(fields: [residentId], references: [id])
+  propertyId              String?
+  property                Property?     @relation(fields: [propertyId], references: [id])
+  communityId             String
+  community               Community     @relation(fields: [communityId], references: [id])
+  amount                  Int
+  paymentMethod           String
+  status                  PaymentStatus @default(PAID)
+  paidAt                  DateTime?
+  confirmationNumber      String        @unique
+  // Set for real Stripe payments, null for historical/seeded rows. The session id
+  // is the webhook idempotency key: @unique makes a duplicate delivery a constraint
+  // violation rather than a double credit.
+  stripeCheckoutSessionId String?       @unique
+  stripePaymentIntentId   String?       @unique
+  createdAt               DateTime      @default(now())
+
+  // Reversal. A payment is never deleted — an auditor needs to see that money was
+  // entered and undone, not an absence. Voiding unwinds the allocations below.
+  voidedAt   DateTime?
+  voidedById String?
+  voidedBy   User?     @relation("PaymentVoidedBy", fields: [voidedById], references: [id])
+  voidReason String?
+
+  allocations PaymentAllocation[]
 
   @@index([communityId])
   @@map("payments")
+}
+
+/// A resident's standing instruction to charge a saved payment method.
+///
+/// Kept out of `User` deliberately: this is a per-community financial arrangement
+/// with its own lifecycle, and the failure fields below exist to answer one
+/// question the AR view asks directly — "which residents' autopay is broken?".
+/// A resident has at most one enrolment because a RESIDENT belongs to exactly one
+/// community, which is also what makes the saved method unambiguous: with direct
+/// charges the Customer and PaymentMethod live on that community's connected
+/// account, not on the platform.
+model AutopayEnrollment {
+  id          String    @id @default(cuid())
+  userId      String    @unique
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  communityId String
+  community   Community @relation(fields: [communityId], references: [id])
+
+  /// PaymentMethod id on the community's connected account.
+  stripePaymentMethodId String
+  /// 'card' or 'us_bank_account' — what Stripe called it.
+  methodType            String
+  /// 'visa', 'mastercard', or the bank name. Null when Stripe gives us nothing.
+  methodBrand           String?
+  methodLast4           String
+
+  /// Switched off by the resident, or left on with a failure recorded against it.
+  /// A disabled enrolment keeps its method so it can be switched back on.
+  enabled   Boolean  @default(true)
+  enabledAt DateTime @default(now())
+
+  /// When the scheduled run last attempted this enrolment, successful or not.
+  /// Guards against charging twice if the run fires more than once in a day.
+  lastRunAt DateTime?
+
+  /// The most recent failure, cleared on the next success. Drives the
+  /// "Autopay issues" view: a row with lastFailureAt set needs attention.
+  lastFailureAt      DateTime?
+  lastFailureCode    String?
+  lastFailureMessage String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([communityId])
+  @@map("autopay_enrollments")
+}
+
+/// Which charges a payment actually paid, and how much of it went to each.
+///
+/// This is the record; `Charge.amountPaid` is a cache of it. Before this model
+/// existed a payment's effect was smeared across charge rows with nothing tying
+/// the movements together, which made reversing one impossible — the breakdown was
+/// computed by applyPaymentToCharges and then thrown away.
+///
+/// Invariant: for any charge, `amountPaid` equals the sum of its allocations.
+/// Voiding a payment deletes its allocation rows rather than flagging them, so
+/// that invariant keeps holding; the audit log preserves the reversed breakdown.
+model PaymentAllocation {
+  id        String   @id @default(cuid())
+  paymentId String
+  payment   Payment  @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  chargeId  String
+  charge    Charge   @relation(fields: [chargeId], references: [id], onDelete: Cascade)
+  /// Cents applied from this payment to this charge. Always positive.
+  amount    Int
+  createdAt DateTime @default(now())
+
+  @@index([paymentId])
+  @@index([chargeId])
+  @@map("payment_allocations")
 }
 
 enum PaymentStatus {
   PAID
   PENDING
   FAILED
+  VOIDED
 }
 
 model Poll {
@@ -664,21 +779,21 @@ enum ArchitecturalRequestStatus {
 }
 
 model ArchitecturalRequest {
-  id                     String                         @id @default(cuid())
+  id                     String                           @id @default(cuid())
   residentId             String
-  resident               User                           @relation("ResidentArchRequests", fields: [residentId], references: [id])
+  resident               User                             @relation("ResidentArchRequests", fields: [residentId], references: [id])
   propertyId             String?
-  property               Property?                      @relation(fields: [propertyId], references: [id])
+  property               Property?                        @relation(fields: [propertyId], references: [id])
   communityId            String
-  community              Community                      @relation(fields: [communityId], references: [id])
+  community              Community                        @relation(fields: [communityId], references: [id])
   requestType            ArchitecturalRequestType
   description            String
   desiredStartDate       DateTime?
-  status                 ArchitecturalRequestStatus     @default(DRAFT)
+  status                 ArchitecturalRequestStatus       @default(DRAFT)
   governingRuleReference String?
   decisionReason         String?
-  createdAt              DateTime                       @default(now())
-  updatedAt              DateTime                       @updatedAt
+  createdAt              DateTime                         @default(now())
+  updatedAt              DateTime                         @updatedAt
   comments               ArchitecturalRequestComment[]
   activities             ArchitecturalRequestActivity[]
   attachments            ArchitecturalRequestAttachment[]
@@ -688,14 +803,14 @@ model ArchitecturalRequest {
 }
 
 model ArchitecturalRequestComment {
-  id        String               @id @default(cuid())
-  requestId String
-  request   ArchitecturalRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
-  authorId  String
-  author    User                 @relation("ArchRequestComments", fields: [authorId], references: [id])
-  body      String
-  isInternal Boolean             @default(false)
-  createdAt DateTime             @default(now())
+  id         String               @id @default(cuid())
+  requestId  String
+  request    ArchitecturalRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  authorId   String
+  author     User                 @relation("ArchRequestComments", fields: [authorId], references: [id])
+  body       String
+  isInternal Boolean              @default(false)
+  createdAt  DateTime             @default(now())
 
   @@map("architectural_request_comments")
 }
@@ -756,25 +871,25 @@ enum ViolationAppealStatus {
 }
 
 model Violation {
-  id              String          @id @default(cuid())
+  id              String                @id @default(cuid())
   residentId      String
-  resident        User            @relation("ResidentViolations", fields: [residentId], references: [id])
+  resident        User                  @relation("ResidentViolations", fields: [residentId], references: [id])
   propertyId      String?
-  property        Property?       @relation(fields: [propertyId], references: [id])
+  property        Property?             @relation(fields: [propertyId], references: [id])
   createdById     String
-  createdBy       User            @relation("CreatedViolations", fields: [createdById], references: [id])
+  createdBy       User                  @relation("CreatedViolations", fields: [createdById], references: [id])
   communityId     String
-  community       Community       @relation(fields: [communityId], references: [id])
+  community       Community             @relation(fields: [communityId], references: [id])
   violationType   ViolationType
   ruleCitation    String
   description     String
   observedAt      DateTime
   deadline        DateTime?
-  status          ViolationStatus @default(DRAFT)
+  status          ViolationStatus       @default(DRAFT)
   resolutionSteps String?
   evidenceUrl     String?
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
   comments        ViolationComment[]
   activities      ViolationActivity[]
   appeal          ViolationAppeal?
@@ -829,19 +944,19 @@ model ViolationAttachment {
 }
 
 model ViolationAppeal {
-  id           String               @id @default(cuid())
-  violationId  String               @unique
-  violation    Violation            @relation(fields: [violationId], references: [id], onDelete: Cascade)
+  id            String                @id @default(cuid())
+  violationId   String                @unique
+  violation     Violation             @relation(fields: [violationId], references: [id], onDelete: Cascade)
   submittedById String
-  submittedBy  User                 @relation("AppealSubmitter", fields: [submittedById], references: [id])
-  reason       String
-  status       ViolationAppealStatus @default(SUBMITTED)
-  outcome      String?
-  reviewedById String?
-  reviewedBy   User?                @relation("AppealReviewer", fields: [reviewedById], references: [id])
-  reviewedAt   DateTime?
-  createdAt    DateTime             @default(now())
-  updatedAt    DateTime             @updatedAt
+  submittedBy   User                  @relation("AppealSubmitter", fields: [submittedById], references: [id])
+  reason        String
+  status        ViolationAppealStatus @default(SUBMITTED)
+  outcome       String?
+  reviewedById  String?
+  reviewedBy    User?                 @relation("AppealReviewer", fields: [reviewedById], references: [id])
+  reviewedAt    DateTime?
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
 
   @@map("violation_appeals")
 }

@@ -2,12 +2,21 @@
 
 import { use, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Pencil, Trash2 } from 'lucide-react';
+import { ArrowLeft, CreditCard, ExternalLink, Pencil, Trash2 } from 'lucide-react';
 import { useToast } from '@/context/toast';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+
+interface StripeStatus {
+  stripeAccountId: string | null;
+  stripeChargesEnabled: boolean;
+  stripeDetailsSubmitted: boolean;
+  stripeConfigured: boolean;
+  canAcceptPayments: boolean;
+  refreshError: string | null;
+}
 
 interface Person { id: string; firstName: string; lastName: string; email: string }
 interface StaffRow { id: string; createdAt: string; user: Person & { role: string } }
@@ -60,12 +69,23 @@ export default function CommunityDetailPage({ params }: { params: Promise<{ id: 
   const [propertyForm, setPropertyForm] = useState(EMPTY_PROPERTY);
   const [showPropertyForm, setShowPropertyForm] = useState(false);
   const [deleting, setDeleting] = useState<Property | null>(null);
+  const [stripe, setStripe] = useState<StripeStatus | null>(null);
+  const [connecting, setConnecting] = useState(false);
 
   const load = useCallback(async () => {
-    const [detail, cands] = await Promise.all([
+    // On the hop back from Stripe-hosted onboarding, ask the API to read the live
+    // account rather than our webhook-maintained mirrors — account.updated may not
+    // have arrived yet, and the admin is looking at the page right now.
+    const justReturned =
+      typeof window !== 'undefined' &&
+      new URLSearchParams(window.location.search).get('stripe') === 'return';
+
+    const [detail, cands, stripeRes] = await Promise.all([
       fetch(`/api/admin/communities/${id}`),
       fetch(`/api/admin/communities/${id}/candidates`),
+      fetch(`/api/admin/communities/${id}/stripe${justReturned ? '?refresh=1' : ''}`),
     ]);
+    setStripe(stripeRes.ok ? await stripeRes.json() : null);
     if (!detail.ok) {
       setState('error');
       return;
@@ -83,6 +103,20 @@ export default function CommunityDetailPage({ params }: { params: Promise<{ id: 
   useEffect(() => {
     load();
   }, [load]);
+
+  // Stripe returns to ?stripe=return (finished or abandoned the flow) or
+  // ?stripe=refresh (the single-use account link expired). Read from location so
+  // this client page needs no Suspense boundary.
+  useEffect(() => {
+    const outcome = new URLSearchParams(window.location.search).get('stripe');
+    if (!outcome) return;
+
+    if (outcome === 'refresh') {
+      toast('That onboarding link expired. Start it again.', 'info');
+    }
+
+    window.history.replaceState(null, '', window.location.pathname);
+  }, [toast]);
 
   /** Every mutation reports the server's own message — these rules are enforced there. */
   async function send(url: string, method: string, body?: unknown, success?: string) {
@@ -102,6 +136,29 @@ export default function CommunityDetailPage({ params }: { params: Promise<{ id: 
       return true;
     } finally {
       setBusy(false);
+    }
+  }
+
+  /**
+   * Creates the connected account if needed and hands off to Stripe-hosted
+   * onboarding. Account links are single-use, so this is also the "continue"
+   * action for a half-finished account.
+   */
+  async function connectStripe() {
+    setConnecting(true);
+    try {
+      const res = await fetch(`/api/admin/communities/${id}/stripe`, { method: 'POST' });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.url) {
+        toast(data?.error ?? 'Could not start Stripe onboarding.', 'error');
+        setConnecting(false);
+        return;
+      }
+      // Full navigation: onboarding is hosted by Stripe.
+      window.location.assign(data.url);
+    } catch {
+      toast('Could not start Stripe onboarding.', 'error');
+      setConnecting(false);
     }
   }
 
@@ -183,6 +240,90 @@ export default function CommunityDetailPage({ params }: { params: Promise<{ id: 
           </div>
         )}
       </header>
+
+      {/* Online payments (Stripe Connect) */}
+      <section aria-labelledby="stripe-heading" className={card}>
+        <div className="flex items-center justify-between gap-3 mb-3">
+          <h2 id="stripe-heading" className={heading}>
+            Online payments
+          </h2>
+          {stripe && (
+            <span
+              className={`inline-flex items-center gap-1.5 text-xs font-medium px-2 py-1 rounded-full ${
+                stripe.canAcceptPayments
+                  ? 'bg-green-100 text-green-800'
+                  : stripe.stripeAccountId
+                    ? 'bg-yellow-100 text-yellow-800'
+                    : 'bg-gray-100 text-gray-600'
+              }`}
+            >
+              {stripe.canAcceptPayments
+                ? 'Accepting payments'
+                : stripe.stripeAccountId
+                  ? 'Onboarding incomplete'
+                  : 'Not connected'}
+            </span>
+          )}
+        </div>
+
+        {!stripe ? (
+          <p className="text-sm text-gray-500">Payment status could not be loaded.</p>
+        ) : !stripe.stripeConfigured ? (
+          <p className="text-sm text-gray-500">
+            Stripe is not configured on this server. Set <code className="text-xs">STRIPE_SECRET_KEY</code> and{' '}
+            <code className="text-xs">STRIPE_WEBHOOK_SECRET</code> to enable online payments.
+          </p>
+        ) : (
+          <>
+            <p className="text-sm text-gray-500 mb-4">
+              {stripe.canAcceptPayments
+                ? 'Residents of this community can pay their balance online. Payouts go to this association\u2019s own bank account, and its name appears on the resident\u2019s statement.'
+                : stripe.stripeAccountId
+                  ? 'This association has started onboarding but cannot take payments yet. Stripe still needs more information.'
+                  : 'Connect this association to Stripe so residents can pay online. The association is onboarded as its own merchant, so payouts and disputes belong to it rather than to the platform.'}
+            </p>
+
+            {stripe.refreshError && (
+              <p className="text-sm text-yellow-700 bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-2 mb-4">
+                Showing the last known status \u2014 Stripe could not be reached just now.
+              </p>
+            )}
+
+            <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm mb-4 max-w-md">
+              <dt className="text-gray-500">Details submitted</dt>
+              <dd className="text-gray-900">{stripe.stripeDetailsSubmitted ? 'Yes' : 'No'}</dd>
+              <dt className="text-gray-500">Charges enabled</dt>
+              <dd className="text-gray-900">{stripe.stripeChargesEnabled ? 'Yes' : 'No'}</dd>
+              {stripe.stripeAccountId && (
+                <>
+                  <dt className="text-gray-500">Account</dt>
+                  <dd className="text-gray-900 font-mono text-xs break-all">{stripe.stripeAccountId}</dd>
+                </>
+              )}
+            </dl>
+
+            {!stripe.canAcceptPayments && (
+              <button
+                type="button"
+                onClick={connectStripe}
+                disabled={connecting || busy}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+              >
+                {stripe.stripeAccountId ? (
+                  <ExternalLink className="w-4 h-4" aria-hidden="true" />
+                ) : (
+                  <CreditCard className="w-4 h-4" aria-hidden="true" />
+                )}
+                {connecting
+                  ? 'Opening Stripe\u2026'
+                  : stripe.stripeAccountId
+                    ? 'Continue onboarding'
+                    : 'Connect with Stripe'}
+              </button>
+            )}
+          </>
+        )}
+      </section>
 
       {/* Staff */}
       <section aria-labelledby="staff-heading" className={card}>

@@ -21,6 +21,12 @@ export async function proxy(req: NextRequest) {
 
   if (PUBLIC_PATHS.some((p) => pathname.startsWith(p))) return NextResponse.next();
   if (pathname.startsWith('/api/auth')) return NextResponse.next();
+  // Stripe webhooks carry a signature, not a JWT. Without this exemption every
+  // delivery 401s here before app/api/webhooks/stripe/route.ts can verify it.
+  if (pathname.startsWith('/api/webhooks/')) return NextResponse.next();
+  // The autopay cron carries a shared secret, not a JWT — it runs with no user
+  // present. The route checks that secret itself.
+  if (pathname.startsWith('/api/cron/')) return NextResponse.next();
   if (pathname.startsWith('/_next') || pathname.startsWith('/favicon')) return NextResponse.next();
 
   const authHeader = req.headers.get('authorization');

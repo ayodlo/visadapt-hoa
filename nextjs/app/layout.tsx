@@ -10,12 +10,17 @@ export const metadata: Metadata = {
 };
 
 // Runs synchronously during HTML parsing, before first paint, so a saved
-// "light" preference never flashes dark (and vice versa). Dark is the default.
+// "light" preference never flashes dark (and vice versa). Light is the default.
 const themeInitScript = `(function(){try{var t=localStorage.getItem("theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t)}catch(e){}})()`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" data-theme="dark" suppressHydrationWarning className={`h-full ${geist.variable}`}>
+    <html
+      lang="en"
+      data-theme="light"
+      suppressHydrationWarning
+      className={`h-full ${geist.variable}`}
+    >
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
