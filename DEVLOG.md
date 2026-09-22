@@ -2,6 +2,45 @@
 
 ---
 
+## 2026-09-22 (card_payments gating fix; ACH blocked by platform payment-method settings)
+
+**Files changed:**
+- `nextjs/prisma/schema.prisma` + `migrations/20260922120000_add_stripe_card_payments_active/` — new `Community.stripeCardPaymentsActive` (default false). **Applied to dev (`ep-fancy-dew`) only, NOT prod.**
+- `nextjs/lib/stripe.ts` — `accountMirrors(account)` (the one place Stripe account → Community mirrors is computed) and `canAcceptPayments(community)` (account id && charges_enabled && card_payments active).
+- `nextjs/app/api/admin/communities/[id]/stripe/route.ts` — GET reads the live account on **every** load (not just `?refresh=1`) and writes the mirrors back; `canAcceptPayments` via the helper. POST's `accounts.create` now also requests `us_bank_account_ach_payments` (uncommitted until this handoff).
+- `nextjs/app/api/webhooks/stripe/route.ts` — `handleAccountUpdated` uses `accountMirrors`; log line includes `cardPayments`.
+- `nextjs/app/api/payments/me/checkout/route.ts`, `payments/me/autopay/route.ts`, `payments/me/autopay/setup/route.ts`, `lib/autopay.ts` — every payment gate uses `canAcceptPayments`.
+- `nextjs/app/dashboard/communities/[id]/page.tsx` — "Card payments: Active / Not active" row; no longer sends `?refresh=1`.
+- `nextjs/__tests__/lib/stripe.test.ts` (new) — 8 tests (309 total).
+
+**Decisions made:**
+- **Option A: a new column, not redefining `stripeChargesEnabled`.** Keeps the mirror honest to its Stripe field name; the combined rule lives in one helper.
+- **Gate the payment paths, not just the badge.** Fixing only `canAcceptPayments` in the route would have made the badge honest while residents could still start checkouts that fail.
+- **Live read on every communities-page load.** SUPER_ADMIN-only, low traffic; one Stripe call per view. It also repairs mirrors after a missed/failed/out-of-order `account.updated`. Payment paths still trust the mirrors between page visits — a periodic re-sync would close that gap; not built.
+- **Card-only gate is deliberate for now.** An ACH-only HOA would be blocked; revisit if that ever exists.
+- **ACH requested for all new accounts** and on the sandbox demo account (`stripe post ... capabilities[us_bank_account_ach_payments][requested]=true` → active immediately, no new requirements).
+- **Resident payment methods = Card + ACH + Link/Apple Pay/Google Pay**, enforced in the platform's Connect payment-method settings (not pinned in code). BNPL (Klarna/Affirm/Zip), Cash App, Amazon Pay and crypto off.
+
+**Verification:** `tsc` clean, eslint clean on changed files, 309 vitest. Live against the dev server: demo community backfilled to `stripeCardPaymentsActive: true` / `canAcceptPayments: true` by one page load; both Playwright communities read `false` / `false`. A checkout session created successfully through the new gate.
+
+**Next steps:**
+1. **Platform Connect payment methods — user action, not yet confirmed done.** `dashboard.stripe.com/test/settings/connect/payment_methods` (sandbox): ACH Direct Debit ON; Card/Link/Apple Pay/Google Pay ON; Klarna/Affirm/Zip/Cash App/Amazon Pay/Crypto OFF (non-overridable). Then create a checkout and confirm `payment_method_types` is card/us_bank_account/link only. **Repeat in live mode before go-live.**
+2. **Then the ACH test:** pay the pending $12 "ACH Test Charge" (charge `cmudatd5v00014yqdyf9x8ydo`, demo resident) with a test bank account → expect Payment PENDING → `checkout.session.async_payment_succeeded` → PAID.
+3. Then autopay against real Stripe: hosted setup page, `off_session` charge, real decline codes in `lastFailureCode`.
+4. **Prod: run `prisma migrate deploy` against `ep-weathered-leaf` BEFORE deploying this branch** — the build (`prisma generate && next build`) does not migrate, and every Community query would fail on the missing column. After deploying, open each community page once (or wait for `account.updated`) — until then every community reads "cannot accept payments".
+5. Branch `fix/card-payments-capability` is not merged or pushed.
+6. Still owed: Accounts v2 migration, Stripe refunds, autopay-failure email, overdue ager.
+
+**Gotchas:**
+- **Capability ≠ offered.** With dynamic payment methods, a method needs BOTH the account capability AND to be on in the payment method configuration. Connected accounts' configs inherit from the platform's parent config (`pmc_1UIE5b…`), which **can only be edited in the Dashboard** — the API returns "Platform parent configurations can only be managed via the dashboard."
+- **Stripe's platform defaults enable nearly everything** (Klarna, Affirm, Zip, Cash App, Amazon Pay, crypto…). `paymentMethodLabel` maps any unknown type to `"Card"`, so those would silently be mislabelled in the ledger if ever re-enabled.
+- Existing communities have `stripeCardPaymentsActive = false` until a page load or webhook refreshes them — this blocks checkout/autopay for them in the meantime.
+- PowerShell 5.1 mangles a `git commit -m @'...'@` message containing double quotes into pathspecs — use `git commit -F <file>`.
+- `prisma generate` fails with EPERM on the query-engine DLL while `next dev` is running; the TS types still regenerate, but restart the dev server to load the new client.
+- `stripe listen --print-secret` is stable per machine and matches `.env.local`'s `STRIPE_WEBHOOK_SECRET`.
+
+---
+
 ## 2026-09-22 (First real Stripe payment — and the capability bug that blocked it)
 
 **Files changed:**
