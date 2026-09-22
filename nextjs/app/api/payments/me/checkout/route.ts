@@ -5,7 +5,7 @@ import { getActiveCommunityId } from '@/lib/community';
 import { prisma } from '@/lib/prisma';
 import { ok, err, unauthorized } from '@/lib/api';
 import { createAuditLog } from '@/lib/audit';
-import { getStripe, isStripeConfigured } from '@/lib/stripe';
+import { canAcceptPayments, getStripe, isStripeConfigured } from '@/lib/stripe';
 import { residentOutstandingBalance } from '@/lib/payments';
 
 const schema = z.object({
@@ -45,11 +45,17 @@ export async function POST(req: NextRequest) {
 
   const community = await prisma.community.findUnique({
     where: { id: communityId },
-    select: { id: true, name: true, stripeAccountId: true, stripeChargesEnabled: true },
+    select: {
+      id: true,
+      name: true,
+      stripeAccountId: true,
+      stripeChargesEnabled: true,
+      stripeCardPaymentsActive: true,
+    },
   });
   if (!community) return err('No community selected', 400);
 
-  if (!community.stripeAccountId || !community.stripeChargesEnabled) {
+  if (!community.stripeAccountId || !canAcceptPayments(community)) {
     return err('This community is not set up to accept online payments yet', 409);
   }
 

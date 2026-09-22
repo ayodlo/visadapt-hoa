@@ -3,7 +3,7 @@ import { getActiveCommunityId } from '@/lib/community';
 import { prisma } from '@/lib/prisma';
 import { ok, err, unauthorized } from '@/lib/api';
 import { createAuditLog } from '@/lib/audit';
-import { getStripe, isStripeConfigured } from '@/lib/stripe';
+import { canAcceptPayments, getStripe, isStripeConfigured } from '@/lib/stripe';
 
 /**
  * Starts enrolment in autopay.
@@ -35,7 +35,13 @@ export async function POST() {
   const [community, user] = await Promise.all([
     prisma.community.findUnique({
       where: { id: communityId },
-      select: { id: true, name: true, stripeAccountId: true, stripeChargesEnabled: true },
+      select: {
+        id: true,
+        name: true,
+        stripeAccountId: true,
+        stripeChargesEnabled: true,
+        stripeCardPaymentsActive: true,
+      },
     }),
     prisma.user.findUnique({
       where: { id: session.id },
@@ -45,7 +51,7 @@ export async function POST() {
 
   if (!community || !user) return err('No community selected', 400);
 
-  if (!community.stripeAccountId || !community.stripeChargesEnabled) {
+  if (!community.stripeAccountId || !canAcceptPayments(community)) {
     return err('This community is not set up to accept online payments yet', 409);
   }
 

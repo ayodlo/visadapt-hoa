@@ -5,7 +5,7 @@ import { getActiveCommunityId } from '@/lib/community';
 import { prisma } from '@/lib/prisma';
 import { ok, err, unauthorized, notFound } from '@/lib/api';
 import { createAuditLog } from '@/lib/audit';
-import { getStripe, isStripeConfigured } from '@/lib/stripe';
+import { canAcceptPayments, getStripe, isStripeConfigured } from '@/lib/stripe';
 import { describeMethodLabel } from '@/lib/autopay';
 
 /**
@@ -40,7 +40,7 @@ export async function GET() {
     }),
     prisma.community.findUnique({
       where: { id: communityId },
-      select: { stripeAccountId: true, stripeChargesEnabled: true },
+      select: { stripeAccountId: true, stripeChargesEnabled: true, stripeCardPaymentsActive: true },
     }),
   ]);
 
@@ -54,10 +54,7 @@ export async function GET() {
     lastFailureAt: enrollment?.lastFailureAt ?? null,
     lastFailureMessage: enrollment?.lastFailureMessage ?? null,
     // Autopay cannot be offered at all until the association can take money.
-    available:
-      isStripeConfigured() &&
-      Boolean(community?.stripeAccountId) &&
-      Boolean(community?.stripeChargesEnabled),
+    available: isStripeConfigured() && Boolean(community && canAcceptPayments(community)),
   });
 }
 

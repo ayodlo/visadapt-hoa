@@ -30,6 +30,37 @@ export function isStripeConfigured(): boolean {
 }
 
 /**
+ * The Community columns mirrored from a connected account. Both writers — the
+ * account.updated webhook and the onboarding page's live read — go through this,
+ * so the mirrors cannot drift apart in meaning.
+ */
+export function accountMirrors(account: Stripe.Account) {
+  return {
+    stripeChargesEnabled: account.charges_enabled ?? false,
+    stripeCardPaymentsActive: account.capabilities?.card_payments === 'active',
+    stripeDetailsSubmitted: account.details_submitted ?? false,
+  };
+}
+
+/**
+ * Whether residents of this community can actually pay online. charges_enabled
+ * alone lies: an account without the card_payments capability reports it true,
+ * renders Checkout, and fails only when the resident confirms. `pending` and
+ * `inactive` both count as not ready.
+ */
+export function canAcceptPayments(community: {
+  stripeAccountId: string | null;
+  stripeChargesEnabled: boolean;
+  stripeCardPaymentsActive: boolean;
+}): boolean {
+  return (
+    Boolean(community.stripeAccountId) &&
+    community.stripeChargesEnabled &&
+    community.stripeCardPaymentsActive
+  );
+}
+
+/**
  * Maps a Stripe payment method type onto the `Payment.paymentMethod` strings this
  * app already stores, so Stripe rows read the same as the historical ones rather
  * than introducing a second vocabulary.

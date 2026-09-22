@@ -29,6 +29,10 @@ model Community {
   // account.updated webhook. Not invented state: charges_enabled is the only
   // reliable signal that the account can actually take money.
   stripeChargesEnabled   Boolean @default(false)
+  // Mirror of capabilities.card_payments === 'active'. charges_enabled alone is
+  // NOT enough: an account granted only `transfers` reports charges_enabled: true
+  // yet fails every card at confirm. Gate on both — see canAcceptPayments().
+  stripeCardPaymentsActive Boolean @default(false)
   stripeDetailsSubmitted Boolean @default(false)
   // Who eats the processing fee. Default true = the HOA absorbs it, which is
   // current behaviour (residents are never surcharged). Nothing reads this yet —

@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 import type Stripe from 'stripe';
 import { prisma } from '@/lib/prisma';
 import { ok, err } from '@/lib/api';
-import { getStripe, isStripeConfigured, paymentMethodLabel } from '@/lib/stripe';
+import { accountMirrors, getStripe, isStripeConfigured, paymentMethodLabel } from '@/lib/stripe';
 import { failStripePayment, recordStripePayment, settlePendingStripePayment } from '@/lib/payments';
 import {
   clearAutopayFailure,
@@ -335,7 +335,7 @@ async function resolvePaymentMethodType(
   return null;
 }
 
-/** Keeps our mirrors of charges_enabled / details_submitted honest. */
+/** Keeps our mirrors of charges_enabled / card_payments / details_submitted honest. */
 async function handleAccountUpdated(account: Stripe.Account) {
   const community = await prisma.community.findFirst({
     where: { stripeAccountId: account.id },
@@ -345,15 +345,13 @@ async function handleAccountUpdated(account: Stripe.Account) {
 
   await prisma.community.update({
     where: { id: community.id },
-    data: {
-      stripeChargesEnabled: account.charges_enabled ?? false,
-      stripeDetailsSubmitted: account.details_submitted ?? false,
-    },
+    data: accountMirrors(account),
   });
 
   console.log('[stripe] account updated', {
     accountId: account.id,
     communityId: community.id,
     chargesEnabled: account.charges_enabled,
+    cardPayments: account.capabilities?.card_payments ?? null,
   });
 }

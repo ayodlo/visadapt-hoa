@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
 import { ok, err, unauthorized, forbidden, notFound } from '@/lib/api';
 import { createAuditLog } from '@/lib/audit';
-import { getStripe, isStripeConfigured } from '@/lib/stripe';
+import { accountMirrors, canAcceptPayments, getStripe, isStripeConfigured } from '@/lib/stripe';
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -17,52 +17,41 @@ type Params = { params: Promise<{ id: string }> };
  * 2026-09-08 records "platform admin has no role" as still open. Follow the
  * existing pattern until that decision lands rather than inventing a role here.
  */
-export async function GET(req: NextRequest, { params }: Params) {
+export async function GET(_req: NextRequest, { params }: Params) {
   const session = await getSession();
   if (!session) return unauthorized();
   if (session.role !== 'SUPER_ADMIN') return forbidden();
 
   const { id } = await params;
-  let community = await prisma.community.findUnique({
-    where: { id },
-    select: {
-      id: true,
-      name: true,
-      stripeAccountId: true,
-      stripeChargesEnabled: true,
-      stripeDetailsSubmitted: true,
-      absorbsProcessingFees: true,
-    },
-  });
+  const select = {
+    id: true,
+    name: true,
+    stripeAccountId: true,
+    stripeChargesEnabled: true,
+    stripeCardPaymentsActive: true,
+    stripeDetailsSubmitted: true,
+    absorbsProcessingFees: true,
+  } as const;
+  let community = await prisma.community.findUnique({ where: { id }, select });
   if (!community) return notFound('Community');
 
-  // ?refresh=1 pulls the live account instead of trusting our mirrors.
+  // Every load reads the live account and rewrites our mirrors.
   //
   // The mirrors are maintained by the account.updated webhook, which is the right
-  // steady-state mechanism but is useless immediately after onboarding: the admin
-  // is redirected back here within seconds and the webhook may not have landed, so
-  // a freshly-completed account would still read "not connected". The onboarding
-  // page asks for a refresh on return.
-  const wantsRefresh = req.nextUrl.searchParams.get('refresh') === '1';
+  // steady-state mechanism for the payment paths — but this page is where a human
+  // decides whether an association is ready, and a missed or late webhook left it
+  // showing "Accepting payments" for hours while every checkout failed. The page is
+  // SUPER_ADMIN-only and rarely viewed, so one Stripe call per view is cheap, and
+  // the write also repairs the mirrors the payment paths gate on.
   let refreshError: string | null = null;
 
-  if (wantsRefresh && community.stripeAccountId && isStripeConfigured()) {
+  if (community.stripeAccountId && isStripeConfigured()) {
     try {
       const account = await getStripe().accounts.retrieve(community.stripeAccountId);
       community = await prisma.community.update({
         where: { id: community.id },
-        data: {
-          stripeChargesEnabled: account.charges_enabled ?? false,
-          stripeDetailsSubmitted: account.details_submitted ?? false,
-        },
-        select: {
-          id: true,
-          name: true,
-          stripeAccountId: true,
-          stripeChargesEnabled: true,
-          stripeDetailsSubmitted: true,
-          absorbsProcessingFees: true,
-        },
+        data: accountMirrors(account),
+        select,
       });
     } catch (e) {
       // Report the stale mirrors rather than failing the page; the webhook will
@@ -76,7 +65,7 @@ export async function GET(req: NextRequest, { params }: Params) {
     ...community,
     stripeConfigured: isStripeConfigured(),
     // The only state that matters to a resident trying to pay.
-    canAcceptPayments: Boolean(community.stripeAccountId) && community.stripeChargesEnabled,
+    canAcceptPayments: canAcceptPayments(community),
     refreshError,
   });
 }

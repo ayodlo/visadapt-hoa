@@ -12,6 +12,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 interface StripeStatus {
   stripeAccountId: string | null;
   stripeChargesEnabled: boolean;
+  stripeCardPaymentsActive: boolean;
   stripeDetailsSubmitted: boolean;
   stripeConfigured: boolean;
   canAcceptPayments: boolean;
@@ -73,17 +74,12 @@ export default function CommunityDetailPage({ params }: { params: Promise<{ id: 
   const [connecting, setConnecting] = useState(false);
 
   const load = useCallback(async () => {
-    // On the hop back from Stripe-hosted onboarding, ask the API to read the live
-    // account rather than our webhook-maintained mirrors — account.updated may not
-    // have arrived yet, and the admin is looking at the page right now.
-    const justReturned =
-      typeof window !== 'undefined' &&
-      new URLSearchParams(window.location.search).get('stripe') === 'return';
-
+    // The stripe endpoint reads the live account on every call, so the status is
+    // current even on the hop back from Stripe-hosted onboarding.
     const [detail, cands, stripeRes] = await Promise.all([
       fetch(`/api/admin/communities/${id}`),
       fetch(`/api/admin/communities/${id}/candidates`),
-      fetch(`/api/admin/communities/${id}/stripe${justReturned ? '?refresh=1' : ''}`),
+      fetch(`/api/admin/communities/${id}/stripe`),
     ]);
     setStripe(stripeRes.ok ? await stripeRes.json() : null);
     if (!detail.ok) {
@@ -294,6 +290,8 @@ export default function CommunityDetailPage({ params }: { params: Promise<{ id: 
               <dd className="text-gray-900">{stripe.stripeDetailsSubmitted ? 'Yes' : 'No'}</dd>
               <dt className="text-gray-500">Charges enabled</dt>
               <dd className="text-gray-900">{stripe.stripeChargesEnabled ? 'Yes' : 'No'}</dd>
+              <dt className="text-gray-500">Card payments</dt>
+              <dd className="text-gray-900">{stripe.stripeCardPaymentsActive ? 'Active' : 'Not active'}</dd>
               {stripe.stripeAccountId && (
                 <>
                   <dt className="text-gray-500">Account</dt>

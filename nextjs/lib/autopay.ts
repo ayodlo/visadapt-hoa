@@ -1,6 +1,6 @@
 import type Stripe from 'stripe';
 import { prisma } from './prisma';
-import { getStripe, paymentMethodLabel } from './stripe';
+import { canAcceptPayments, getStripe, paymentMethodLabel } from './stripe';
 import { residentOutstandingBalance } from './payments';
 
 /**
@@ -147,7 +147,13 @@ export async function runAutopay(options: { now?: Date; dryRun?: boolean } = {})
       lastRunAt: true,
       user: { select: { id: true, email: true, stripeCustomerId: true } },
       community: {
-        select: { id: true, name: true, stripeAccountId: true, stripeChargesEnabled: true },
+        select: {
+          id: true,
+          name: true,
+          stripeAccountId: true,
+          stripeChargesEnabled: true,
+          stripeCardPaymentsActive: true,
+        },
       },
     },
   });
@@ -165,7 +171,7 @@ export async function runAutopay(options: { now?: Date; dryRun?: boolean } = {})
       continue;
     }
 
-    if (!enrollment.community.stripeAccountId || !enrollment.community.stripeChargesEnabled) {
+    if (!enrollment.community.stripeAccountId || !canAcceptPayments(enrollment.community)) {
       skip('community cannot accept payments');
       continue;
     }
