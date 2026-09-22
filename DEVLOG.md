@@ -2,6 +2,41 @@
 
 ---
 
+## 2026-09-22 (First real Stripe payment — and the capability bug that blocked it)
+
+**Files changed:**
+- `nextjs/app/api/admin/communities/[id]/stripe/route.ts` — `accounts.create` now requests `card_payments` and `transfers`. Previously requested nothing, so every connected account got `transfers` only and could not process a card.
+- `mobile/STORE_SUBMISSION.md` — step 2 now records the real `EXPO_PUBLIC_API_URL` (`https://account.portalhoa.com`) instead of the old `your-app.vercel.app` placeholder, and notes the value is baked in at build time.
+
+**The headline: the Stripe surface has now run against a real test-mode key.** Sandbox platform `acct_1UIDzfIm0X2hNr0S` ("Portal HOA"), demo community onboarded as `acct_1UIH5rIq265SPz3q`. A $5.00 Demo Charge was paid through hosted Checkout and recorded correctly: `Payment` 500c PAID / "Credit Card" with `cs_test_…` + `pi_3UIVzhIq265SPz3q…`, one 500c `PaymentAllocation`, `Charge.amountPaid` 500, status PAID, balance $0.00. The `pi_` id carries the connected account's fragment, confirming a direct charge on the HOA's own account. `resolvePaymentMethodType` retrieved the intent with `stripeAccount` and produced "Credit Card" rather than the `default` fallback, so that path is proven too.
+
+**Decisions made:**
+- **`accounts.create` must request capabilities explicitly.** Express accounts are not granted `card_payments` by default — ours got only `transfers`. The failure mode is vicious: `charges_enabled` still reads `true`, our mirrors still go green, Checkout still renders with the right amount, and only confirming the payment fails, with Stripe's generic "There was an error processing your request." Diagnosed by reading `capabilities` off the account directly; nothing in the app surfaces it.
+- **Accounts v1 was re-enabled in the Dashboard rather than migrating to v2 now.** New Stripe accounts reject `accounts.create({ type: 'express' })` outright ("Stripe no longer recommends Accounts v1 for new Connect integrations"); the toggle at `settings/developers/api-policies/feat_accounts_v1_support` restores it. Taken deliberately as temporary debt: with the money path never once having run end to end, debugging a new API and an unproven pipeline simultaneously would have left no known-good baseline. The migration is owed before go-live.
+- **Existing accounts patched in place** via `stripe post /v1/accounts/<id> -d "capabilities[card_payments][requested]=true"` rather than re-onboarding from scratch, since the account ids are already stored on community rows.
+- **`losses_collector` stays with the platform** (implied by v1 Express). Stripe pushes SaaS platforms on direct charges toward Managed Risk (`losses_collector: 'stripe'`, Accounts v2); that is a business decision about who eats unrecoverable negative balances, deferred with the migration rather than settled by accident.
+
+**Verification:** `tsc --noEmit` clean. Payment confirmed by reading the database directly, not the UI. Connect webhook forwarding confirmed by paired `-->` / `<-- [200]` listener lines plus the handler's own `[stripe] account updated` log.
+
+**Next steps:**
+1. **Fix `canAcceptPayments` (`stripe/route.ts:79`).** It mirrors `charges_enabled`, which was `true` for the entire period the account could not process cards. Mirroring the `card_payments` capability instead would have caught this immediately.
+2. **Migrate onboarding to Accounts v2** (`stripe.v2.core.accounts` + `stripe.v2.core.accountLinks`). Contained to this route, the `?refresh=1` status read, and converting `handleAccountUpdated` to a thin-event handler — the payment paths pass `{ stripeAccount }` and do not move. `dashboard: 'full'` is GA; `dashboard: 'express'` + Managed Risk needs API version `2026-08-26.preview`, against the pin at `lib/stripe.ts:8`.
+3. **Still unproven against real Stripe:** ACH (`test_us_bank_account` → PENDING → `async_payment_succeeded`), the hosted setup page, `off_session` autopay charging, and real decline codes in `lastFailureCode`.
+4. The two Playwright communities remain `card_payments: inactive`. Harmless — no demo users, and e2e makes no real Stripe calls.
+
+**Gotchas:**
+- **A green "Accepting payments" badge proves nothing.** It reads DB mirrors updated only by `account.updated` or a `?stripe=return` visit — a plain page load never re-reads Stripe. All three communities showed green for hours while `charges_enabled` was actually `false`. This is a real product bug, not a test artifact: a missed webhook leaves residents starting checkouts that cannot succeed.
+- **A webhook `200` does not mean the handler did anything.** `handleAccountUpdated` returns silently when no community matches `account.id`. The `[stripe] account updated` log line is the only proof.
+- **`stripe listen` needs both `--forward-to` and `--forward-connect-to`** — direct-charge events arrive as Connect events. A `-->` line with no `<-- [200]` means print-only mode and nothing is reaching the app.
+- **Newer Stripe CLI requires `--events` / `--all-snapshot` / `--all-thin`,** and a multi-line `--events` list gets split by the shell into invalid event names (`checkout.sess`). Keep it on one line.
+- **Stripe test mode has no identity database.** Real SSN/DOB/address are flagged "Invalid" and block Confirm on the onboarding review screen. Use `address_full_match`, DOB `1901-01-01`, SSN `000-00-0000`, EIN `000000000`, phone `0000000000`.
+- **Requesting `card_payments` surfaces ~20 new KYC requirements** (company address, EIN, representative identity, MCC) that `transfers` alone never demanded, and flips the account to `requirements.past_due` until they are cleared.
+- **In Git Bash, `stripe get /v1/...` gets path-mangled** into a Windows path. Prefix with `MSYS_NO_PATHCONV=1`.
+- **Neon drops idle connections** (`prisma:error ... kind: Closed`) and Prisma does not reconnect — restart the dev server before testing, or the webhook 500s and Stripe retries against a dead pool.
+- **`npm run create-super-admin` promotes an existing email and leaves the password unchanged** (`prisma/create-super-admin.ts:27-31`), so reusing an existing address silently ignores `SUPER_ADMIN_PASSWORD` and logins 401. It also reads no env file — `.env` does not exist here, only `.env.local`, so export `DATABASE_URL` first.
+
+---
+
 ## 2026-09-11 (Autopay — the last Stripe piece of the AR mockup)
 
 **Files changed:**

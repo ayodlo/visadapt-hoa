@@ -113,6 +113,17 @@ export async function POST(req: NextRequest, { params }: Params) {
       const account = await stripe.accounts.create({
         type: 'express',
         business_profile: { name: community.name, product_description: 'HOA assessments and dues' },
+        // Neither capability is granted by default, and both are load-bearing:
+        // `card_payments` because residents pay ON the connected account (direct
+        // charges), `transfers` so the money reaches the association's bank.
+        // Omitting card_payments is silent until the very last step — the account
+        // still reports charges_enabled: true, our mirrors still go green, and
+        // Checkout still renders; only confirming the payment fails, with a
+        // generic "There was an error processing your request."
+        capabilities: {
+          card_payments: { requested: true },
+          transfers: { requested: true },
+        },
         metadata: { communityId: community.id },
       });
       accountId = account.id;

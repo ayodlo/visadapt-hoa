@@ -33,10 +33,11 @@ submitted to a store; it's all local config and a plan.
   each file's current size for the exact spec Expo expects).
 
 ### 2. Deploy the backend so the app has a real API to talk to
-- The web app isn't deployed yet (see root `DEVLOG.md` — Vercel deploy is
-  still on the TODO list). `eas.json`'s `preview`/`production` profiles point
-  `EXPO_PUBLIC_API_URL` at the placeholder `https://your-app.vercel.app` —
-  update this to the real deployed URL once it exists.
+- `eas.json`'s `preview`/`production` profiles already point
+  `EXPO_PUBLIC_API_URL` at `https://account.portalhoa.com`. Confirm that host
+  actually serves the deployed Next.js app before building — a build baked
+  against a URL that doesn't resolve produces an app that cannot log in, and
+  the value is compiled in at build time, not read at runtime.
 - This also makes the privacy policy page (`/privacy`) reachable at a real,
   stable URL — required for both stores' privacy policy link field.
 
