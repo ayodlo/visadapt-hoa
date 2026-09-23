@@ -64,20 +64,43 @@ export async function POST(req: NextRequest) {
         }
         break;
 
+      // Stripe does not order deliveries, and a failed checkout.session.completed
+      // is retried later, so the outcome of an ACH debit can arrive before the
+      // payment it settles has been recorded. Acknowledging that as a no-op would
+      // lose the outcome for good: the late `completed` still carries
+      // payment_status 'unpaid' and would leave the payment PENDING forever.
+      // Instead, record the payment from this event's session (which carries the
+      // same metadata) and then apply the outcome. The second settle/fail also
+      // covers a concurrent `completed` winning the insert, which makes the
+      // record call a duplicate that left the row PENDING.
       case 'checkout.session.async_payment_succeeded': {
-        const result = await settlePendingStripePayment(event.data.object.id);
+        const session = event.data.object;
+        let result = await settlePendingStripePayment(session.id);
+        const recordedFromSession = !result.found;
+        if (recordedFromSession) {
+          await handleCheckoutCompleted(session, event.account ?? null);
+          result = await settlePendingStripePayment(session.id);
+        }
         console.log('[stripe] async payment succeeded', {
-          sessionId: event.data.object.id,
+          sessionId: session.id,
           settled: result.settled,
+          recordedFromSession,
         });
         break;
       }
 
       case 'checkout.session.async_payment_failed': {
-        const result = await failStripePayment(event.data.object.id);
+        const session = event.data.object;
+        let result = await failStripePayment(session.id);
+        const recordedFromSession = !result.found;
+        if (recordedFromSession) {
+          await handleCheckoutCompleted(session, event.account ?? null);
+          result = await failStripePayment(session.id);
+        }
         console.log('[stripe] async payment failed', {
-          sessionId: event.data.object.id,
+          sessionId: session.id,
           recorded: result.failed,
+          recordedFromSession,
         });
         break;
       }

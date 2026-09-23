@@ -181,37 +181,56 @@ function idempotencyKeyFor(input: RecordStripePaymentInput) {
 /**
  * Promotes a previously PENDING payment (ACH) to PAID and settles charges then.
  * Charges are deliberately left untouched while a bank debit is in flight.
+ *
+ * `found: false` means no payment exists for the session yet — its
+ * checkout.session.completed has not been processed. Stripe does not order
+ * webhook deliveries, so the caller must record the payment itself rather than
+ * treat this as a no-op.
  */
 export async function settlePendingStripePayment(
   checkoutSessionId: string
-): Promise<{ settled: boolean }> {
+): Promise<{ found: boolean; settled: boolean }> {
   const payment = await prisma.payment.findUnique({
     where: { stripeCheckoutSessionId: checkoutSessionId },
     select: { id: true, residentId: true, communityId: true, amount: true, status: true },
   });
-  if (!payment || payment.status === 'PAID') return { settled: false };
+  if (!payment) return { found: false, settled: false };
+  if (payment.status !== 'PENDING') return { found: true, settled: false };
 
-  await prisma.$transaction(async (tx) => {
-    await tx.payment.update({
-      where: { id: payment.id },
+  const settled = await prisma.$transaction(async (tx) => {
+    // Conditional on still being PENDING, so two concurrent deliveries of the
+    // same event cannot both pass the read above and apply the money twice.
+    const { count } = await tx.payment.updateMany({
+      where: { id: payment.id, status: 'PENDING' },
       data: { status: 'PAID', paidAt: new Date() },
     });
+    if (count === 0) return false;
     await applyToCharges(tx, payment.id, payment.residentId, payment.communityId, payment.amount);
+    return true;
   });
 
-  return { settled: true };
+  return { found: true, settled };
 }
 
-/** Marks a payment FAILED. Charges were never touched, so nothing to unwind. */
-export async function failStripePayment(checkoutSessionId: string): Promise<{ failed: boolean }> {
+/**
+ * Marks a payment FAILED. Charges were never touched, so nothing to unwind.
+ * `found` has the same meaning as in settlePendingStripePayment.
+ */
+export async function failStripePayment(
+  checkoutSessionId: string
+): Promise<{ found: boolean; failed: boolean }> {
   const payment = await prisma.payment.findUnique({
     where: { stripeCheckoutSessionId: checkoutSessionId },
     select: { id: true, status: true },
   });
-  if (!payment || payment.status === 'PAID') return { failed: false };
+  if (!payment) return { found: false, failed: false };
 
-  await prisma.payment.update({ where: { id: payment.id }, data: { status: 'FAILED' } });
-  return { failed: true };
+  // Conditional so a settle racing this cannot be overwritten to FAILED.
+  const { count } = await prisma.payment.updateMany({
+    where: { id: payment.id, status: 'PENDING' },
+    data: { status: 'FAILED' },
+  });
+  return { found: true, failed: count > 0 };
 }
 
 
