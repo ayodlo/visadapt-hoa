@@ -2,6 +2,39 @@
 
 ---
 
+## 2026-09-23 (First real ACH payment — and the webhook-ordering bug it exposed)
+
+**Files changed:**
+- `nextjs/app/api/webhooks/stripe/route.ts` — `async_payment_succeeded` / `async_payment_failed` no longer no-op when no Payment exists for the session: they record it from the event's own session via `handleCheckoutCompleted`, then settle/fail again.
+- `nextjs/lib/payments.ts` — `settlePendingStripePayment` / `failStripePayment` return `found` alongside `settled` / `failed`, and both transitions are now conditional `updateMany({ status: 'PENDING' })`, so concurrent deliveries can't apply money twice or overwrite a settle with FAILED.
+- `nextjs/__tests__/workflow/stripe-webhook-ordering.test.ts` (new) — 8 tests driving the real route against an in-memory ledger. 5 of them fail against the previous route. 317 total.
+
+**The headline: ACH works end to end.** The sandbox Connect payment-method config (`pmc_1UIE5b…`, Dashboard → Settings → Connect → Payment methods → Default) now has ACH on. The demo resident paid the $12 "ACH Test Charge" with a test bank account: Payment PENDING / "Bank Transfer" on `completed`, then PAID with a 1200c allocation and the charge PAID on `async_payment_succeeded`.
+
+**The bug:** the dev server was down when the resident clicked pay, so `checkout.session.completed` was refused. `async_payment_succeeded` arrived after restart, found no Payment, and returned 200 — so the money was received and never recorded. In production Stripe would retry the missed `completed`, but its snapshot still says `payment_status: 'unpaid'`, so it would record PENDING and nothing would ever settle it. Recovered this one by fetching both original events (`stripe get /v1/events/<id> --stripe-account …`) and replaying them signed, in order.
+
+**Decisions made:**
+- **Reuse `handleCheckoutCompleted` for the fallback** rather than a second recording path — the success event's session carries the same metadata, amount and payment intent, so it gets the same metadata/account/amount checks. It records PAID directly because that session's `payment_status` is `'paid'`.
+- **Settle/fail a second time after the fallback.** A concurrent `completed` can win the unique insert with PENDING, making the fallback a `duplicate`; the second call promotes that row.
+- **A failure that arrives first is recorded as a FAILED row**, matching what the in-order path produces.
+
+**Verification:** `tsc` clean, eslint clean on changed files, 317 vitest. Live against the dev server + Neon: succeeded-before-completed with a fresh session and a temporary $12 charge → PAID, 1200c allocated, charge PAID; duplicate delivery and late `completed` both no-ops. Probe rows deleted afterwards.
+
+**Next steps:**
+1. **Payment-method config still offers Klarna, Cash App, Amazon Pay and crypto** at Checkout (probe session on 2026-09-23 listed `card, klarna, link, us_bank_account, cashapp, amazon_pay, crypto`). The user saw the change as "in review"; re-check and turn them off. **Repeat the whole config in live mode before go-live.**
+2. Autopay against real Stripe: hosted setup page, `off_session` charge, real decline codes in `lastFailureCode`.
+3. Prod: `prisma migrate deploy` against `ep-weathered-leaf` BEFORE deploying this branch (the card_payments column from 2026-09-22). Branch `fix/card-payments-capability` still not merged or pushed.
+4. Still owed: Accounts v2 migration, Stripe refunds, autopay-failure email, overdue ager.
+
+**Gotchas:**
+- **`stripe listen` does not retry.** An event refused while the server is down is gone from the local app; real endpoints get ~3 days of retries.
+- **`stripe events resend` refuses connected-account events** ("not permitted to configure webhook endpoints on a connected account"). Fetch the event with `stripe get /v1/events/<id> --stripe-account <acct>` and replay it signed with `stripe.webhooks.generateTestHeaderString`.
+- Replaying an event under a new session id must also change `payment_intent` — `Payment.stripePaymentIntentId` is unique, and the collision surfaces as a 500 (the P2002 fallback only looks up by session id).
+- A killed background `npm run dev` leaves its `node` child listening on 3000; the next `npm run dev` then exits with "Another next dev server is already running".
+- The Dashboard's Connect payment-methods page is under the Settings gear → Connect → Payment methods, not under the Connect product in the sidebar.
+
+---
+
 ## 2026-09-22 (card_payments gating fix; ACH blocked by platform payment-method settings)
 
 **Files changed:**
