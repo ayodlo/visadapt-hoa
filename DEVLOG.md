@@ -23,7 +23,7 @@
 **Next steps:**
 1. **Payment-method config still offers Klarna, Cash App, Amazon Pay and crypto** at Checkout (probe session on 2026-09-23 listed `card, klarna, link, us_bank_account, cashapp, amazon_pay, crypto`). The user saw the change as "in review"; re-check and turn them off. **Repeat the whole config in live mode before go-live.**
 2. Autopay against real Stripe: hosted setup page, `off_session` charge, real decline codes in `lastFailureCode`.
-3. Prod: `prisma migrate deploy` against `ep-weathered-leaf` BEFORE deploying this branch (the card_payments column from 2026-09-22). Branch `fix/card-payments-capability` still not merged or pushed.
+3. Prod: `prisma migrate deploy` against `ep-weathered-leaf` BEFORE deploying this branch (the card_payments column from 2026-09-22). Branch `fix/card-payments-capability` still not merged or pushed. **Migrations are not automated anywhere** — the build is `prisma generate && next build`, `vercel.json` has only the cron, and no workflow runs `migrate` (Vercel dashboard build-command override not checked; no CLI). Options, undecided: prepend `prisma migrate deploy` to the build (only safe if preview deploys don't share the prod `DATABASE_URL`), or a GitHub Actions step on merge to `main` with a prod-only secret.
 4. Still owed: Accounts v2 migration, Stripe refunds, autopay-failure email, overdue ager.
 
 **Gotchas:**
