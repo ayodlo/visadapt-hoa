@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { getSession } from '@/lib/auth';
-import { getActiveCommunityId } from '@/lib/community';
+import { getActiveCommunityId, isDemoCommunity } from '@/lib/community';
 import { prisma } from '@/lib/prisma';
 import { ok, err, unauthorized, forbidden } from '@/lib/api';
 import { createAuditLog } from '@/lib/audit';
@@ -108,19 +108,21 @@ export async function POST(req: NextRequest) {
     metadata: { title: announcement.title, priority: announcement.priority, audience: announcement.audience },
   });
 
-  const recipientRole = announcement.audience === 'BOARD_MEMBERS' ? 'BOARD_MEMBER' : 'RESIDENT';
-  const recipients =
-    recipientRole === 'RESIDENT'
-      ? await prisma.user.findMany({ where: { role: 'RESIDENT', communityId, id: { not: session.id } }, select: { id: true } })
-      : await prisma.user.findMany({
-          where: { role: 'BOARD_MEMBER', id: { not: session.id }, communityAssignments: { some: { communityId } } },
-          select: { id: true },
-        });
-  await sendPushToUsers(recipients.map((r) => r.id), {
-    title: 'New Announcement',
-    body: announcement.title,
-    data: { type: 'announcement', id: announcement.id },
-  });
+  if (!(await isDemoCommunity(communityId))) {
+    const recipientRole = announcement.audience === 'BOARD_MEMBERS' ? 'BOARD_MEMBER' : 'RESIDENT';
+    const recipients =
+      recipientRole === 'RESIDENT'
+        ? await prisma.user.findMany({ where: { role: 'RESIDENT', communityId, id: { not: session.id } }, select: { id: true } })
+        : await prisma.user.findMany({
+            where: { role: 'BOARD_MEMBER', id: { not: session.id }, communityAssignments: { some: { communityId } } },
+            select: { id: true },
+          });
+    await sendPushToUsers(recipients.map((r) => r.id), {
+      title: 'New Announcement',
+      body: announcement.title,
+      data: { type: 'announcement', id: announcement.id },
+    });
+  }
 
   return ok({ announcement }, 201);
 }

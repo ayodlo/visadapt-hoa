@@ -58,6 +58,15 @@ export async function getActiveCommunityId(session: SessionUser): Promise<string
   return accessible[0]?.id ?? null;
 }
 
+// The public demo community never notifies anyone: its logins are shared, so an
+// announcement or comment posted there must not reach a real inbox or device.
+// Every email/push call site with a community in scope checks this first.
+export async function isDemoCommunity(communityId: string | null | undefined): Promise<boolean> {
+  if (!communityId) return false;
+  const community = await prisma.community.findUnique({ where: { id: communityId }, select: { isDemo: true } });
+  return community?.isDemo ?? false;
+}
+
 export function setActiveCommunityCookie(communityId: string): Record<string, string> {
   const isProd = process.env.NODE_ENV === 'production';
   const maxAge = 7 * 24 * 60 * 60;

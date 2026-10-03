@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { sendPasswordResetEmail } from '@/lib/email';
 import { ok, err } from '@/lib/api';
 import { rateLimit } from '@/lib/rate-limit';
+import { isDemoAccount } from '@/lib/demo';
 
 const schema = z.object({ email: z.string().email() });
 
@@ -18,7 +19,9 @@ export async function POST(req: NextRequest) {
 
   const user = await prisma.user.findUnique({ where: { email: parsed.data.email } });
 
-  if (user) {
+  // Demo logins are shared and their password is public; a reset would lock every
+  // other visitor out. Same response either way so this reveals nothing.
+  if (user && !isDemoAccount(user.id)) {
     const token = crypto.randomBytes(32).toString('hex');
     const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
     await prisma.passwordResetToken.create({ data: { userId: user.id, token, expiresAt } });

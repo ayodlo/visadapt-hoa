@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "communities" ADD COLUMN     "isDemo" BOOLEAN NOT NULL DEFAULT false;

@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
-import { getActiveCommunityId } from '@/lib/community';
+import { getActiveCommunityId, isDemoCommunity } from '@/lib/community';
 import { isStaff } from '@/lib/roles';
 import { ok, err, unauthorized, forbidden, notFound } from '@/lib/api';
 import { sendMaintenanceStatusEmail } from '@/lib/email';
@@ -65,7 +65,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     include: { submittedBy: { select: { id: true, email: true, firstName: true, lastName: true } } },
   });
 
-  if (parsed.data.status && parsed.data.status !== existing.status) {
+  if (parsed.data.status && parsed.data.status !== existing.status && !(await isDemoCommunity(communityId))) {
     sendMaintenanceStatusEmail(
       updated.submittedBy.email,
       updated.submittedBy.firstName,

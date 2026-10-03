@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { isAdmin } from '@/lib/roles';
+import { DEMO_ACCOUNTS, DEMO_PASSWORD, isDemoLoginEnabled } from '@/lib/demo';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -14,6 +15,10 @@ export default function LoginPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    await signIn(email, password);
+  }
+
+  async function signIn(loginEmail: string, loginPassword: string) {
     setError('');
     setLoading(true);
     try {
@@ -21,7 +26,7 @@ export default function LoginPage() {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email: loginEmail, password: loginPassword }),
       });
 
       const data = await res.json();
@@ -85,6 +90,28 @@ export default function LoginPage() {
             {loading ? 'Signing in…' : 'Sign in'}
           </button>
         </form>
+
+        {isDemoLoginEnabled() && (
+          <section aria-labelledby="demo-heading" className="mt-6 border-t border-gray-200 pt-6">
+            <h3 id="demo-heading" className="text-sm font-semibold text-gray-900">Try the demo</h3>
+            <p className="mt-1 mb-3 text-sm text-gray-600">
+              Explore a sample community as any role. Changes are reset every night.
+            </p>
+            <div className="grid grid-cols-3 gap-2">
+              {DEMO_ACCOUNTS.map((account) => (
+                <button
+                  key={account.id}
+                  type="button"
+                  disabled={loading}
+                  onClick={() => signIn(account.email, DEMO_PASSWORD)}
+                  className="border border-gray-300 rounded-lg py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                >
+                  {account.label}
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
 
         <p className="mt-4 text-sm text-center text-gray-600">
           Don&apos;t have an account? Contact your HOA administrator to be added.

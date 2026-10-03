@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
-import { getActiveCommunityId } from '@/lib/community';
+import { getActiveCommunityId, isDemoCommunity } from '@/lib/community';
 import { isStaff } from '@/lib/roles';
 import { sendPushToUsers } from '@/lib/push';
 import { sendNewMaintenanceRequestEmail } from '@/lib/email';
@@ -94,6 +94,8 @@ async function notifyStaffOfNewRequest(
   urgent = false
 ) {
   try {
+    if (await isDemoCommunity(communityId)) return;
+
     const recipients = await prisma.user.findMany({
       where: {
         id: { not: actorId },

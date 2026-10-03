@@ -38,8 +38,12 @@ model Community {
   // current behaviour (residents are never surcharged). Nothing reads this yet —
   // surcharging is regulated in some states and is a Phase 2 product decision.
   absorbsProcessingFees  Boolean @default(true)
+  // The public demo community (see lib/demo.ts). Its data is wiped and reseeded
+  // nightly by /api/cron/demo-reset, and it never sends email or push — anyone
+  // can sign in to it, so nothing it does may reach a real inbox or device.
+  isDemo                 Boolean @default(false)
 
-  users                 User[]
+  users                User[]
   communityAssignments  CommunityAssignment[]
   properties            Property[]
   vendors               Vendor[]

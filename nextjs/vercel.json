@@ -4,6 +4,10 @@
     {
       "path": "/api/cron/autopay?dryRun=1",
       "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/demo-reset",
+      "schedule": "0 10 * * *"
     }
   ]
 }

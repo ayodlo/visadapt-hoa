@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
 import { ok, err, unauthorized, notFound } from '@/lib/api';
+import { isDemoAccount } from '@/lib/demo';
 
 const schema = z.object({
   currentPassword: z.string().min(1),
@@ -13,6 +14,7 @@ const schema = z.object({
 export async function POST(req: NextRequest) {
   const session = await getSession();
   if (!session) return unauthorized();
+  if (isDemoAccount(session.id)) return err('The demo account password cannot be changed', 403);
 
   const body = await req.json().catch(() => null);
   const parsed = schema.safeParse(body);

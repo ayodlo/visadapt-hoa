@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
 import { getActiveCommunityId } from '@/lib/community';
 import { isAdmin } from '@/lib/roles';
+import { isDemoAccount } from '@/lib/demo';
 import { ok, err, unauthorized, forbidden, notFound } from '@/lib/api';
 
 const schema = z.object({
@@ -56,6 +57,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   const { id } = await params;
   const existing = await assertAccessible(id, session, communityId);
   if (!existing) return notFound('User');
+  if (isDemoAccount(id)) return err('Demo accounts cannot be changed', 403);
 
   const body = await req.json().catch(() => null);
   const parsed = schema.safeParse(body);
@@ -82,6 +84,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
 
   const existing = await assertAccessible(id, session, communityId);
   if (!existing) return notFound('User');
+  if (isDemoAccount(id)) return err('Demo accounts cannot be deleted', 403);
 
   await prisma.user.delete({ where: { id } });
   return ok({ deleted: true });
