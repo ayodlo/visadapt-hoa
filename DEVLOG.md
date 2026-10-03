@@ -2,6 +2,40 @@
 
 ---
 
+## 2026-10-03 (Public demo community; per-community maintenance request numbers)
+
+**Files changed:**
+- `nextjs/lib/demo.ts` (new) — client-safe demo constants: `DEMO_COMMUNITY_ID` (`community_public_demo`, "Willow Creek HOA (Demo)"), three logins with fixed ids (`resident@` / `board@` / `manager@demo.portalhoa.local`, password `try-portal-hoa`), `isDemoAccount()`, `isDemoLoginEnabled()`.
+- `nextjs/lib/demo-seed.ts` (new) — `resetDemoCommunity(prisma)`: one transaction (120 s timeout), wipes only rows in the demo community or owned by the fixed demo user ids, then rebuilds 12 residents, properties, dues/payments/allocations, announcements, events, polls, documents, issues, maintenance, arch requests, violations + appeal. All dates relative to now.
+- `nextjs/prisma/seed-demo.ts` (new) + `npm run seed:demo`; `nextjs/app/api/cron/demo-reset/route.ts` (new, CRON_SECRET bearer, GET+POST); `nextjs/vercel.json` — nightly `0 10 * * *`.
+- `nextjs/prisma/schema.prisma` + `migrations/20261002120000_add_community_is_demo` — `Community.isDemo`.
+- `nextjs/lib/community.ts` — `isDemoCommunity()`; checked before every email/push in 9 routes (announcements, issue comments ×2, arch decisions ×2, violation notice, appeal decision, maintenance new/status).
+- `nextjs/app/api/auth/change-password`, `forgot-password`, `users/[id]` — demo logins can't change/reset password, can't be role-changed or deleted (403; forgot-password answers identically but issues nothing).
+- `nextjs/app/(auth)/login/page.tsx` — "Try the demo" buttons behind `NEXT_PUBLIC_DEMO_LOGIN=1` (documented in `.env.example`).
+- `nextjs/prisma/migrations/20261003120000_request_number_unique_per_community`, `lib/maintenance.ts` (`nextRequestSequence`), `app/api/maintenance/route.ts` — maintenance numbering fix (below).
+- Tests: `__tests__/workflow/demo-accounts.test.ts`, `__tests__/lib/demo.test.ts`, `nextRequestSequence` cases in `__tests__/lib/maintenance.test.ts`. 330 vitest.
+
+**Decisions made:**
+- **Separate demo seed, not `prisma/seed.ts`.** `seed.ts` calls unfiltered `deleteMany({})` on announcements, charges, payments, issues, arch requests and violations — it wipes every community. Never run it against prod.
+- Shared public logins (all three roles) + nightly reset, chosen by the user over read-only or manual-reset options. Notifications suppressed via a DB flag rather than fake email domains.
+- Demo has no Stripe account by design — balances show, nobody can pay.
+- **Maintenance numbers:** `requestNumber` was globally unique but allocated per community, so a second community collided with the first after 5 retries. Also `count()+1` reused numbers after deletes. Now `@@unique([communityId, requestNumber])` and the next number is one past the highest this year (numeric compare, survives > 9999).
+
+**Verification:** tsc/eslint clean, 330 vitest. Dev DB (`ep-fancy-dew`): both migrations applied; demo reset run 3× (3.5 s), other communities' row counts identical before/after, 0 ledger-invariant violations. Live dev server: all three demo logins + dashboards 200; demo change-password 403; admin delete of demo board 403; two resident submissions got MR-2026-0005/0006 while `community_default_seed` holds 0001–0008.
+
+**Next steps (go-live of the demo):**
+1. Vercel: set `NEXT_PUBLIC_DEMO_LOGIN=1` (build-time — redeploy after) and confirm `CRON_SECRET` is set.
+2. After the deploy migrates prod, create the data once: `POST /api/cron/demo-reset` with `Authorization: Bearer $CRON_SECRET`, or `npm run seed:demo` with the prod `DATABASE_URL`.
+3. Open items: demo visitors can still upload files to S3 (private, but storage grows); demo document links are placeholders (`cdn.example.com`); notification suppression has no direct test.
+4. Still owed from before: Stripe payment-method config (sandbox + live), autopay against real Stripe, Accounts v2, refunds, autopay-failure email, overdue ager.
+
+**Gotchas:**
+- PowerShell 5.1 `Set-Content -Encoding utf8` writes a BOM — a commit message file written that way puts an invisible character at the start of the subject. Write message files with a BOM-free writer.
+- Killing `next dev` mid-write can truncate `.next/dev/types/routes.d.ts`, which then breaks `tsc --noEmit` with hundreds of syntax errors. Delete `.next/dev/types` and rerun.
+- `node -e "..."` from PowerShell loses the inner double quotes; put throwaway scripts in a file.
+
+---
+
 ## 2026-09-23 (First real ACH payment — and the webhook-ordering bug it exposed)
 
 **Files changed:**
