@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs';
 import type { Prisma, PrismaClient } from '@prisma/client';
 import { DEMO_ACCOUNTS, DEMO_COMMUNITY_ID, DEMO_COMMUNITY_NAME, DEMO_PASSWORD } from './demo';
+import { formatRequestNumber } from './maintenance';
 
 /**
  * Wipe and rebuild the public demo community.
@@ -276,17 +277,18 @@ async function rebuild(tx: Tx, passwordHash: string): Promise<DemoResetResult> {
   });
 
   // ── Maintenance requests ────────────────────────────────────────────────────
-  // requestNumber is left null on purpose: it is unique across ALL communities but
-  // allocated per community (app/api/maintenance/route.ts), so seeded numbers here
-  // would collide with a real community's first requests.
+  // Numbered oldest first, like the app does. Unique per community only, so these
+  // cannot collide with a real community's numbers.
+  const maintenanceYear = new Date(now).getUTCFullYear();
+  let maintenanceSeq = 0;
   await tx.maintenanceRequest.createMany({
     data: [
+      { resident: 9, title: 'Pool gate not latching', description: 'The pool gate swings open instead of self-closing.', status: 'RESOLVED' as const, priority: 'URGENT' as const, category: 'POOL_SPA' as const, locationType: 'COMMON_AREA' as const, residentUrgency: 'EMERGENCY' as const, propertyScope: 'HOA_COMMON' as const, age: 15 },
       { resident: 0, title: 'Irrigation leak by the side yard', description: 'Water pooling on the common strip next to my driveway whenever the sprinklers run.', status: 'IN_PROGRESS' as const, priority: 'MEDIUM' as const, category: 'IRRIGATION' as const, locationType: 'EXTERIOR' as const, residentUrgency: 'NORMAL' as const, propertyScope: 'HOA_COMMON' as const, age: 5 },
       { resident: 3, title: 'Clubhouse restroom faucet dripping', description: 'The left faucet in the women\'s restroom will not shut off fully.', status: 'OPEN' as const, priority: 'LOW' as const, category: 'PLUMBING' as const, locationType: 'COMMON_AREA' as const, residentUrgency: 'LOW' as const, propertyScope: 'HOA_COMMON' as const, age: 2 },
       { resident: 5, title: 'Fence panel down after the storm', description: 'A section of the perimeter fence behind my house blew down. The backyard is open to the trail.', status: 'SUBMITTED' as const, priority: 'HIGH' as const, category: 'FENCING' as const, locationType: 'EXTERIOR' as const, residentUrgency: 'HIGH' as const, propertyScope: 'SHARED' as const, age: 0 },
-      { resident: 9, title: 'Pool gate not latching', description: 'The pool gate swings open instead of self-closing.', status: 'RESOLVED' as const, priority: 'URGENT' as const, category: 'POOL_SPA' as const, locationType: 'COMMON_AREA' as const, residentUrgency: 'EMERGENCY' as const, propertyScope: 'HOA_COMMON' as const, age: 15 },
     ].map(({ resident, age, ...m }) => ({
-      ...m, requestNumber: null, preferredContactMethod: 'EMAIL' as const, propertyId: propertyId(resident),
+      ...m, requestNumber: formatRequestNumber(maintenanceYear, ++maintenanceSeq), preferredContactMethod: 'EMAIL' as const, propertyId: propertyId(resident),
       submittedById: RESIDENTS[resident].id, communityId: C, createdAt: daysAgo(age), updatedAt: daysAgo(age),
     })),
   });

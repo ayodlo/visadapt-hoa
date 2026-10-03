@@ -8,7 +8,7 @@ import { isStaff } from '@/lib/roles';
 import { sendPushToUsers } from '@/lib/push';
 import { sendNewMaintenanceRequestEmail } from '@/lib/email';
 import { ok, err, unauthorized } from '@/lib/api';
-import { formatRequestNumber, isEmergency, maintenanceRequestSchema, staffQuickRequestSchema } from '@/lib/maintenance';
+import { formatRequestNumber, isEmergency, maintenanceRequestSchema, nextRequestSequence, staffQuickRequestSchema } from '@/lib/maintenance';
 import { copyS3Object, deleteS3Object, headS3Object } from '@/lib/s3';
 import {
   MAX_DIRECT_UPLOAD_BYTES,
@@ -43,26 +43,28 @@ export async function GET() {
 }
 
 /**
- * Allocate the next per-year request number.
+ * Allocate the next per-community, per-year request number.
  *
  * Retried because two concurrent submissions can derive the same sequence; the
- * unique index on `requestNumber` is what actually guarantees correctness, and
- * this loop just turns that collision into a fresh attempt.
+ * unique index on (communityId, requestNumber) is what actually guarantees
+ * correctness, and this loop just turns that collision into a fresh attempt.
+ * Each attempt re-reads the highest number, so it picks up the winner's.
  */
 async function createWithRequestNumber(
   data: Omit<Prisma.MaintenanceRequestUncheckedCreateInput, 'requestNumber'>,
   attempts = 5
 ) {
   const year = new Date().getUTCFullYear();
-  const yearStart = new Date(Date.UTC(year, 0, 1));
 
   for (let attempt = 0; attempt < attempts; attempt++) {
-    const used = await prisma.maintenanceRequest.count({
-      where: { communityId: data.communityId, createdAt: { gte: yearStart } },
+    const taken = await prisma.maintenanceRequest.findMany({
+      where: { communityId: data.communityId, requestNumber: { startsWith: `MR-${year}-` } },
+      select: { requestNumber: true },
     });
+    const sequence = nextRequestSequence(taken.map((r) => r.requestNumber), year);
     try {
       return await prisma.maintenanceRequest.create({
-        data: { ...data, requestNumber: formatRequestNumber(year, used + 1 + attempt) },
+        data: { ...data, requestNumber: formatRequestNumber(year, sequence) },
         include: INCLUDE,
       });
     } catch (error) {

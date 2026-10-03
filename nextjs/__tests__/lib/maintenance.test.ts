@@ -14,6 +14,7 @@ import {
   labelFor,
   maintenanceRequestSchema,
   needsAccessDetails,
+  nextRequestSequence,
   specificLocationsFor,
 } from '@/lib/maintenance';
 
@@ -126,6 +127,26 @@ describe('formatRequestNumber', () => {
 
   it('does not truncate beyond four digits', () => {
     expect(formatRequestNumber(2026, 12345)).toBe('MR-2026-12345');
+  });
+});
+
+describe('nextRequestSequence', () => {
+  it('starts at 1 for a community with no numbers this year', () => {
+    expect(nextRequestSequence([], 2026)).toBe(1);
+    expect(nextRequestSequence([null, null], 2026)).toBe(1);
+  });
+
+  it('goes one past the highest, so deleted requests never cause a reuse', () => {
+    // 0002..0004 deleted: a count would say 2 and hand out the taken 0003.
+    expect(nextRequestSequence(['MR-2026-0001', 'MR-2026-0005'], 2026)).toBe(6);
+  });
+
+  it('ignores other years and unnumbered rows', () => {
+    expect(nextRequestSequence(['MR-2025-0090', null, 'MR-2026-0003'], 2026)).toBe(4);
+  });
+
+  it('compares numerically past four digits', () => {
+    expect(nextRequestSequence(['MR-2026-9999', 'MR-2026-10000'], 2026)).toBe(10001);
   });
 });
 

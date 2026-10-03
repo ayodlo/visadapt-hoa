@@ -167,11 +167,30 @@ export const staffQuickRequestSchema = z.object({
 /**
  * Human-readable request number, e.g. `MR-2026-0007`.
  *
- * The sequence is per year and derived from a count, so it stays readable for
- * residents quoting it back to staff. Uniqueness is enforced by the database.
+ * The sequence is per community and per year, so it stays readable for residents
+ * quoting it back to staff. Uniqueness is enforced by the database on
+ * (communityId, requestNumber).
  */
 export function formatRequestNumber(year: number, sequence: number): string {
   return `MR-${year}-${String(sequence).padStart(4, '0')}`;
+}
+
+/**
+ * The next sequence for `year`, given the numbers a community already holds:
+ * one past the highest, not one past the count. A count goes backwards when a
+ * request is deleted and would then hand out numbers that are still taken.
+ * Compared numerically because the padding stops at four digits, so
+ * `MR-2026-10000` sorts before `MR-2026-9999` as a string.
+ */
+export function nextRequestSequence(existing: readonly (string | null)[], year: number): number {
+  const prefix = `MR-${year}-`;
+  let max = 0;
+  for (const n of existing) {
+    if (!n?.startsWith(prefix)) continue;
+    const seq = Number(n.slice(prefix.length));
+    if (Number.isInteger(seq) && seq > max) max = seq;
+  }
+  return max + 1;
 }
 
 export function labelFor(choices: readonly Choice[], value: string | null | undefined): string {
