@@ -1,0 +1,55 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> >> /Contents 6 0 R >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>
+endobj
+6 0 obj
+<< /Length 1379 >>
+stream
+BT /F2 9 Tf 56 760 Td (WILLOW CREEK HOMEOWNERS ASSOCIATION) Tj ET
+BT /F2 18 Tf 56 734 Td (Operating Budget \(Adopted\)) Tj ET
+BT /F1 9 Tf 56 706 Td (Sample document for the Willow Creek HOA demo. Not a real governing document.) Tj ET
+BT /F2 12 Tf 56 674 Td (Income) Tj ET
+BT /F1 10.5 Tf 56 656 Td (Monthly assessments \(12 lots x $275 x 12 months\) ......... $39,600) Tj ET
+BT /F1 10.5 Tf 56 635 Td (Late fees and other income ......................................... $400) Tj ET
+BT /F2 12 Tf 56 608 Td (Expenses) Tj ET
+BT /F1 10.5 Tf 56 590 Td (Landscaping \(Evergreen Grounds Co.\) ...................... $12,000) Tj ET
+BT /F1 10.5 Tf 56 569 Td (Pool service and chemicals .................................... $6,500) Tj ET
+BT /F1 10.5 Tf 56 548 Td (Utilities \(common areas\) ........................................ $5,200) Tj ET
+BT /F1 10.5 Tf 56 527 Td (Insurance ............................................................. $4,800) Tj ET
+BT /F1 10.5 Tf 56 506 Td (Management and administration ............................. $4,000) Tj ET
+BT /F1 10.5 Tf 56 485 Td (Gate and access systems ........................................ $1,500) Tj ET
+BT /F1 10.5 Tf 56 464 Td (Reserve contribution ............................................. $6,000) Tj ET
+BT /F2 12 Tf 56 437 Td (Total) Tj ET
+BT /F1 10.5 Tf 56 419 Td (Income $40,000. Expenses $40,000. Balanced budget.) Tj ET
+endstream
+endobj
+7 0 obj
+<< /Title (Operating Budget \(Adopted\)) /Producer (Portal HOA demo) >>
+endobj
+xref
+0 8
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000251 00000 n 
+0000000348 00000 n 
+0000000450 00000 n 
+0000001881 00000 n 
+trailer
+<< /Size 8 /Root 1 0 R /Info 7 0 R >>
+startxref
+1968
+%%EOF

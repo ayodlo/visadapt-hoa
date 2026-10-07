@@ -2,7 +2,8 @@ import { NextRequest } from 'next/server';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { getSession } from '@/lib/auth';
-import { getActiveCommunityId } from '@/lib/community';
+import { getActiveCommunityId, isDemoCommunity } from '@/lib/community';
+import { DEMO_UPLOADS_DISABLED } from '@/lib/demo';
 import { ok, err, unauthorized } from '@/lib/api';
 import { getPresignedUploadUrl } from '@/lib/s3';
 import {
@@ -37,6 +38,7 @@ export async function POST(req: NextRequest) {
 
   const communityId = await getActiveCommunityId(session);
   if (!communityId) return err('No community selected', 400);
+  if (await isDemoCommunity(communityId)) return err(DEMO_UPLOADS_DISABLED, 403);
 
   const body = await req.json().catch(() => null);
   const parsed = schema.safeParse(body);

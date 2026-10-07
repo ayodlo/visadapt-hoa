@@ -229,8 +229,9 @@ async function rebuild(tx: Tx, passwordHash: string): Promise<DemoResetResult> {
   });
 
   // ── Documents ───────────────────────────────────────────────────────────────
-  // External links only: the demo must not write to, or depend on, the S3 bucket.
-  const DOCS = 'https://cdn.example.com/willow-creek';
+  // Served from nextjs/public/demo-documents/ rather than the S3 bucket: the demo
+  // must not write to or depend on it. Each fileName below must match a file there.
+  const DOCS = '/demo-documents';
   await tx.document.createMany({
     data: [
       { title: 'Declaration of CC&Rs', description: 'Covenants, conditions and restrictions for Willow Creek.', category: 'CC_AND_RS' as const, fileName: 'Willow-Creek-CCRs.pdf' },

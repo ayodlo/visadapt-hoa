@@ -2,7 +2,8 @@ import { NextRequest } from 'next/server';
 import { randomUUID } from 'node:crypto';
 import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
-import { getActiveCommunityId } from '@/lib/community';
+import { getActiveCommunityId, isDemoCommunity } from '@/lib/community';
+import { DEMO_UPLOADS_DISABLED } from '@/lib/demo';
 import { ok, err, unauthorized, forbidden, notFound } from '@/lib/api';
 import { deleteS3Object, getPresignedViewUrl, uploadToS3 } from '@/lib/s3';
 import { eventImageKey, validateImage } from '@/lib/uploads';
@@ -20,6 +21,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   const communityId = await getActiveCommunityId(session);
   if (!communityId) return err('No community selected', 400);
+  if (await isDemoCommunity(communityId)) return err(DEMO_UPLOADS_DISABLED, 403);
 
   const { id } = await params;
   const event = await prisma.event.findUnique({ where: { id } });

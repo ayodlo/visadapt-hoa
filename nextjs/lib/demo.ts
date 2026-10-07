@@ -45,6 +45,12 @@ export function isDemoAccount(userId: string): boolean {
   return DEMO_ACCOUNT_IDS.has(userId);
 }
 
+/**
+ * Returned by every upload route in the demo community. Anyone can sign in
+ * there, so it must not be a way to put arbitrary files in our bucket.
+ */
+export const DEMO_UPLOADS_DISABLED = 'File uploads are turned off in the demo community.';
+
 /** Whether the login page offers the demo buttons. Off unless explicitly enabled. */
 export function isDemoLoginEnabled(): boolean {
   return process.env.NEXT_PUBLIC_DEMO_LOGIN === '1';

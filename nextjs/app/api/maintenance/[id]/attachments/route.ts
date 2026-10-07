@@ -2,7 +2,8 @@ import { NextRequest } from 'next/server';
 import { randomUUID } from 'node:crypto';
 import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
-import { getActiveCommunityId } from '@/lib/community';
+import { getActiveCommunityId, isDemoCommunity } from '@/lib/community';
+import { DEMO_UPLOADS_DISABLED } from '@/lib/demo';
 import { isStaff } from '@/lib/roles';
 import { ok, err, unauthorized, notFound } from '@/lib/api';
 import { getPresignedDownloadUrl, getPresignedViewUrl, uploadToS3 } from '@/lib/s3';
@@ -74,6 +75,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   const communityId = await getActiveCommunityId(session);
   if (!communityId) return err('No community selected', 400);
+  if (await isDemoCommunity(communityId)) return err(DEMO_UPLOADS_DISABLED, 403);
 
   const { id } = await params;
   if (!(await loadRequest(id, communityId, session.id, isStaff(session.role)))) {

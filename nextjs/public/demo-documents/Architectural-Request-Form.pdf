@@ -1,0 +1,56 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> >> /Contents 6 0 R >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>
+endobj
+6 0 obj
+<< /Length 1377 >>
+stream
+BT /F2 9 Tf 56 760 Td (WILLOW CREEK HOMEOWNERS ASSOCIATION) Tj ET
+BT /F2 18 Tf 56 734 Td (Architectural Change Request Form) Tj ET
+BT /F1 9 Tf 56 706 Td (Sample document for the Willow Creek HOA demo. Not a real governing document.) Tj ET
+BT /F1 10.5 Tf 56 680 Td (Submit this form, or use Architectural Requests in Portal HOA, before starting any exterior) Tj ET
+BT /F1 10.5 Tf 56 665 Td (change. Allow up to 30 days for review.) Tj ET
+BT /F2 12 Tf 56 638 Td (Owner) Tj ET
+BT /F1 10.5 Tf 56 620 Td (Name: ______________________________ Address: ______________________________) Tj ET
+BT /F2 12 Tf 56 593 Td (Type of Change) Tj ET
+BT /F1 10.5 Tf 56 575 Td ([ ] Fence [ ] Exterior paint [ ] Landscaping [ ] Solar [ ] Roof [ ] Shed [ ] Other) Tj ET
+BT /F2 12 Tf 56 548 Td (Description) Tj ET
+BT /F1 10.5 Tf 56 530 Td (Describe the change, materials and colors. Attach a site plan showing location and) Tj ET
+BT /F1 10.5 Tf 56 515 Td (dimensions.) Tj ET
+BT /F1 10.5 Tf 56 494 Td (______________________________________________________________________________) Tj ET
+BT /F1 10.5 Tf 56 473 Td (______________________________________________________________________________) Tj ET
+BT /F2 12 Tf 56 446 Td (Desired Start Date) Tj ET
+BT /F1 10.5 Tf 56 428 Td (____________________) Tj ET
+BT /F1 10.5 Tf 56 407 Td (Owner signature: ______________________________ Date: ____________) Tj ET
+endstream
+endobj
+7 0 obj
+<< /Title (Architectural Change Request Form) /Producer (Portal HOA demo) >>
+endobj
+xref
+0 8
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000251 00000 n 
+0000000348 00000 n 
+0000000450 00000 n 
+0000001879 00000 n 
+trailer
+<< /Size 8 /Root 1 0 R /Info 7 0 R >>
+startxref
+1971
+%%EOF
